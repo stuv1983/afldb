@@ -9,7 +9,8 @@
 # Container flags (never --privileged): --network none --cgroupns=private --tmpfs /run --tmpfs /run/lock --cap-add SYS_ADMIN (systemd
 # as PID 1) --cap-add DAC_READ_SEARCH --cap-add SYS_PTRACE (the two capabilities the root facts reader's unit keeps; Docker's default
 # set lacks them; production root has them) --security-opt apparmor=unconfined. Labels r7v.run=<RID> on the image and containers.
-# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|pull-log|down [--keep-image]
+# r8: the image adds sudo, used only by r8-sudo-on (arm gets sudo INSIDE the prod container for scenario h; r8-sudo-off removes it).
+# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh|pull-log|down [--keep-image]
 set -uo pipefail; export LC_ALL=C
 [ "$(hostname)" != afldb-prod ] || { echo "REFUSED: rehearsal never runs on production"; exit 2; }
 WS=${1:?workspace}; RID=${2:?rid}; CMD=${3:?command}; KEEP=${4:-}
@@ -32,7 +33,7 @@ up)
   echo "== r7v host up $(date -u +%FT%TZ) host=$(hostname) user=$(id -un) day=$DAY docker $(docker version -f '{{.Server.Version}}')"
   if ! docker image inspect "$IMG" > /dev/null 2>&1; then
     mkdir -p "$WS/build"
-    printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps postgresql-16 openssh-server openssh-client rsync netcat-openbsd python3 cron tzdata && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
+    printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps postgresql-16 openssh-server openssh-client rsync netcat-openbsd python3 cron tzdata sudo && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
       "$PIN" "$LBL" > "$WS/build/Dockerfile"
     docker build --label "$LBL" -t "$IMG" "$WS/build" > "$WS/build/build.log" 2>&1 || { tail -20 "$WS/build/build.log"; echo "STOP image build failed"; exit 1; }
   fi
@@ -66,7 +67,7 @@ EOF
   echo "R7V HOSTKEY prod $(docker exec "$A" bash "$CT" hostkey)"; echo "R7V HOSTKEY offhost $(docker exec "$B" bash "$CT" hostkey)"
   echo "R7V READY";;
 hostile) for c in "$A" "$B"; do echo "== $c hostile"; docker exec "$c" bash "$CT" hostile; done;;
-tamper|untamper|forge|unforge) docker exec "$A" bash "$CT" "$CMD";;
+tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh) docker exec "$A" bash "$CT" "$CMD";;
 pull-log) docker exec "$B" bash "$CT" pull-log;;
 down)
   n=$(docker ps -aq --filter "label=$LBL" | wc -l); [ "$n" = 0 ] || docker ps -aq --filter "label=$LBL" | xargs -r docker rm -f > /dev/null

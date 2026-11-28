@@ -23,6 +23,12 @@
 #   [HARNESS]      this script's own judgement (never an input to the gate)
 # Scenarios (argument 1): genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted
 #                         genuine-rd rearm-in-rd post-pub-fail (review round 1)
+#                         arm-sudo (r8): [FIXTURE] arm gets sudo INSIDE this container only; install-backup.sh run as root through
+#                         arm's sudo (su arm, then sudo; with SUDO_* removed; with arm's shell replaced by exec sudo) is REFUSED
+#                         ("REFUSED: root session descends from arm: <test>") and changes nothing; then the owner install (root, not
+#                         through arm) and verify-backup-install.sh --as-arm; the scenario ends there (no timer run)
+# r8, every scenario: arm's checks are verify-backup-install.sh --as-arm, run by root (setpriv to arm, no login): acceptance
+# evidence; the old run in an arm session (env -i) is kept as INFO only.
 # The last line printed is "SCENARIO <name> PASS|FAIL ...".
 set -uo pipefail; export LC_ALL=C
 SC=${1:?scenario}; FIX=/in/fix; DAY=${R7B_DAY:?}; TD=${R7B_TD:?}; DAYC=${DAY//-/}
@@ -56,8 +62,9 @@ dump_waiting() { # seconds count: at least <count> pg_dump backends wait on the 
   local i; for i in $(seq 1 $(( $1 * 5 ))); do [ "$(pg -c "SELECT count(*) FROM pg_stat_activity WHERE application_name='pg_dump' AND wait_event_type='Lock'")" -ge "$2" ] && return 0; sleep 0.2; done; return 1; }
 
 # ------------------------------------------------------------------------------------------------------------------ scenario table
-EXPECT=refused; KIND=scheduled; TIMER=early; LOCK=0; HOLD=0; RET=0; REFUSAL=; ARMSUITE=0; RD=0
+EXPECT=refused; KIND=scheduled; TIMER=early; LOCK=0; HOLD=0; RET=0; REFUSAL=; ARMSUITE=0; RD=0; ARMSUDO=0
 case $SC in
+  arm-sudo)         EXPECT=none; ARMSUDO=1;;
   genuine-rd)       EXPECT=attributed; RD=1;;
   rearm-in-rd)      EXPECT=attributed; KIND=catch-up; TIMER=at-td; RD=1;;
   post-pub-fail)    REFUSAL='has no valid completion record';;
@@ -123,6 +130,31 @@ if [ "$SC" = genuine ]; then
   refuse_case "a bundle file not matching SHA256SUMS" /opt/r7b-tamper
   rm -rf /home/r7b-stage /opt/r7b-gw /opt/r7b-tamper
 fi
+if [ "$ARMSUDO" = 1 ]; then
+  hdr "r8: install-backup.sh as root THROUGH ARM'S SUDO [FIXTURE: arm's sudo exists inside this container only; FIXTURE-ATTACK: arm's session]"
+  command -v sudo > /dev/null || { hfail "sudo is not in the image"; }
+  printf 'arm ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/r8-arm-fixture; chmod 0440 /etc/sudoers.d/r8-arm-fixture
+  L FIXTURE "/etc/sudoers.d/r8-arm-fixture: arm ALL=(ALL) NOPASSWD: ALL (container only); arm's session: $(su -s /bin/bash arm -c 'id; true' < /dev/null 2>&1)"
+  snap() { { getent passwd afldb-backup; getent group afldb-backup afldb-backup-read; id arm; ls -la --time-style=+%s $CODE $DR $DID 2>&1
+             systemctl show afldb-backup.service -p DropInPaths; } | sha256sum | cut -c1-64; }
+  S0=$(snap); L HARNESS "state digest before (accounts, $CODE, $DR, $DID, DropInPaths): $S0"
+  sudo_case() { # label command-run-by-arm expected-test
+    local o rc; o=$(cd / && su -s /bin/bash arm -c "$2" < /dev/null 2>&1); rc=$?
+    echo "   [FIXTURE-ATTACK] su -s /bin/bash arm -c '$2'  ($1)"
+    printf '%s\n' "$o" | sed 's/^/   | /'
+    if [ "$rc" = 1 ] && grep -q "^REFUSED: root session descends from arm: .*$3" <<< "$o" && grep -qx 'BACKUP INSTALL RESULT FAIL (nothing was changed)' <<< "$o" \
+       && [ "$(snap)" = "$S0" ] && ! grep -q 'bundle .* verified' <<< "$o"; then hok "$1: REFUSED ($3 fired), exit 1, state digest unchanged"
+    else hfail "$1: not refused cleanly (exit $rc, state $(snap))"; fi
+  }
+  sudo_case "sudo in an arm session" "sudo -n bash $STAGE/install-backup.sh $STAGE; exit \$?" "test SUDO_USER: SUDO_USER=arm"
+  sudo_case "sudo with SUDO_USER/SUDO_UID removed, arm's shell kept" \
+    "sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash $STAGE/install-backup.sh $STAGE; exit \$?" "test ancestor: pid [0-9]* (bash)"
+  sudo_case "exec sudo with SUDO_* removed (arm's shell replaced; sudo itself is the arm-uid ancestor)" \
+    "exec sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash $STAGE/install-backup.sh $STAGE" "test ancestor: pid [0-9]* (sudo)"
+  L HARNESS "loginuid of this root session: $(cat /proc/$$/loginuid) (the container cannot set one without CAP_AUDIT_CONTROL; the loginuid test is not exercised here)"
+  rm -f /etc/sudoers.d/r8-arm-fixture; L FIXTURE "arm's sudo removed before the owner install"
+  [ "$(snap)" = "$S0" ] && hok "after the three refusals the state digest still equals the one before ($S0)" || hfail "state changed during the refusals"
+fi
 (cd / && bash $STAGE/install-backup.sh $STAGE) > $OUT/install.out 2>&1; IRC=$?
 echo "install-backup.sh $STAGE (root): exit $IRC"; sed 's/^/   | /' $OUT/install.out
 [ "$IRC" = 0 ] || { hfail "install-backup.sh exited $IRC"; echo "SCENARIO $SC FAIL install failed"; exit 1; }
@@ -134,11 +166,31 @@ echo 'afldbbackup afldb-backup afldb_backup' >> $I
 pg -c 'SELECT pg_reload_conf()' > /dev/null
 L FIXTURE "owner step 1 applied as printed: pg_hba first line '$(grep -m1 -v '^#' $H)', pg_ident '$(grep afldbbackup $I)', pg_reload_conf()"
 (cd / && bash $STAGE/verify-backup-install.sh) > $OUT/verify-root.out 2>&1; VRR=$?
+(cd / && bash $STAGE/verify-backup-install.sh --as-arm) > $OUT/verify-asarm.out 2>&1; VRAA=$?
 (cd /home/arm && as_arm bash $STAGE/verify-backup-install.sh) > $OUT/verify-arm.out 2>&1; VRA=$?
 echo "verify-backup-install.sh as root: exit $VRR"; sed 's/^/   | /' $OUT/verify-root.out
-echo "verify-backup-install.sh as arm (new login, env -i): exit $VRA"; sed 's/^/   | /' $OUT/verify-arm.out
+echo "[REAL] verify-backup-install.sh --as-arm, run by root (r8 ACCEPTANCE path: setpriv to arm, no login, stdin /dev/null, new session): exit $VRAA"
+sed 's/^/   | /' $OUT/verify-asarm.out
+echo "[INFO] verify-backup-install.sh in an arm session (setpriv env -i, the r7 path; INFO only, not acceptance evidence): exit $VRA"; sed 's/^/   | /' $OUT/verify-arm.out
 usermod -a -G afldb-backup-read r7reader
-[ "$VRR" = 0 ] && [ "$VRA" = 0 ] && hok "verify-backup-install.sh PASS as root and as arm" || hfail "verify-backup-install.sh root $VRR arm $VRA"
+DROPPED=$(sed -n 's/^dropped identity ([^)]*): //p' $OUT/verify-asarm.out)
+L HARNESS "dropped identity logged by --as-arm: ${DROPPED:-none}"
+if [ "$VRR" = 0 ] && [ "$VRAA" = 0 ] && [[ $(tail -1 $OUT/verify-asarm.out) == "BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),"*"(afldb-backup-read)"* ]] \
+   && [[ $DROPPED == "uid=1000(arm) gid=1000(arm) "* ]] && grep -q '^\[as arm\] PASS this arm process carries afldb-backup-read' $OUT/verify-asarm.out \
+   && grep -q '^\[as arm\] AS-ARM CHILD RESULT PASS' $OUT/verify-asarm.out && [ "$(grep -c '^BACKUP INSTALL RESULT' $OUT/verify-asarm.out)" = 1 ]; then
+  hok "verify-backup-install.sh PASS as root and --as-arm (dropped identity: $DROPPED)"
+else hfail "verify-backup-install.sh root $VRR --as-arm $VRAA ($(tail -1 $OUT/verify-asarm.out | cut -c1-160))"; fi
+[ "$VRA" = 0 ] && [[ $(tail -1 $OUT/verify-arm.out) == "BACKUP INSTALL RESULT INFO-ONLY pass in arm's own session"* ]] \
+  && hok "the arm-session run (INFO) ends INFO-ONLY, not 'BACKUP INSTALL RESULT PASS'" || hfail "the arm-session run (INFO) ended $(tail -1 $OUT/verify-arm.out | cut -c1-120) exit $VRA"
+if [ "$ARMSUDO" = 1 ]; then
+  grep -q '^session check: no ancestor of pid' $OUT/install.out && hok "the owner install (root, not through arm) passed the session check: $(grep -m1 '^session check' $OUT/install.out | cut -c1-160)" \
+    || hfail "the owner install printed no passing session check"
+  o=$(cd /home/arm && as_arm bash $STAGE/verify-backup-install.sh --as-arm 2>&1); rc=$?
+  echo "--as-arm started by arm itself: exit $rc: $(tail -1 <<< "$o")"
+  [ "$rc" = 1 ] && grep -q '^FAIL --as-arm is run by root' <<< "$o" && hok "--as-arm refuses to run as arm" || hfail "--as-arm run by arm: exit $rc"
+  if [ ${#FAILS[@]} = 0 ]; then echo "SCENARIO $SC PASS installer refused 3 arm-descended root sessions (SUDO_USER; ancestor bash; ancestor sudo), state unchanged; owner install passed the session check; --as-arm PASS as $DROPPED"; exit 0; fi
+  echo "SCENARIO $SC FAIL ${#FAILS[@]} harness failure(s): $(printf '%s; ' "${FAILS[@]}" | cut -c1-400)"; exit 1
+fi
 
 hdr "effective unit and installed paths (REAL-SYSTEMD, as root)"
 systemctl show afldb-backup.service -p User -p Group -p SupplementaryGroups -p FragmentPath -p DropInPaths -p EnvironmentFiles -p ExecStartEx -p ExecStartPostEx \

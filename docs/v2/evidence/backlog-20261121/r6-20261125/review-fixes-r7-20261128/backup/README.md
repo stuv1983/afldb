@@ -15,6 +15,10 @@ chmod or replace anything in `seals/`, `published/`, `state/`, the code or the u
 The gate rule `sealed_origin` reads only root-controlled facts: PID 1, root-owned files, the seal and the published copy. No journal line,
 no arm-owned path and no arm-owned binary is read or executed for origin or the dump.
 
+r8 (R8 `DEPENDENCIES.md`): no provenance (P) dependency is reachable by uid arm without root; the remaining ones need root (F1, an owner
+action) or a superuser arm database role escalating to root (R7 README §4 item 17). The installer now refuses a root session that
+descends from arm (section 4 item 10), and arm's checks of the install run through `--as-arm` (item 11).
+
 ## 2. Files and pinned digests
 
 | File (this directory) | Installed as (root:root unless stated) | sha256 |
@@ -23,10 +27,10 @@ no arm-owned path and no arm-owned binary is read or executed for origin or the 
 | `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `793e94be…` |
 | `70-afldb-backup-sealed.conf` | `/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf` 0644 | `f8a18580…` |
 | `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `1153df78…` |
-| `install-backup.sh` | not installed (owner runs it from the staging directory) | `f433b81a…` |
-| `verify-backup-install.sh` | not installed (read-only check, run as root and as arm) | `f286ea7b…` |
+| `install-backup.sh` | not installed (owner runs it from the staging directory; r8: refuses a root session descending from arm) | `21c33fa4…` (r7: `f433b81a…`) |
+| `verify-backup-install.sh` | not installed (read-only check, run as root, then as root with `--as-arm`) | `f1dcc7db…` (r7: `f286ea7b…`) |
 | repository `tools/maintenance/backup.sh` (staged as `backup.sh`) | `/usr/local/lib/afldb-backup/tools/maintenance/backup.sh` 0755, byte-identical | `df609046…` |
-| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `d0023d10…` |
+| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `d1c11c25…` (r7: `d0023d10…`) |
 
 Full digests: `SHA256SUMS`. `sealed-origin.sh` pins the run, the sealer, `backup.sh` and the drop-in; `verify-backup-install.sh` pins
 `sealed-origin.sh`. If any of those bytes change, re-pin in that order (library, then verify script, then `SHA256SUMS`).
@@ -76,38 +80,73 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
    block; Linux only, not run here: no Node on the workstation).
 9. **Harness image** adds `strace` (DESIGN 6 lists postgresql-16, openssh, rsync, netcat) and the container gets `--cap-add SYS_PTRACE`:
    only for the harness's own FIXTURE hold of the sealer (section 6). Production has no tracer.
+10. **r8 installer guard.** `install-backup.sh` refuses, before any change, a root session that descends from arm: an ancestor
+    (walked from `$$` to PID 1 through `/proc/<pid>/status`) with arm's real or effective uid, `SUDO_USER=arm` or `SUDO_UID` = arm's
+    uid, or `/proc/$$/loginuid` = arm's uid (unset, 4294967295, is allowed). It prints `REFUSED: root session descends from arm:
+    <each test that fired>` and `BACKUP INSTALL RESULT FAIL (nothing was changed)`. A tripwire for `sudo` in an arm session (F1), not
+    a proof: root that arm already holds can start the installer outside its own process tree with an unset loginuid.
+11. **r8 `verify-backup-install.sh --as-arm`.** arm's checks are acceptance evidence only when root runs
+    `verify-backup-install.sh --as-arm`: root re-executes the script's bytes as arm with
+    `setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c <bytes>`, stdin `/dev/null`,
+    no controlling terminal, output sanitised and prefixed `[as arm] `, and judges by the arm process's exit status and the dropped
+    `id` (which must equal root's `id arm`). The bytes, not the path, are passed because the staging directory may be root-only; the
+    file's sha256 and the bytes' sha256 are both printed. A run in an arm session ends `BACKUP INSTALL RESULT INFO-ONLY ...` (arm's
+    login chooses that process). r8 also fixed r7's `seals: bad array subscript` message when no seal exists yet (INFO line only).
+12. **Harness image (r8)** adds `sudo`, used only inside the `arm-sudo` scenario's container.
 
 ## 5. Installation (owner; can be done BEFORE the qualifying backup; the production checkout is never written)
 
 Prerequisites: the base `afldb-backup.service` and `.timer` installed as root-owned copies (not links into the checkout); PostgreSQL with
 the existing read-only role `afldb_backup`; the r6 attest drop-in NOT installed; outside 02:15-02:50; and **root reached by a path that
-does not pass through arm's login** (independent review round 1, **F1**, HIGH, not fixable in code): the console, or a separate
-administrative account with its own key that arm cannot write to. On production root is today reached by the owner's `sudo` inside an
-arm SSH session; a hostile arm login environment can capture or reuse that root, and then G1 does not hold (whoever holds root can
-write seals and published dumps). Creating such a path is a host-account change needing owner approval; production `sudoers` is
-unchecked. Every later root action (step 3's `sudo -u postgres`, rollback) must use the same path.
+does not pass through arm's login** (independent review round 1, **F1**, HIGH, not fixable in code). That means the provider console
+logged in **as root**, or the admin root session of `../../review-fixes-r8-20261128/OWNER-PROCEDURE.md` (r8): the separate account
+`afldb-admin` with its own key and password, then `sudo -k; sudo /usr/bin/bash --noprofile --norc`. On production root is today
+reached by the owner's `sudo` inside an arm SSH session. A hostile arm login environment can capture or reuse that root, and then G1
+does not hold, because whoever holds root can write seals and published dumps. None of these qualifies: `sudo` in an arm session,
+`ssh afldb … sudo`, or a console login as arm. Creating the admin path is a host-account change needing owner approval
+(OWNER-PROCEDURE Phases 0–1), and production `sudoers` is unchecked. Every step below and every rollback step runs in that admin root
+session (or at the console as root), and arm's session is never used for any of them. `install-backup.sh` refuses a root session that
+descends from arm (r8): an ancestor with real or effective uid arm, `SUDO_USER`/`SUDO_UID` = arm, or loginuid = arm. It prints
+`REFUSED: root session descends from arm` and changes nothing. That refusal is a tripwire, not proof; OWNER-PROCEDURE Phase 2 is the
+proof.
 
 1. Stage the bundle in a new root-owned directory outside `/home` (e.g. `install -d -m 0755 /root/afldb-r7-backup`): the seven files of
    `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `d0023d10…` (this README)
-   and `sha256sum -c SHA256SUMS`.
-2. `bash /root/afldb-r7-backup/install-backup.sh /root/afldb-r7-backup` as root. It refuses staging under `/home`, group/other-writable
+   and `sha256sum -c SHA256SUMS`. r8 sets the source of these bytes and the pin:
+   * The only source is a `git archive` of `<R8-PIN:tested-rev>` made in the owner's **workstation** clone and hashed there. It
+     travels over the admin path, and the admin root session re-verifies it against the workstation value (OWNER-PROCEDURE 2.1,
+     3.1–3.2).
+   * Never copy from arm's checkout `/home/arm/projects/afldb`, never run git as root there, and never read the expected digest from
+     a file on production.
+   * The pin becomes `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682`, since r8 changes `install-backup.sh` and `verify-backup-install.sh`.
+2. `bash /root/afldb-r7-backup/install-backup.sh /root/afldb-r7-backup` as root in the admin root session. It refuses a session that
+   descends from arm (r8, above), staging under `/home`, group/other-writable
    staging, any mismatch with `SHA256SUMS`, a library/bundle pin mismatch, a missing helper, an unloaded or untrusted base unit, the r6
    attest drop-in, and a running backup. It creates group `afldb-backup-read`, system user `afldb-backup` (`--system --user-group`,
    home `/nonexistent`, shell `/usr/sbin/nologin`, no supplementary group), adds arm to `afldb-backup-read`, creates the directories of
    DESIGN 2, installs the code and the drop-in, runs `systemctl daemon-reload`, and self-checks with `sealed_origin_install`.
 3. PostgreSQL (the install prints these; it does not edit them): `pg_ident.conf` += `afldbbackup afldb-backup afldb_backup`;
    `pg_hba.conf` += `local afldb_prod afldb_backup peer map=afldbbackup` **before any broader `local` line**; then
-   `sudo -u postgres psql -c 'SELECT pg_reload_conf()'` (a reload, not a restart).
-4. `bash verify-backup-install.sh` as root, then as arm **in a new login** (arm's existing sessions do not carry the new group): both must
-   print `BACKUP INSTALL RESULT PASS` (root: peer login works as afldb_backup; arm: cannot list staging, cannot write any directory, can
-   list published, cannot authenticate as afldb_backup).
+   `sudo -u postgres psql -c 'SELECT pg_reload_conf()'` (a reload, not a restart). The edits and the reload run in the admin root
+   session; there `runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'` is the same command without a second sudo.
+4. From the admin root session, run `bash verify-backup-install.sh` (root's checks), then `bash verify-backup-install.sh --as-arm`
+   (r8). With `--as-arm`, root drops to arm itself: `setpriv --reuid=arm --regid=arm --init-groups --reset-env`,
+   `/usr/bin/bash --noprofile --norc`, stdin `/dev/null`. The fresh process carries the new group without arm's login or startup
+   files; this replaces r7's "as arm in a new login". Both must print `BACKUP INSTALL RESULT PASS`. For root, that means peer login
+   works as afldb_backup. For arm, it means arm cannot list staging, cannot write any directory, can list published, and cannot
+   authenticate as afldb_backup.
 5. streamanator: the off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged; arm reads
-   through `afldb-backup-read`). Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
+   through `afldb-backup-read`). Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`. This is an
+   unprivileged change to arm's own files (the forced `rrsync -ro` path in production arm's `authorized_keys`, and streamanator's pull
+   configuration), with no root step. The pull's authenticity is not relied on: G0B checks the copy. G0B itself is only as
+   independent as streamanator's root path (OWNER-PROCEDURE §8). streamanator's arm is in `docker`, `lxd` and `sudo`.
 6. Leave the timer alone. The next 02:20 run writes `/var/lib/afldb-backup/seals/<invocation>.seal` and publishes the dump; until then
    every gate STOPs (`0 seals … in the window`), by design.
 
 ## 6. Rollback
 
+Every rollback command runs in the admin root session (or at the console as root), never in an arm session. That covers the
+`rm`, `daemon-reload`, `gpasswd`, the pg line edits and the reload (`runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'`).
 `rm /etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf && systemctl daemon-reload`: the unit runs as before (User=arm,
 `scheduled-backup.sh backup` in the checkout, `/home/arm/backups/afldb-scheduled`). Optional, afterwards: `gpasswd -d arm afldb-backup-read`,
 remove the pg_hba/pg_ident lines and reload. Keep `/var/lib/afldb-backup` (published dumps and seals are backups and evidence) until the
@@ -165,3 +204,7 @@ and role grant; owner pg edit applied by the harness; the two HOLDS (a root psql
 * A `Persistent=` catch-up whose PostgreSQL dependency takes more than 5 s is a false STOP (unchanged from r6); two seals in the window
   (a start by hand after the timer's run) STOP as ambiguous.
 * Disk: the published copy and the staging copy coexist during sealing (2x one dump).
+* r8: the installer guard (section 4 item 10) is a tripwire, not a proof of an independent root path; the `loginuid` test is not
+  exercised by the harness (a container cannot set loginuid without `CAP_AUDIT_CONTROL`). Under `--as-arm`, another arm process can
+  write text into the arm child's output pipe (same uid); it appears only as `[as arm]` data and cannot change the exit status that
+  decides the result.

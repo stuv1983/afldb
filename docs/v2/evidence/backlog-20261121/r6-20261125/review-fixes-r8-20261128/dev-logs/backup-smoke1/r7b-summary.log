@@ -1,0 +1,3 @@
+SCENARIO arm-sudo PASS installer refused 3 arm-descended root sessions (SUDO_USER; ancestor bash; ancestor sudo), state unchanged; owner install passed the session check; --as-arm PASS as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+containers left with label r7b.run=smoke1: 0; images with label r7b.run=smoke1: 1
+R7 BACKUP HARNESS RESULT PASS

@@ -315,7 +315,11 @@ This merges both READMEs (backup §9, verify §9); nothing is dropped. Where the
 `ARM-PRODUCED` or "arm data".
 
 1. **The weekly restore evidence.** arm's `last-verify.json`, the FAILED markers in arm's `.state` and the restored dump file are
-   arm's, because the restore runs as arm. Its journal side is trusted; the state files are not.
+   arm's, because the restore runs as arm. r8 correction: the journal side is **not** trusted as a whole. `afldb-backup-verify.service`
+   runs arm's checkout script (`tools/maintenance/scheduled-backup.sh verify`) as arm, so the restore journal line's content and the
+   exit status PID 1 records as `Result=success` are arm-authored. Only the journald trusted fields (`_SYSTEMD_UNIT`,
+   `_SYSTEMD_INVOCATION_ID`, the receipt time) and PID 1's timer and start facts are trusted: they prove that the scheduled unit ran
+   and when, not what it restored (R8 `DEPENDENCIES.md` §3.1).
 2. **The application itself.** The release directories, `release.json`, `events.log`, and the HTTP answers of `/api/health` and
    `_buildManifest.js` come from arm's processes. The verifier proves which release directory the running MainPID uses (kernel cwd),
    not that its content is what was built.
@@ -356,46 +360,94 @@ Added after the independent review (round 1), all nine items of its list, none d
 16. **Denial.** arm can force G0 and A-2 to STOP at will (markers, process names, port 3100, large files, `/tmp`, a full disk, a
     stopped service). Not a forging risk: a STOP never becomes a PASS.
 17. **Unknown, to check on the host:** whether arm's PostgreSQL role is a superuser. If it is, it can act as OS user `postgres`
-    (for example `COPY … TO PROGRAM`), which owns `pg_hba.conf` and `pg_ident.conf`, the files holding both peer maps, so it could
-    let arm authenticate as `afldb_backup` or `afldb_verify`. Check before installing (`SELECT rolsuper FROM pg_roles WHERE rolname
-    = <arm's role>`, as postgres, through the F1 root path).
+    (for example `COPY … TO PROGRAM`). r8, precisely (R8 `DEPENDENCIES.md` §3.2). As `postgres` it **could**: edit `pg_hba.conf`
+    and `pg_ident.conf` and reload, so arm authenticates as `afldb_backup` or `afldb_verify` (data it can already read; nothing over
+    the seal or the verdict); change what the server answers, including the bytes the sealed run's `pg_dump` receives (content, not
+    provenance: item 7) and the lines of item 10; stop or break the server (a STOP); impersonate the server on the postgres-owned
+    socket directory. It **could not**, without a further escalation: write `/var/lib/afldb-backup`, either code directory, `/etc/systemd`
+    or `/etc/ssh`; read staging; signal or ptrace `afldb-backup`, the root sealer or `afldb-verify`; alter a dump after `pg_dump`
+    wrote it; forge `_UID=0` or `_SYSTEMD_UNIT` journal fields or PID 1 facts; reach the root facts socket. A postgres-to-root
+    escalation through root tooling that handles postgres-owned files was not reviewed, so treat a superuser arm role as a step
+    toward F1: check before installing (`SELECT rolsuper FROM pg_roles WHERE rolname = <arm's role>`, as postgres, through the F1
+    root path) and revoke it if set.
 18. **Look-alike verdict text (review round 2, N1, INFO).** The neutraliser prefixes only lines containing the exact phrases
     `OWNER VERDICT` / `AFLDB-VERIFY RESULT`; arm-influenced text such as `OWNER  VERDICT`, `VERDlCT` or a phrase split across lines
     reaches Stu's terminal as an indented data line. It is never the last line and never authenticated: only the wrapper's own
     `OWNER VERDICT` line, and its exit status, are the verdict. Read nothing else as one.
 
+Added in r8 (the dependency review, R8 `DEPENDENCIES.md`, which classifies every item above and every trusted input):
+
+19. **The seven A-2 arguments.** They come from the Tuesday record, printed by arm-run scripts over arm's login; A-2 checks that the
+    live host matches them and nothing checks them against an independent source. Example: arm kills the application after the
+    owner's Tuesday restart, systemd restarts it with a new `InvocationID`, and a hostile login prints that ID as the owner's; A-2's
+    InvocationID line then PASSes. So an **`OWNER VERDICT A2 PASS` establishes that the live production host matched these seven
+    arguments at `at=`**, not that the arguments are right. The wrapper prints this as an `A2 SCOPE:` line before the verdict, and
+    each A-2 PASS line that rests on arm's data carries `[ARM-PRODUCED ...]`. `backup-origin=attributed` alone rests on root and
+    PID 1 evidence. The G0 counterpart (`G0 SCOPE:`): the off-host pull-log lineage is ARM-PRODUCED.
+20. **streamanator's root.** streamanator's arm is in the groups `sudo`, `docker` and `lxd` (observed 28 Nov 2026); `docker` and
+    `lxd` are root-equivalent, so an off-host `afldb-verify` installed there today would rest on streamanator's arm: it could replace
+    that verifier and its answers. G2 for the G0b half needs arm out of those groups there (owner action), or an explicit acceptance
+    that the off-host half rests on streamanator's arm.
+21. **The installer guard is a tripwire, not a proof (r8).** `install-backup.sh` and `install-verify.sh` now refuse, before any
+    change, a root session that descends from arm (an ancestor with arm's real or effective uid, `SUDO_USER`/`SUDO_UID` = arm, or
+    loginuid = arm), printing `REFUSED: root session descends from arm: <test>`. That catches the documented mistake (item 9: `sudo`
+    in an arm session). It cannot catch root that arm already holds, which can start an installer outside its own process tree
+    (`systemd-run`, `at`, cron) with a clean environment and an unset loginuid. Item 9 stays an owner action.
+22. **arm's checks of the backup install (r8).** "verify-backup-install.sh as arm in a new login" let arm's login choose the process
+    that judged arm's permissions. Acceptance is now root's `verify-backup-install.sh --as-arm` (setpriv to arm without arm's login,
+    stdin `/dev/null`, a new session, output sanitised and prefixed `[as arm] `, verdict by the arm process's exit status and the
+    dropped `id`); a run in an arm session ends `BACKUP INSTALL RESULT INFO-ONLY ...`. Another arm process can still write text into
+    that child's output pipe (same uid); such text is shown only as `[as arm]` data and cannot change the exit status.
+
 ## 5. Installation prerequisites and order (owner; nothing here was installed)
 
 All of these must be met **before the qualifying 02:20 backup**, the 02:20 run of the gate date. They run:
 * outside 02:15–02:50;
-* as root reached by a path that does **not** pass through arm's login: the console, or a separate administrative account with its
-  own key that arm cannot write to (review round 1, **F1**; §4 item 9). `sudo` in an arm SSH session does not qualify. No such path
-  exists on production today; creating it is a host-account change needing owner approval, and production `sudoers` is unchecked.
-  Every later root action (the `postgres` steps, rollback, every root step of the plan) uses the same path;
-* after checking that arm's PostgreSQL role is not a superuser (§4 item 17);
-* from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision
-  `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
+* as root reached by a path that does **not** pass through arm's login (review round 1, **F1**; §4 item 9): the provider console
+  logged in **as root**, or the admin root session of `../review-fixes-r8-20261128/OWNER-PROCEDURE.md` (r8), that is, the separate
+  account `afldb-admin` with its own key and password, then `sudo -k; sudo /usr/bin/bash --noprofile --norc`. None of these
+  qualifies: `sudo` in an arm SSH session, `ssh afldb … sudo`, or a console login **as arm** (with or without `sudo`/`su` after it).
+  No such path exists on production today; OWNER-PROCEDURE Phases 0–1 create and verify it before any change to existing access,
+  and production `sudoers` is unchecked. Every later root action uses the same session: the `runuser -u postgres` steps, the
+  pg_hba/pg_ident edits and reloads, rollback, and every root step of the plan. arm's SSH session carries only unprivileged, pinned
+  scripts and data;
+* after OWNER-PROCEDURE Phase 2 (r8) has established, among its other checks, that arm's PostgreSQL roles are not superusers (§4
+  item 17; checks D1/D4);
+* from root-owned staging directories outside `/home`. The bytes are a `git archive` of the tested revision
+  `<R8-PIN:tested-rev>`, made in the owner's **workstation** clone, hashed there, and carried over the admin path. The admin root
+  session re-verifies them against the workstation value. Never copy them from arm's checkout, never run git as root in it, and
+  never read an expected digest from a file on production. (r7 named `7d69302007568d3141a567c8eba89e4ee473c9a6` here; r8 changes
+  the installers, so the pin moves.)
 
 Nothing writes the production checkout, so P1/P2's clean-tree checks are unchanged. The operator text is in the release runbook §4.1a
 and the R6 plan's r7 note.
 
 1. **Production, R7/backup** (backup README §5).
    * Preconditions: the base units are root-owned copies, not links; no r6 attest drop-in; the zone file is a root-owned regular file.
-   * Check `SHA256SUMS` `d0023d10…` (review round 1), then run `install-backup.sh`.
-   * Add the `pg_ident`/`pg_hba` lines before any broader `local` line, then reload.
-   * `verify-backup-install.sh` must print `BACKUP INSTALL RESULT PASS` as root and as arm in a new login.
+   * Check `SHA256SUMS` `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682` (r7: `d0023d10…`), then run `install-backup.sh` in the admin root session. It
+     refuses (`REFUSED: root session descends from arm`) a root session that descends from arm (r8).
+   * In the same session, add the `pg_ident`/`pg_hba` lines before any broader `local` line, then reload.
+   * `verify-backup-install.sh` must print `BACKUP INSTALL RESULT PASS` twice, both run from the admin root session: once as root,
+     and once with `--as-arm` (r8). With `--as-arm`, root drops to arm through
+     `setpriv --reuid=arm --regid=arm --init-groups --reset-env`, `/usr/bin/bash --noprofile --norc` and stdin `/dev/null`, so the
+     process carries the new group without arm's login or startup files. This replaces r7's "as arm in a new login".
 2. **Production, R7/verify** (verify README §8, §10). It needs group `afldb-backup-read`, so step 1 comes first.
    * Preconditions: `/usr/bin/python3.12`, group `systemd-journal`, `/usr/lib/postgresql/16/bin/psql`, `Include
      /etc/ssh/sshd_config.d/*.conf` at the top of `sshd_config`, and Stu's new key pair.
-   * Run `install-verify.sh --role prod --key …`.
-   * Apply `verifier-db.sql` as postgres, add the `pg-auth-lines.txt` lines, and reload.
-   * Run `verify-verify-install.sh --role prod`.
-3. **streamanator** (owner, root there).
+   * In the admin root session, run `install-verify.sh --role prod --key …`. The key is Stu's verify public key, carried over the
+     admin path and fingerprint-checked against the workstation. The installer refuses a session that descends from arm (r8).
+   * In the same session, apply `verifier-db.sql` with `runuser -u postgres`, add the `pg-auth-lines.txt` lines, and reload.
+   * Run `verify-verify-install.sh --role prod` in the same session.
+3. **streamanator** (owner; root there reached by an independent path as in OWNER-PROCEDURE §8). How the owner reaches root there
+   is UNKNOWN. streamanator's arm is in `docker`, `lxd` and `sudo`, all root-equivalent, so until the owner decides otherwise
+   `G0B PASS` is attested by a host arm controls. It can forge the off-host claim, not the dump bytes.
    * Run `install-verify.sh --role offhost --key …`, then `verify-verify-install.sh --role offhost`.
-   * The pull source becomes `<prod>:/var/lib/afldb-backup/published/`.
+   * The pull source becomes `<prod>:/var/lib/afldb-backup/published/`. This is an unprivileged edit of arm's own files: the forced
+     `rrsync -ro` path in production arm's `authorized_keys`, and streamanator's pull configuration. No root step is involved.
    * Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
 4. **Workstation.**
-   * Stage `verify/` from `7d693020` and run `sha256sum -c SHA256SUMS` (`221b254a…`; wrapper `BUNDLE_SHA` `df3457cc…`).
+   * Stage `verify/` from `<R8-PIN:tested-rev>` in the owner's own clone and run `sha256sum -c SHA256SUMS`
+     (`3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd`; wrapper `BUNDLE_SHA` `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`; r7: `7d693020`, `221b254a…`, `df3457cc…`).
    * Run `afldb-verify-call.sh version`. It must print `OWNER VERDICT VERSION PASS` for both hosts.
 
 Until then, and until a sealed timer run exists for the gate date, G0 and A-2 STOP, by design. Rollback: backup README §6.
@@ -415,6 +467,20 @@ All implementation deviations are accepted except two:
   foresee it.
 
 V2 records that system helpers (python, bash, systemctl, journalctl, psql) are trusted by path and ownership, not by digest.
+
+r8 (not in DESIGN §7; each changes the packet, none changes the seal format `/4`, `.done`, the dispatch-kind rule, a refusal or a
+date gate):
+* **R8-1 installer guard** (§4 item 21): both installers refuse a root session descending from arm before any change. A tripwire.
+* **R8-2 `verify-backup-install.sh --as-arm`** (§4 item 22): the arm process receives the script's **bytes** with `bash -c`, not its
+  path, because the staging directory may be root-only (arm could not open the path); it prints the file's sha256 and the sha256 of
+  the bytes passed, which must be equal. The arm-session run is INFO only.
+* **R8-3 `install-verify.sh` trust order**: r7 sourced the staging `bundle/lib.sh` before checking that the staging was trusted. r8
+  checks the path (and refuses `/home`), every component and lib.sh's digest first, and executes `verify-verify-install.sh` only when
+  it is trusted and equals its line in the packet `SHA256SUMS`, checked before any change.
+* **R8-4 wrapper `version` exit**: r7 exited 0 even when a host answered STOP; r8 exits 1 unless both hosts answer an authenticated
+  PASS. The wrapper also prints `A2 SCOPE:` / `G0 SCOPE:` lines (§4 item 19) before the verdict; the `OWNER VERDICT` line format is
+  unchanged.
+* **R8-5 labels**: A-2 and G0b PASS lines that rest on arm's data carry `[ARM-PRODUCED ...]`; no check changed.
 
 ## 7. What remains unproven
 

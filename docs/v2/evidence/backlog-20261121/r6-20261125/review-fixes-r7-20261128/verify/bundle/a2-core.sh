@@ -221,18 +221,18 @@ done
 
 echo "-- 4. services and the release (outcome $OUTC)"
 for u in postgresql@16-main afldb caddy; do [ "$(systemctl is-active "$u")" = active ] && ok "$u active" || bad "$u $(systemctl is-active "$u")"; done
-if attested_invocation "$ATT"; then echo "INVOCATION_ID $AI_ID"; ok "live InvocationID = the owner-attested $ATT (Tuesday ${TUE#tue:}; from the sitting record)"
+if attested_invocation "$ATT"; then echo "INVOCATION_ID $AI_ID"; ok "live InvocationID = the owner-attested $ATT (Tuesday ${TUE#tue:}; from the sitting record) [ARM-PRODUCED input: the attested value is an A-2 argument from the Tuesday record, printed by arm-run scripts over arm's login; the live value is PID 1's]"
 else echo "INVOCATION_ID none (the live InvocationID was not validated: nothing to carry to F-2)"; bad "InvocationID: $AI_WHY"; fi
 systemctl show afldb -p NRestarts -p MainPID -p ActiveEnterTimestamp --no-pager | sed 's/^/     /'
 MAIN=$(systemctl show afldb -p MainPID --value); NW=0; [[ $MAIN =~ ^[1-9][0-9]*$ ]] && NW=$(pgrep -P "$MAIN" | wc -l)
-[ "$NW" = 2 ] && ok "exactly 2 worker processes" || bad "worker processes $NW (expected 2)"
+[ "$NW" = 2 ] && ok "exactly 2 worker processes [ARM-PRODUCED: arm's processes; the parent is PID 1's MainPID]" || bad "worker processes $NW (expected 2)"
 if [ "$RFOK" = 1 ] && [ "${RF[checkout_present]:-}" = yes ]; then
-  [ "${RF[current_link]:-}" = "releases/$CUR" ] && ok "current = $CUR" || bad "current = $(san "${RF[current_link]:-${RF[current_link_error]:-?}}" 120) (expected $CUR)"
+  [ "${RF[current_link]:-}" = "releases/$CUR" ] && ok "current = $CUR [ARM-PRODUCED: arm's link; CURRENT_ID is an A-2 argument from the Tuesday record]" || bad "current = $(san "${RF[current_link]:-${RF[current_link_error]:-?}}" 120) (expected $CUR)"
   info "previous = $(san "${RF[previous_link]:-${RF[previous_link_error]:-?}}" 120); checkout HEAD $(san "${RF[checkout_head]:-${RF[checkout_head_error]:-?}}" 80) (read as files: arm data)"
-  if serving_release "$CUR"; then ok "release status (r7 verifier port of release.mjs status, read-only): one result line 'STATUS PASS $CUR', process cwd = the release, health and BUILD_ID manifests, no unattested restart"
+  if serving_release "$CUR"; then ok "release status (r7 verifier port of release.mjs status, read-only): one result line 'STATUS PASS $CUR', process cwd = the release, health and BUILD_ID manifests, no unattested restart [ARM-PRODUCED: release dirs, release.json, events.log, HTTP answers and the process cwd are arm's; MainPID and InvocationID are PID 1's]"
   else bad "the release status port does not prove $CUR is serving: $SR_WHY"; fi
   U=${RF[env_url_count]:-}; S=${RF[env_secret_count]:-}
-  if [ "$OUTC" = accepted ]; then [ "$U/$S" = 1/1 ] && ok "env counts 1/1 (arm-owned .env, counted by the root facts reader)" || bad "env counts $(san "$U/$S" 40) (accepted A1 left 1/1)"; else info "env counts $U/$S (outcome $OUTC: record)"; fi
+  if [ "$OUTC" = accepted ]; then [ "$U/$S" = 1/1 ] && ok "env counts 1/1 (arm-owned .env, counted by the root facts reader) [ARM-PRODUCED]" || bad "env counts $(san "$U/$S" 40) (accepted A1 left 1/1)"; else info "env counts $U/$S (outcome $OUTC: record)"; fi
   dash "$VB/afldb-settle-failure-status.sh" 2>&1 | sed 's/^/     /'; info "settle-failure-status rc ${PIPESTATUS[0]} (packet R6 prerequisite 5: recorded before the reboot; pinned bundle copy)"
   CS=$(sha256sum < /etc/caddy/Caddyfile | cut -d' ' -f1)
   if [ "$R4" = r4:yes ]; then [ "$CS" = f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d ] && ok "Caddyfile = R4 f00859d5" || bad "Caddyfile $CS (r4:yes expects f00859d5)"
@@ -240,7 +240,7 @@ if [ "$RFOK" = 1 ] && [ "${RF[checkout_present]:-}" = yes ]; then
   a=$(sha256sum < /etc/needrestart/conf.d/50-afldb-hold.conf 2>/dev/null); b=$(sha256sum < /etc/apt/apt.conf.d/52-afldb-unattended 2>/dev/null)
   [ "${a%% *}" = "$PIN_NEEDRESTART" ] && [ "${b%% *}" = "$PIN_APT52" ] \
     && ok "R1 host policy installed (both files equal the pinned repo digests)" || bad "R1 host policy not installed (packet R6 prerequisite 4)"
-  [ "${RF[a1_baseline]:-}" = nonempty ] && ok "A1 raw-head baseline present (post-reboot raw-head check runs)" || info "no A1 raw-head baseline: the post-reboot raw-head check is skipped"
+  [ "${RF[a1_baseline]:-}" = nonempty ] && ok "A1 raw-head baseline present (post-reboot raw-head check runs) [ARM-PRODUCED: arm's file]" || info "no A1 raw-head baseline: the post-reboot raw-head check is skipped"
 else bad "no checkout /home/arm/projects/afldb (root facts: $(san "${RF[checkout_present]:-unavailable}" 60))"; fi
 [ -d /var/log/afldb-r5-prefix-retained-20261124 ] && info "R5 directory $(stat -c '%U:%G %a' /var/log/afldb-r5-prefix-retained-20261124)" || info "R5 directory absent"
 
@@ -264,7 +264,7 @@ else
   restore_service_ok=0
   if (( V0 <= vt && vt <= vs && vs <= V1 && vs - vt <= 5 && vs <= vf_end && vf_end <= vf_window )) &&
       [ "$vr" = success ] && [ "$vx" = 0 ]; then
-    ok "afldb-backup-verify.service scheduled run $(mel "$vs") Result=$vr status=$vx"
+    ok "afldb-backup-verify.service scheduled run $(mel "$vs") Result=$vr status=$vx [ARM-PRODUCED: PID 1 records the timer dispatch, start and exit, but the unit runs arm's checkout script as arm, which chooses its exit status]"
     restore_service_ok=1
   else bad "restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window"; fi
   jf() { sed -n "s/.*\"$2\":\"\{0,1\}\([^\",}]*\)\"\{0,1\}[,}].*/\1/p" <<< "$1" | head -1; }
@@ -281,10 +281,10 @@ else
   [ "$va" = 1 ] || info "verify attempts=$(san "$va" 8) (2 = one benign retry; record it)"
   BR=$(systemctl show afldb-backup.service -p Result --value 2>/dev/null)   # sealed install: the failure record is PID 1's Result=
   MA=$(tr '\n' ' ' <<< "${RF[failed_marker]:-}" | cut -d' ' -f1-40)
-  [ "$RFOK" = 1 ] && [ -z "${RF[failed_marker]:-}" ] && [ "$BR" = success ] && ok "no FAILED marker (afldb-backup.service Result=success, PID 1; arm .state clean)" \
+  [ "$RFOK" = 1 ] && [ -z "${RF[failed_marker]:-}" ] && [ "$BR" = success ] && ok "no FAILED marker (afldb-backup.service Result=success, PID 1; arm .state clean) [ARM-PRODUCED in part: arm can delete its own markers; Result= is PID 1's]" \
     || bad "FAILED marker(s): afldb-backup.service Result=$(san "$BR" 40) arm $(san "$MA" 200) $([ "$RFOK" = 1 ] || echo '(arm state unreadable)')"
   BS=$(backup_status "$SLB" "$LVJ"); rc=$?
-  printf '%s\n' "$BS" | sed 's/^/     /'; [ "$rc" = 0 ] && [ "$RFOK" = 1 ] && ok "backup status rc 0 (r7 port of scheduled-backup.sh status)" || bad "backup status not 0 (r7 port of scheduled-backup.sh status)"
+  printf '%s\n' "$BS" | sed 's/^/     /'; [ "$rc" = 0 ] && [ "$RFOK" = 1 ] && ok "backup status rc 0 (r7 port of scheduled-backup.sh status) [ARM-PRODUCED in part: nightly freshness is the sealed root state; restore freshness and markers are arm's .state]" || bad "backup status not 0 (r7 port of scheduled-backup.sh status)"
   shopt -s nullglob; PD=(/var/lib/afldb-backup/published/*.dump); shopt -u nullglob
   info "dumps held: published ${#PD[@]}, arm directory $(san "${RF[dumps_held]:-?}" 8)"
   if trusted_helper "$PSQL"; then
@@ -300,9 +300,9 @@ SQL
   # review round 1, F2: the comment on afldb_restore_test and the migrations ledger are written by arm's role; each line is printed
   # through san() (printable ASCII only), like every other arm-derived value. The checks below still read the raw answer.
   while IFS= read -r ROL; do printf '     %s\n' "$(san "$ROL" 400)"; done <<< "$RO"
-  grep -qx 'ledger|118|118_fixtures_unconfirmed_participants.sql' <<< "$RO" && ok "ledger 118" || bad "ledger differs"
+  grep -qx 'ledger|118|118_fixtures_unconfirmed_participants.sql' <<< "$RO" && ok "ledger 118 [ARM-PRODUCED: arm's database role writes the migrations ledger]" || bad "ledger differs"
   if [ -n "$RESTORE" ] && grep -Fxq "rt|afldb_restore_test|afldb.restore_test.v1 sha256=$vsha|0" <<< "$RO"; then
-    ok "afldb_restore_test comment matches the scheduled restore dump, numbackends 0"
+    ok "afldb_restore_test comment matches the scheduled restore dump, numbackends 0 [ARM-PRODUCED: arm's role creates and comments that database]"
     echo "RESTORE-EVIDENCE $RESTORE"
     echo "RESTORE-SHA $vsha"
   else bad "afldb_restore_test lacks the scheduled restore digest or has active connections"; fi

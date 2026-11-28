@@ -1,0 +1,87 @@
+== dev-a1 2026-11-28T03:10:53Z admin root session: Phase 3 installs, both checks, owner checks before the access change
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step install 2026-11-28T03:10:49Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+---- install-backup.sh (admin root session, staging /root/afldb-r8-backup)
+session check: no ancestor of pid 615 has arm's uid (6 hops to pid 1), SUDO_USER=afldb-admin SUDO_UID=1001, loginuid=1001 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 4 item 9)
+sha256sum: WARNING: 2 computed checksums did NOT match
+install-backup.sh: FAILED
+verify-backup-install.sh: FAILED
+INSTALL REFUSED: the bundle does not match SHA256SUMS
+BACKUP INSTALL RESULT FAIL
+R8P INSTALL-BACKUP exit 1
+t
+---- verify-backup-install.sh as root
+== verify-backup-install 2026-11-28T03:10:49Z as uid=0(root) gid=0(root) groups=0(root)
+FAIL the installed library path is not root-owned without group/other write: 0 755 1 directory;0 755 1 directory;0 755 1 directory;0 755 1 directory;stat: cannot statx '/usr/local/lib/afldb-backup': No such file or directory;stat: cannot statx '/usr/local/lib/afldb-backup/sealed-origin.sh': No such file or directory;
+/root/afldb-r8-backup/verify-backup-install.sh: line 69: /usr/local/lib/afldb-backup/sealed-origin.sh: No such file or directory
+FAIL /usr/local/lib/afldb-backup/sealed-origin.sh has sha256 '', not the pinned 1153df783e622623
+BACKUP INSTALL RESULT FAIL
+R8P VBI-ROOT exit 1
+---- verify-backup-install.sh --as-arm (root drops to arm: setpriv --reset-env, bash --noprofile --norc, stdin /dev/null)
+== verify-backup-install --as-arm 2026-11-28T03:10:49Z as uid=0(root) gid=0(root) groups=0(root)
+script /root/afldb-r8-backup/verify-backup-install.sh: file sha256 97463ebdc92f17051933434817147c85513a4b5a85b2d8af3a09cb3a84ddfd3d, bytes passed to the arm process sha256 97463ebdc92f17051933434817147c85513a4b5a85b2d8af3a09cb3a84ddfd3d
+drop: setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c <script> verify-backup-install.sh --as-arm-child < /dev/null
+dropped identity (setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/id): uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo)
+root's id arm:                                                            uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo)
+[as arm] == verify-backup-install 2026-11-28T03:10:49Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo) (--as-arm child: started by root through setpriv, no login)
+[as arm] FAIL the installed library path is not root-owned without group/other write: 0 755 1 directory;0 755 1 directory;0 755 1 directory;0 755 1 directory;stat: cannot statx '/usr/local/lib/afldb-backup': No such file or directory;stat: cannot statx '/usr/local/lib/afldb-backup/sealed-origin.sh': No such file or directory;
+[as arm] verify-backup-install.sh: line 69: /usr/local/lib/afldb-backup/sealed-origin.sh: No such file or directory
+[as arm] FAIL /usr/local/lib/afldb-backup/sealed-origin.sh has sha256 '', not the pinned 1153df783e622623
+[as arm] AS-ARM CHILD RESULT FAIL
+arm process exit status 1
+BACKUP INSTALL RESULT FAIL (as arm via setpriv, no login: exit 1; dropped identity uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo); id arm uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo))
+R8P VBI-ARM exit 1 mode=as-arm
+---- install-verify.sh --role prod (admin root session, staging /root/afldb-r8-verify)
+bash: /root/afldb-r8-verify/install-verify.sh: No such file or directory
+main: line 61: /root/afldb-r8-verify/verifier-db.sql: No such file or directory
+grep: /root/afldb-r8-verify/pg-auth-lines.txt: No such file or directory
+R8P INSTALL-VERIFY exit 127
+   verifier-db.sql exit 1
+grep: /root/afldb-r8-verify/pg-auth-lines.txt: No such file or directory
+sed: -e expression #1, char 56: expected \ after `a', `c' or `i'
+t
+   pg_hba local lines: local afldb_prod afldb_backup peer map=afldbbackup;local all postgres peer;local all all peer;local replication all peer;
+---- verify-verify-install.sh --role prod as root
+R8P VVI exit 127
+---- owner checks after the installs, BEFORE the access change
+bash: /root/afldb-r8-verify/verify-verify-install.sh: No such file or directory
+== afldb-owner-checks (R6 r8) 2026-11-28T03:10:49Z host=afldb-prod as uid=0
+   script sha256 c4a1e07dfabc0da27bac507761e3722a5eedbe1f2febf10b80e747daeded473a
+CHECK A1 PASS running as root
+CHECK A2 PASS no ancestor of this session has arm's uid, loginuid or SUDO_USER (loginuid 1001; 4294967295 = unset); 741:bash?:uid=0/0:loginuid=1001 595:bash?:uid=0/0:loginuid=1001:sudo=afldb-admin,uid:1001 594:sudo?:uid=1001/0:loginuid=1001 593:sshd?:uid=1001/1001:loginuid=1001 582:sshd?:uid=0/0:loginuid=1001 279:sshd?:uid=0/0:loginuid=4294967295 1:systemd?:uid=0/0:loginuid=4294967295
+CHECK A3 PASS SUDO_USER in this environment: unset
+CHECK B1 FAIL sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+CHECK B4 PASS report: sudo authentication timestamp type: tty; timeout: 15.0 minutes
+CHECK B2 FAIL arm is in: sudo (arm's groups: arm sudo)
+CHECK B3 PASS no sudoers file names arm or %arm (2 file(s) read); include directives: /etc/sudoers.d 
+CHECK B6 PASS report: passwd -S root: L (L locked, P usable)
+CHECK B6 PASS report: passwd -S arm: P (L locked, P usable)
+CHECK B6 PASS report: passwd -S afldb-admin: P (L locked, P usable)
+CHECK C1 PASS arm is in none of docker, lxd, incus-admin, incus, libvirt, disk, shadow; read-only log groups: none
+CHECK C2b PASS no polkit .pkla grants to arm; 1 .rules file(s) read
+CHECK C3 PASS no root-run unit command or EnvironmentFile under /home (2 unit file(s) mention /home; each runs as arm)
+CHECK C4 PASS no root cron entry runs a /home path
+CHECK C5 PASS root's home and startup files are root-owned, not group/other-writable, carry no ACL and do not mention /home/
+CHECK C6 PASS root's authorized keys: 0 ( ); none is one of arm's 1 key fingerprint(s)
+CHECK C7 PASS report: kernel.yama.ptrace_scope=1 (0: arm may ptrace any of its own processes; never run an owner command in an arm session)
+CHECK C8 PASS report: sshd for root: permitrootlogin without-password;pubkeyauthentication yes;passwordauthentication yes;kbdinteractiveauthentication no;permituserrc yes;permituserenvironment no;; sshd_config first directive: line 12:Include /etc/ssh/sshd_config.d/*.conf
+CHECK C9 PASS /etc/ld.so.preload absent
+CHECK D0 PASS PostgreSQL reachable as postgres by peer: 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+CHECK D1 PASS login roles: afldb_app afldb_backup afldb_owner postgres ; with any of super/createrole/replication/bypassrls: postgres(super=t createrole=t replication=t bypassrls=t) 
+CHECK D2 PASS no login role is a member of pg_execute_server_program or pg_write_server_files; pg_read_server_files members: 
+CHECK D3 PASS report: owner of database afldb_prod: afldb_owner
+CHECK D4 PASS arm's DSN roles (names only): DATABASE_URL=>afldb_app AFLDB_OWNER_DATABASE_URL=>afldb_owner AFLDB_BACKUP_DATABASE_URL=>afldb_backup [afldb_app: not superuser, no server program/file role, createrole=false] [afldb_backup: not superuser, no server program/file role, createrole=false] [afldb_owner: not superuser, no server program/file role, createrole=false]
+CHECK D5 PASS pg_hba has no trust line and pg_ident maps neither arm nor a regex to postgres, all, afldb_backup or afldb_verify
+CHECK E0 PASS arm cannot run 'sudo -n true' (no passwordless sudo, no cached ticket reachable from a fresh arm process)
+CHECK E1 PASS as arm (uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo); no startup file, no PAM session) nothing in the protected set or its parents is writable (access(2), ACLs included; 42 paths)
+CHECK E2 PASS every component of the 42 protected paths: not arm-owned, not group/other-writable, no ACL, no link (14 absent, e.g. not installed yet)
+CHECK E3 PASS outside /home,/tmp,/var/tmp,/proc,/sys,/dev,/run/user: no arm-owned, arm-group-writable or world-writable path except: none
+CHECK F1 PASS admin account: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); home /home/afldb-admin; shell /bin/bash
+CHECK F2 PASS arm is not in afldb-admin's primary group
+CHECK F3 PASS afldb-admin may run (ALL) ALL with its own password
+CHECK F4 PASS afldb-admin has a usable password (for sudo; it is typed only in the admin session)
+CHECK F5 PASS afldb-admin authorises 1 key(s) (SHA256:hhOqGs7wobIr/woG+ef4VhNJoF4LgcVHW8Bzgf4CVt0 = the workstation fingerprint); none is arm's; home and startup files trusted
+CHECK F6 FAIL sshd for afldb-admin: forcecommand 'none', pubkeyauthentication yes
+OWNER CHECKS RESULT BLOCKED fail=B1,B2,F6 unknown=none
+R8P CHECKS exit 1

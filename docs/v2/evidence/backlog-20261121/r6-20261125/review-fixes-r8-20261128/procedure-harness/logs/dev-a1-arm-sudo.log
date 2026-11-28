@@ -1,0 +1,8 @@
+== dev-a1 2026-11-28T03:10:40Z arm's login + arm's sudo: the owner checks, and (if guarded) install-backup.sh
+-- as: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+/usr/bin/bash: /opt/afldb-r8-armtest/checks/afldb-owner-checks.sh: No such file or directory
+R8P ARM-CHECKS exit 127
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+bash: /opt/afldb-r8-armtest/backup/install-backup.sh: No such file or directory
+R8P ARM-INSTALL exit 127

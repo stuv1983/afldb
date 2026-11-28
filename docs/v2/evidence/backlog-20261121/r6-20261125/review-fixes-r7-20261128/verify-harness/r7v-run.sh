@@ -3,7 +3,9 @@
 # containers, never production. The documented owner entry point verify/afldb-verify-call.sh runs with the workstation's real ssh
 # client (Windows OpenSSH, as in the runbook), a FRESH test verify key, PINNED container host keys, and the rehearsal transport
 # (ProxyCommand = ssh arm@streamanator `docker exec -i <container> nc 127.0.0.1 22`; the containers stay --network none).
-# Usage: bash r7v-run.sh [--verify-rev <rev>] [--keep-image] <RID>
+# Usage: bash r7v-run.sh [--verify-rev <rev>] [--keep-image] [--log-dir <dir>] <RID>
+#   --log-dir DIR     r8: write the logs to DIR (absolute, or relative to the worktree) instead of verify-harness/logs/ (r8 dev runs:
+#                     R8/dev-logs/...).
 #   --verify-rev REV  every worktree file sent must equal its blob at REV (git show REV:<path>), and no untracked file may sit in the
 #                     verify/ or verify-harness/ directories (logs/ excepted); otherwise the run is refused. Recorded in every log.
 # Scenarios (one summary line each, then "R7 VERIFY HARNESS RESULT PASS|FAIL"):
@@ -19,16 +21,26 @@
 #   g  forged-comment  review round 1, F2: the reviewer's attack (a forged verdict and terminal escapes in the database comment arm's
 #                      role writes) through the owner path: no control byte reaches the output, the forged text appears only on
 #                      '[relayed, neutralised]' lines, and the genuine A-2 verdict and exit equal scenario c's (run right after c)
-# Logs: verify-harness/logs/<RID>-*.log (workstation). Containers, image, workspace and test keys are removed at the end.
+#   r8 additions (R8 DEPENDENCIES.md):
+#   a, c also require the SCOPE line the wrapper prints before the verdict, and the ARM-PRODUCED labels on the arm-produced PASS lines
+#   h  installer-guard  [FIXTURE] arm gets sudo inside the prod container only; the workstation logs in AS ARM by ssh and runs
+#                      sudo install-verify.sh (plain, and with SUDO_* removed): REFUSED "root session descends from arm", and the
+#                      verifier's state digest is unchanged
+#   i  staging-libsh   [FIXTURE-ATTACK] a hostile bundle/lib.sh in an arm-owned, a group-writable and a tampered staging copy: r8's
+#                      install-verify.sh refuses each before sourcing it (no marker); CONTRAST: r7's (the HEAD blob) ran it as root
+#   j  version-exit    wrapper 'version': both hosts PASS -> exit 0 (control); the off-host answer replaced by an authenticated-
+#                      looking VERSION STOP (HARNESS fake transport) -> exit 1; CONTRAST: r7's wrapper (HEAD blob) exited 0
+# Logs: verify-harness/logs/<RID>-*.log (workstation), or --log-dir. Containers, image, workspace and test keys are removed at the end.
 # Development only (never in a recorded run): R7V_IMAGE=<kept image> reuses an image; --keep-image keeps it; R7V_KEEP_CTRS=1 keeps
 # the containers and workspace for inspection (the summary prints the `down` command).
 set -uo pipefail; export LC_ALL=C
-VREV=; KEEPIMG=
-while :; do case ${1:-} in --verify-rev) VREV=${2:?rev}; shift 2;; --keep-image) KEEPIMG=--keep-image; shift;; *) break;; esac; done
+VREV=; KEEPIMG=; LOGDIR=
+while :; do case ${1:-} in --verify-rev) VREV=${2:?rev}; shift 2;; --keep-image) KEEPIMG=--keep-image; shift;; --log-dir) LOGDIR=${2:?dir}; shift 2;; *) break;; esac; done
 RID=${1:?rid}; [[ $RID =~ ^[A-Za-z0-9-]{1,24}$ ]] || { echo "STOP bad RID"; exit 2; }
 WT=/d/dev/afldb-closeout-20261127
 R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128
-HV=$WT/$R7/verify-harness; LOGS=$HV/logs; mkdir -p "$LOGS"
+HV=$WT/$R7/verify-harness; LOGS=$HV/logs
+case $LOGDIR in "") ;; /*) LOGS=$LOGDIR;; *) LOGS=$WT/$LOGDIR;; esac; mkdir -p "$LOGS"
 DEVSSH=(ssh -o BatchMode=yes -i "$HOME/.ssh/afldb_dev" arm@10.0.40.100)
 WSSH=C:/Windows/System32/OpenSSH/ssh.exe; WKEYGEN=C:/Windows/System32/OpenSSH/ssh-keygen.exe
 CALL=$WT/$R7/verify/afldb-verify-call.sh
@@ -65,12 +77,16 @@ bash "$WT/$R7/verify/build-sums.sh" --check | tee -a "$HDR" || { echo "STOP veri
 KD=$(mktemp -d); KDM=$(cygpath -m "$KD"); trap 'rm -rf "$KD"' EXIT
 for k in verify other arm; do "$WKEYGEN" -q -t ed25519 -N '' -C "r7v-$RID-$k" -f "$KDM/$k" > /dev/null || { echo "STOP ssh-keygen"; exit 2; }; done
 mkdir -p "$KD/stage/r7v-keys"; tr -d '\r' < "$KD/verify.pub" > "$KD/stage/r7v-keys/afldb_verify.pub"; tr -d '\r' < "$KD/arm.pub" > "$KD/stage/r7v-keys/arm_key.pub"
+# r8 CONTRAST inputs (HARNESS): the r7 install-verify.sh and wrapper as committed at HEAD (scenarios i and j)
+mkdir -p "$KD/stage/r8-contrast"; git -C "$WT" show "HEAD:$R7/verify/install-verify.sh" > "$KD/stage/r8-contrast/install-verify-r7.sh" \
+  && git -C "$WT" show "HEAD:$R7/verify/afldb-verify-call.sh" > "$KD/call-r7.sh" || { echo "STOP cannot read the r7 contrast blobs at HEAD"; exit 2; }
+echo "[HARNESS] r8 contrast blobs (HEAD $(git -C "$WT" rev-parse --short HEAD)): install-verify-r7.sh $(sha256sum < "$KD/stage/r8-contrast/install-verify-r7.sh" | cut -c1-16)... call-r7.sh $(sha256sum < "$KD/call-r7.sh" | cut -c1-16)..." >> "$HDR"
 echo "[HARNESS] fresh keys: verify $(cut -d' ' -f2 "$KD/verify.pub" | cut -c1-24)... other $(cut -d' ' -f2 "$KD/other.pub" | cut -c1-24)... arm $(cut -d' ' -f2 "$KD/arm.pub" | cut -c1-24)..." >> "$HDR"
 
 # ---- streamanator workspace, containers
 WS=$("${DEVSSH[@]}" 'mktemp -d -p "$HOME" r7v-ws.XXXXXX') || exit 1
 echo "workspace $WS" | tee -a "$HDR"
-tar -C "$WT" -cf - "${SENT[@]}" -C "$KD/stage" r7v-keys | "${DEVSSH[@]}" "mkdir -m 700 '$WS/fix' && tar -C '$WS/fix' -xf - && find '$WS/fix' -type f | wc -l" >> "$HDR"
+tar -C "$WT" -cf - "${SENT[@]}" -C "$KD/stage" r7v-keys r8-contrast | "${DEVSSH[@]}" "mkdir -m 700 '$WS/fix' && tar -C '$WS/fix' -xf - && find '$WS/fix' -type f | wc -l" >> "$HDR"
 HOSTSH="bash '$WS/fix/$R7/verify-harness/r7v-host.sh' '$WS' '$RID'"
 cleanup() { # R7V_KEEP_CTRS=1 (development only): leave the containers and workspace for inspection; remove later with `... down`
   if [ "${R7V_KEEP_CTRS:-}" = 1 ]; then say "KEPT (development): containers and workspace $WS; remove with: $HOSTSH down"
@@ -115,8 +131,11 @@ hdr() { { cat "$HDR"; echo; echo "== scenario $1 ($(date -u +%FT%TZ))"; } > "$2"
 # ---- a: G0 success
 LA=$LOGS/$RID-a-g0-success.log; hdr a "$LA"
 wcall "$LA" g0 "$DAY"; A_OUT=$WOUT; A_RC=$WRC; A_V=$(vline "$WOUT")
-if [ "$A_RC" = 0 ] && [[ $A_V == "OWNER VERDICT G0 PASS transport=rehearsal"* ]] && grep -q '^-- G0b' <<< "$WOUT" && grep -q '^AFLDB-VERIFY RESULT G0B PASS' <<< "$WOUT"; then
-  res a "PASS g0-success: exit 0; $(cut -c1-230 <<< "$A_V")"
+A_LAB=$(grep -c '\[ARM-PRODUCED' <<< "$WOUT")
+{ echo "[HARNESS] r8: SCOPE line: $(grep '^G0 SCOPE: ' <<< "$WOUT" | cut -c1-120)..."; echo "[HARNESS] r8: lines labelled ARM-PRODUCED ($A_LAB):"; grep '\[ARM-PRODUCED' <<< "$WOUT" | cut -c1-200 | sed 's/^/   /'; } >> "$LA"
+if [ "$A_RC" = 0 ] && [[ $A_V == "OWNER VERDICT G0 PASS transport=rehearsal"* ]] && grep -q '^-- G0b' <<< "$WOUT" && grep -q '^AFLDB-VERIFY RESULT G0B PASS' <<< "$WOUT" \
+   && grep -q '^G0 SCOPE: ' <<< "$WOUT" && grep -q '^PASS scheduled pull .*\[ARM-PRODUCED' <<< "$WOUT" && grep -q '^INVOCATION linked .*\[ARM-PRODUCED' <<< "$WOUT"; then
+  res a "PASS g0-success: exit 0, G0 SCOPE line, $A_LAB ARM-PRODUCED label(s); $(cut -c1-230 <<< "$A_V")"
 else res a "FAIL g0-success: exit $A_RC; $(cut -c1-300 <<< "$A_V")"; fi
 
 # ---- c: whole A-2 through the owner path
@@ -126,9 +145,14 @@ NF=$(grep -c '^FAIL ' <<< "$WOUT"); NP=$(grep -c '^PASS ' <<< "$WOUT")
 { echo "[HARNESS] the STOP is the verifier's own: its RESULT line (pinned bundle, this call's nonce) is:"; grep '^AFLDB-VERIFY RESULT' <<< "$WOUT" | sed 's/^/   /'
   echo "[HARNESS] FAIL lines ($NF):"; grep '^FAIL ' <<< "$WOUT" | sed 's/^/   /'
   echo "[HARNESS] PASS lines ($NP):"; grep '^PASS ' <<< "$WOUT" | sed 's/^/   /'; } >> "$LC"
+C_LAB=$(grep -c '^PASS .*\[ARM-PRODUCED' <<< "$WOUT")
+{ echo "[HARNESS] r8: A-2 attribution and whole-A-2 exit, separately: backup-origin=$(sed -n 's/.* backup-origin=\([a-z]*\).*/\1/p' <<< "$C_V"); whole A-2: $(sed -n 's/^OWNER VERDICT A2 \([A-Z]*\).*/\1/p' <<< "$C_V"), wrapper exit $C_RC"
+  echo "[HARNESS] r8: SCOPE line:"; grep '^A2 SCOPE: ' <<< "$WOUT" | sed 's/^/   /'
+  echo "[HARNESS] r8: PASS lines labelled ARM-PRODUCED ($C_LAB):"; grep '^PASS .*\[ARM-PRODUCED' <<< "$WOUT" | sed 's/^/   /'; } >> "$LC"
 if [ "$C_RC" = 1 ] && [[ $C_V == "OWNER VERDICT A2 STOP transport=rehearsal"* ]] && grep -q 'backup-origin=attributed' <<< "$C_V" \
-   && grep -q '^AFLDB-VERIFY RESULT A2 STOP ' <<< "$WOUT" && grep -q '^R6 PRE RESULT STOP' <<< "$WOUT"; then
-  res c "PASS a2-whole: the verifier's own STOP (exit 1, $NF FAIL / $NP PASS lines), backup-origin=attributed reported separately; FAILs: $(grep '^FAIL ' <<< "$WOUT" | cut -c6-60 | tr '\n' '|' | cut -c1-600)"
+   && grep -q '^AFLDB-VERIFY RESULT A2 STOP ' <<< "$WOUT" && grep -q '^R6 PRE RESULT STOP' <<< "$WOUT" \
+   && grep -q '^A2 SCOPE: a PASS establishes that the live production host matched these seven arguments' <<< "$WOUT" && [ "$C_LAB" -ge 8 ]; then
+  res c "PASS a2-whole: the verifier's own STOP (exit 1, $NF FAIL / $NP PASS lines), backup-origin=attributed reported separately; A2 SCOPE line; $C_LAB ARM-PRODUCED PASS lines; FAILs: $(grep '^FAIL ' <<< "$WOUT" | cut -c6-60 | tr '\n' '|' | cut -c1-600)"
 else res c "FAIL a2-whole: exit $C_RC; $(cut -c1-300 <<< "$C_V")"; fi
 
 # ---- g (review round 1, F2): the reviewer's forged database comment, replayed through the owner path
@@ -146,6 +170,40 @@ if [ "$G_RC" = "$C_RC" ] && [ "$(norm <<< "$G_V")" = "$(norm <<< "$C_V")" ] && [
    && [ "$G_FORGED" -ge 1 ] && [ "$G_FORGED" = "$G_NEUT" ] && ! grep -q '^R6 PRE RESULT PASS' <<< "$G_OUT"; then
   res g "PASS forged-comment: the forged text reached the wrapper only as data ($G_NEUT line(s) '[relayed, neutralised] ...', 0 ESC, 0 control bytes); genuine verdict and exit unchanged ($(norm <<< "$G_V" | cut -c1-60)... exit $G_RC)"
 else res g "FAIL forged-comment: exit $G_RC (c: $C_RC) esc=$G_ESC ctl=$G_CTL verdict-lines=$G_NV result-lines=$G_NR forged=$G_FORGED neutralised=$G_NEUT; $(cut -c1-200 <<< "$G_V")"; fi
+
+# ---- h (r8): the installer run as root THROUGH ARM'S SUDO, from a real ssh login as arm, is refused and changes nothing
+LH=$LOGS/$RID-h-installer-guard.log; hdr h "$LH"
+"${DEVSSH[@]}" "$HOSTSH r8-sudo-on" >> "$LH" 2>&1
+HOK=1; HL=
+for hc in plain stripped; do
+  case $hc in
+    plain) rcmd='id; sudo -n bash /root/r7v-staging/install-verify.sh --role prod --key /root/r7v-staging/afldb_verify.pub; exit $?'; want='test SUDO_USER: SUDO_USER=arm';;
+    stripped) rcmd='id; sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash /root/r7v-staging/install-verify.sh --role prod --key /root/r7v-staging/afldb_verify.pub; exit $?'; want='test ancestor: pid [0-9]* (bash)';;
+  esac
+  sleep 3
+  out=$(MSYS_NO_PATHCONV=1 "$WSSH" -F "$CFG" -o BatchMode=yes -o IdentitiesOnly=yes -i "$KA" -T r7v-prod-arm "$rcmd" < /dev/null 2>&1 | tr -d '\r'); rc=$?
+  { echo "-- [FIXTURE-ATTACK] ssh as arm (real login, arm's key) -> $rcmd: exit $rc"; printf '%s\n' "$out" | sed 's/^/   /'; } >> "$LH"
+  if [ "$rc" = 1 ] && grep -q "^REFUSED: root session descends from arm: .*$want" <<< "$out" && grep -qx 'INSTALL-VERIFY RESULT FAIL (nothing was changed)' <<< "$out" \
+     && ! grep -q '^PASS staging bundle' <<< "$out" && grep -q '^uid=1000(arm)' <<< "$out"; then HL+="$hc:refused "; else HL+="$hc:UNEXPECTED($rc) "; HOK=0; fi
+done
+HS=$("${DEVSSH[@]}" "$HOSTSH r8-sudo-off" 2>&1); printf '%s\n' "$HS" >> "$LH"
+grep -q '^R8 STATE UNCHANGED' <<< "$HS" || HOK=0
+{ echo "[HARNESS] REFUSED lines:"; grep -h '^   REFUSED' "$LH" | sed 's/^   /   /'; } >> "$LH"
+[ "$HOK" = 1 ] && res h "PASS installer-guard: install-verify.sh through arm's sudo over a real arm ssh login REFUSED ($HL), verifier state digest unchanged" \
+  || res h "FAIL installer-guard ($HL; $(grep '^R8 STATE' <<< "$HS"))"
+
+# ---- i (r8): a hostile bundle/lib.sh in untrusted or tampered staging is never sourced (contrast: r7 sourced it as root)
+LI=$LOGS/$RID-i-staging-libsh.log; hdr i "$LI"
+IS=$("${DEVSSH[@]}" "$HOSTSH r8-libsh" 2>&1); printf '%s\n' "$IS" >> "$LI"
+il() { grep "^R8 LIBSH $1 " <<< "$IS"; }
+IOK=1
+for c in home-arm group-writable tampered; do [[ $(il $c) == "R8 LIBSH $c exit=1 marker=absent "*"INSTALL-VERIFY STOP"* ]] || IOK=0; done
+[[ $(il home-arm) == *"must not be under /home"* ]] && [[ $(il group-writable) == *"group- or other-writable"* ]] && [[ $(il tampered) == *"does not match its bundle/SHA256SUMS line"* ]] || IOK=0
+[[ $(il contrast-r7-home-arm) == "R8 LIBSH contrast-r7-home-arm exit="*" marker=present "* ]] || IOK=0
+grep -q '^R8 STATE UNCHANGED' <<< "$IS" || IOK=0
+{ echo "[HARNESS] summary:"; grep '^R8 ' <<< "$IS" | sed 's/^/   /'; } >> "$LI"
+[ "$IOK" = 1 ] && res i "PASS staging-libsh: refused before sourcing (home-arm, group-writable, tampered: marker absent); CONTRAST r7 ran the hostile lib.sh as root (marker present); state unchanged" \
+  || res i "FAIL staging-libsh: $(grep '^R8 ' <<< "$IS" | cut -c1-120 | tr '\n' '|')"
 
 # ---- d: hostile arm login environment
 LD=$LOGS/$RID-d-hostile-arm.log; hdr d "$LD"
@@ -229,6 +287,33 @@ fk verify-key-extra-words 2 'AFLDB-VERIFY USAGE refused' -i "$KV" -T r7v-prod "g
 fk verify-key-stdio-forward 255 'open failed|administratively prohibited|forwarding' -i "$KV" -W 127.0.0.1:22 r7v-prod
 fk arm-key-as-arm-control 0 'uid=1000\(arm\)' -i "$KA" -T r7v-prod-arm 'command -p id'
 [ "$FOK" = 1 ] && res f "PASS keys: $FL" || res f "FAIL keys: $FL"
+
+# ---- j (r8): the wrapper's version mode exits 1 when a host answers STOP (r7 exited 0)
+LJ=$LOGS/$RID-j-version-exit.log; hdr j "$LJ"
+JOK=1
+wcall "$LJ" version; J1=$WRC; J1P=$(grep -c '^OWNER VERDICT VERSION PASS' <<< "$WOUT")
+[ "$J1" = 0 ] && [ "$J1P" = 2 ] || JOK=0
+BSHA=$(sed -n 's/^BUNDLE_SHA=\([0-9a-f]\{64\}\).*/\1/p' "$CALL")
+cat > "$KD/fakever" <<EOF
+#!/usr/bin/env bash
+# HARNESS fake transport (r8 scenario j): every call goes to the real client except the off-host 'version' call, which is answered
+# with a well-formed VERSION STOP for this call's nonce, the pinned bundle and the current time (what a verifier whose self-check
+# failed answers: exit 3, role=none).
+cmd=\${!#}; tgt=\${@: -2:1}
+case \$tgt:\$cmd in r7v-offhost:version\ *) n=\${cmd##* }; echo "STOP verifier self-check: (harness)"; echo "AFLDB-VERIFY RESULT VERSION STOP nonce=\$n host=streamanator boot=none bundle=$BSHA at=\$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=3 role=none"; exit 3;; esac
+exec "$WSSH" "\$@"
+EOF
+chmod 755 "$KD/fakever"
+sleep 2
+out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$CALL" --rehearsal "$CFG" --key "$KV" version 2>&1); J2=$?
+{ echo "-- r8 wrapper, off-host answer replaced by a VERSION STOP (HARNESS fake transport): exit $J2"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
+[ "$J2" = 1 ] && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator' <<< "$out" || JOK=0
+sleep 2
+out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$KD/call-r7.sh" --rehearsal "$CFG" --key "$KV" version 2>&1); J3=$?
+{ echo "-- CONTRAST: r7 wrapper (HEAD blob), same fake transport: exit $J3"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
+[ "$J3" = 0 ] && grep -q '^OWNER VERDICT VERSION STOP' <<< "$out" || JOK=0
+[ "$JOK" = 1 ] && res j "PASS version-exit: both PASS -> exit 0 ($J1P PASS lines); off-host STOP -> exit $J2; CONTRAST r7 wrapper exited $J3 with a STOP line" \
+  || res j "FAIL version-exit: control $J1 ($J1P PASS), off-host STOP $J2, r7 contrast $J3"
 
 # ---- b: refusal when a required check fails (root damages the published dump)
 LB=$LOGS/$RID-b-g0-refusal.log; hdr b "$LB"

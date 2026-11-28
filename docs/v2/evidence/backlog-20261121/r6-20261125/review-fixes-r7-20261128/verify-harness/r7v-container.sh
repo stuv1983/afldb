@@ -18,6 +18,9 @@
 #                  SET ROLE, the reviewer's comment: a newline, ESC[2K ESC[G, a forged "R6 PRE RESULT PASS" and a forged
 #                  "OWNER VERDICT A2 PASS transport=production ... exit=0", ESC[8m and an unterminated OSC; unforge restores the
 #                  original comment and owner
+#   r8-sudo-on|r8-sudo-off  r8 scenario h (FIXTURE): grant arm sudo inside this container only, recording the verifier's state digest;
+#                  remove it and compare the digest (the workstation logs in as arm by ssh and runs sudo install-verify.sh between)
+#   r8-libsh       r8 scenario i (FIXTURE-ATTACK): hostile bundle/lib.sh in untrusted or tampered staging copies (see r8_libsh)
 #   status         prints facts for the host driver (labelled HARNESS)
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -234,6 +237,48 @@ export PYTHONPATH=$HOME/pyevil PYTHONSTARTUP=$HOME/pyevil/start.py PGSERVICEFILE
   L FIXTURE-ATTACK "arm's own login now: $(as_arm bash -lc 'type -t bash; echo "$PATH"' 2>&1 | tr '\n' ' ')"
 }
 
+# r8: a digest of the installed verifier's state (account, bundle, config, sshd drop-in, units: names, owners, modes, sizes, mtimes
+# and contents), so a refused install can be shown to have changed nothing.
+VB=/usr/local/lib/afldb-verify
+r8snap() {
+  { getent passwd afldb-verify; getent group afldb-verify
+    find $VB /etc/afldb-verify /etc/ssh/afldb-verify /etc/ssh/sshd_config.d /etc/systemd/system -maxdepth 1 -printf '%p %U:%G %m %s %T@\n' 2>&1 | sort
+    cat $VB/* /etc/afldb-verify/* /etc/ssh/afldb-verify/* /etc/ssh/sshd_config.d/* 2>/dev/null | sha256sum; } | sha256sum | cut -c1-64
+}
+# r8 scenario i (FIXTURE-ATTACK): staging copies of verify/ whose bundle/lib.sh carries an appended hostile line. If install-verify.sh
+# ever sources it (as root), it creates /root/r8-libsh-ran-<case> and redefines trusted_path to pass everything. r8's install-verify.sh
+# checks the staging and lib.sh's digest BEFORE sourcing it, so no marker may appear; r7's (sent as r8-contrast/install-verify-r7.sh,
+# the HEAD blob) sourced lib.sh first: the CONTRAST case shows the marker appearing. Each case: "R8 LIBSH <case> exit=<rc>
+# marker=<absent|present> <first STOP line>"; then the state digest before and after.
+r8_libsh() {
+  local s0 c d rc o
+  s0=$(r8snap); L HARNESS "verifier state digest before: $s0"
+  r8stage() { # dir case
+    rm -rf "$1"; mkdir -p "$1"; cp -r /root/r7v-staging/. "$1/"; chown -R root:root "$1"; chmod -R go-w "$1"; chmod 0755 "$1"
+    printf '%s\n' "touch /root/r8-libsh-ran-$2; trusted_path() { TP_WHY=; return 0; }" >> "$1/bundle/lib.sh"
+  }
+  for c in home-arm group-writable tampered contrast-r7-home-arm; do
+    case $c in
+      home-arm|contrast-r7-home-arm) d=/home/arm/r8-stage-$c; r8stage "$d" "$c"; chown -R arm:arm "$d"
+        L FIXTURE-ATTACK "case $c: staging $d owned by arm (arm can write lib.sh), hostile line appended to bundle/lib.sh";;
+      group-writable) d=/opt/r8-stage-$c; r8stage "$d" "$c"; chmod 0775 "$d"
+        L FIXTURE-ATTACK "case $c: staging $d root-owned but group-writable (0775), hostile line appended to bundle/lib.sh";;
+      tampered) d=/opt/r8-stage-$c; r8stage "$d" "$c"
+        L FIXTURE-ATTACK "case $c: staging $d root-owned and protected, hostile line appended to bundle/lib.sh (digest differs)";;
+    esac
+    if [ "$c" = contrast-r7-home-arm ]; then
+      cp "$FIX/r8-contrast/install-verify-r7.sh" "$d/install-verify.sh"; chown arm:arm "$d/install-verify.sh"
+      L HARNESS "CONTRAST: the r7 install-verify.sh (HEAD blob $(sha256sum < "$d/install-verify.sh" | cut -c1-16)...) in $d"
+    fi
+    rm -f "/root/r8-libsh-ran-$c"
+    o=$(cd / && bash "$d/install-verify.sh" --role prod --key "$d/afldb_verify.pub" < /dev/null 2>&1); rc=$?
+    printf '%s\n' "$o" | sed 's/^/   | /'
+    echo "R8 LIBSH $c exit=$rc marker=$([ -e "/root/r8-libsh-ran-$c" ] && echo present || echo absent) $(grep -m1 "INSTALL-VERIFY STOP" <<< "$o" | cut -c1-320)"
+    rm -rf "$d" "/root/r8-libsh-ran-$c"
+  done
+  [ "$(r8snap)" = "$s0" ] && echo "R8 STATE UNCHANGED $s0" || echo "R8 STATE CHANGED $s0 -> $(r8snap)"
+}
+
 case $CMD in
   setup-prod) setup_prod;;
   setup-offhost) setup_offhost;;
@@ -257,6 +302,16 @@ COMMENT ON DATABASE afldb_restore_test IS :'c';
 DROP ROLE r7v_arm;
 SQL
     L FIXTURE "restored: owner postgres, comment '$(runuser -u postgres -- psql -X -qAt -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'afldb_restore_test'")'";;
+  r8-sudo-on)
+    printf 'arm ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/r8-arm-fixture; chmod 0440 /etc/sudoers.d/r8-arm-fixture
+    r8snap > /root/r8-snap0
+    L FIXTURE "/etc/sudoers.d/r8-arm-fixture: arm ALL=(ALL) NOPASSWD: ALL (this container only, scenario h); sudo $(sudo -V | head -1)"
+    L HARNESS "verifier state digest before (account, $VB, /etc/afldb-verify, /etc/ssh/afldb-verify, sshd_config.d, units): $(cat /root/r8-snap0)";;
+  r8-sudo-off)
+    rm -f /etc/sudoers.d/r8-arm-fixture; s=$(r8snap)
+    L FIXTURE "arm's sudo removed"; L HARNESS "verifier state digest after: $s"
+    [ "$s" = "$(cat /root/r8-snap0)" ] && echo "R8 STATE UNCHANGED $s" || echo "R8 STATE CHANGED $(cat /root/r8-snap0) -> $s"; rm -f /root/r8-snap0;;
+  r8-libsh) r8_libsh;;
   pull-log) cat /home/arm/afldb-ops/state/offhost-pull.log 2>/dev/null;;
   hostkey) cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub;;
   *) echo "STOP unknown command $CMD"; exit 2;;

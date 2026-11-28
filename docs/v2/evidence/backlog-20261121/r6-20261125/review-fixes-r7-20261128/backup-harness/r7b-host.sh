@@ -4,8 +4,9 @@
 # PID 1 is the real systemd 255.4 (the pinned image's Ubuntu 24.04 userland plus apt's systemd, PostgreSQL 16, rsync and strace,
 # installed in the image build only, the one step that uses the network). Container flags (never --privileged): --network none
 # --cgroupns=private --tmpfs /run --tmpfs /run/lock --cap-add SYS_ADMIN (systemd as PID 1: cgroup2 remount) --cap-add SYS_PTRACE
-# (the harness's own root strace HOLD of the sealer, FIXTURE) --security-opt apparmor=unconfined. The entry script remounts the
-# container's cgroup2 read-write, installs a FIXED-OFFSET Australia/Melbourne zone so the real timer's 02:20 lands on today's
+# (the harness's own root strace HOLD of the sealer, FIXTURE) --security-opt apparmor=unconfined. r8: the image adds sudo (used only by
+# scenario arm-sudo, which grants arm sudo INSIDE its container to show the installer refusing a root session that descends from arm).
+# The entry script remounts the container's cgroup2 read-write, installs a FIXED-OFFSET Australia/Melbourne zone so the real timer's 02:20 lands on today's
 # Melbourne date a little after the container starts, and execs /sbin/init.
 # Input: RUN/fix = the transported files (r7b-run.sh). Output: RUN/logs/r7b-<scenario>.log and RUN/logs/r7b-summary.log.
 # Labels: everything created carries r7b.run=<RID>: image r7b-sysd-<RID>:1 (unless --image), containers r7b-<RID>-<scenario>.
@@ -17,7 +18,7 @@ RUN=${1:?run directory}; RID=${2:?run id}; shift 2
 [[ $RID =~ ^[A-Za-z0-9-]+$ ]] && [ -d "$RUN/fix" ] && [ -O "$RUN" ] || { echo "STOP not this run's private directory: $RUN ($RID)"; exit 2; }
 KEEPIMG=0; IMG=
 while [ $# -gt 0 ]; do case $1 in --keep-image) KEEPIMG=1; shift;; --image) IMG=${2:?tag}; KEEPIMG=1; shift 2;; *) break;; esac; done
-ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted genuine-rd rearm-in-rd post-pub-fail)
+ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted genuine-rd rearm-in-rd post-pub-fail arm-sudo)
 SCEN=("$@"); [ ${#SCEN[@]} -gt 0 ] || SCEN=("${ALL[@]}")
 for sc in "${SCEN[@]}"; do [[ " ${ALL[*]} " == *" $sc "* ]] || { echo "STOP unknown scenario $sc"; exit 2; }; done
 PIN=sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba   # grafana/alloy:latest on streamanator, Ubuntu 24.04.4
@@ -30,7 +31,7 @@ echo "== R7 sealed-backup real-systemd harness $(date -u +%FT%TZ) host=$(hostnam
 if [ -z "$IMG" ]; then
   IMG=r7b-sysd-$RID:1
   mkdir -p "$RUN/build"
-  printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps postgresql-16 postgresql-client-16 rsync strace && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
+  printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps postgresql-16 postgresql-client-16 rsync strace sudo && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
     "$PIN" "$LBL" > "$RUN/build/Dockerfile"
   docker build --label "$LBL" -t "$IMG" "$RUN/build" > "$RUN/build/build.log" 2>&1 || { tail -5 "$RUN/build/build.log"; echo "STOP image build failed"; exit 1; }
 fi

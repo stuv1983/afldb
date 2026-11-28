@@ -1,0 +1,61 @@
+[TRANSPORT] workstation 2026-11-28T03:26:16Z: 16 worktree files, CR stripped (none expected)
+   WORKTREE 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   WORKTREE 793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   WORKTREE f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   WORKTREE 1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   WORKTREE 21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   WORKTREE f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   WORKTREE d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   WORKTREE ebe4c7ece669c4040fde0998f99d0a9031da26b8978c37f08bf095cfe5b31f72  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   WORKTREE 5f13c5a4d736502e45ec2be500508d74e2ec442a91b3ff024ce9f26161c83134  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   WORKTREE 3c149dbff19d697b09188f9eed5f252e9d1f469a6608d903ced790d3e5520e31  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   WORKTREE df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   WORKTREE a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   WORKTREE 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   WORKTREE edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   WORKTREE 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   WORKTREE c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   (no --verify-rev: worktree bytes, not a committed revision)
+workspace /home/arm/r7b-ws.BYKP8k
+16
+== R7 sealed-backup real-systemd harness 2026-11-28T03:26:18Z host=streamanator user=arm run=/home/arm/r7b-ws.BYKP8k rid=r8bf day=2026-11-28 docker 29.1.3
+[TRANSPORT] workstation 2026-11-28T03:26:16Z: 16 worktree files, CR stripped (none expected)
+   WORKTREE 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   WORKTREE 793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   WORKTREE f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   WORKTREE 1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   WORKTREE 21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   WORKTREE f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   WORKTREE d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   WORKTREE ebe4c7ece669c4040fde0998f99d0a9031da26b8978c37f08bf095cfe5b31f72  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   WORKTREE 5f13c5a4d736502e45ec2be500508d74e2ec442a91b3ff024ce9f26161c83134  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   WORKTREE 3c149dbff19d697b09188f9eed5f252e9d1f469a6608d903ced790d3e5520e31  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   WORKTREE df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   WORKTREE a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   WORKTREE 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   WORKTREE edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   WORKTREE 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   WORKTREE c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   (no --verify-rev: worktree bytes, not a committed revision)
+image r7b-sysd-r8bf:1 id sha256:9eab42b71e10e535b7c86634a456b54accdd8809ff3a1a427f4f21d88b410820 (base sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba)
+SCENARIO genuine PASS expect=attributed so_rc=0 inv=528792ab5e6845c6b598033c4bf7a448 dump=afldb_prod-20261128-022000.dump sha256=c498e7185ec56eb0cb8e84b37cfd8e729230eabc3d7293e9b50197ef153fa4dc dispatch=scheduled delay=128.6s
+SCENARIO perm PASS expect=attributed so_rc=0 inv=a5bb84aecb354d28b5fa4dd1d70c9cd3 dump=afldb_prod-20261128-022000.dump sha256=6d9894cbbfe503e3d7ab588066d090c59f72783b611e87aa4021fe99a2f05dfc dispatch=scheduled delay=130.7s
+SCENARIO review2 PASS expect=attributed so_rc=0 inv=d052b9d7a14b430aa66af26e10a3d69d dump=afldb_prod-20261128-022000.dump sha256=a0456b4392cb4030a9fa55259ed098a0709a86943f0177ca799baab7d36cd7d4 dispatch=scheduled delay=128.8s
+SCENARIO hand-start PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO timer-then-hand PASS expect=refused so_rc=1 reason=another run of afldb-backup.service was sealed in the window (/var/lib/afldb-backup/seals/8223c613b99246c58ca80275ec3eecd6.seal, trigger none): ambiguous
+SCENARIO restart PASS expect=refused so_rc=1 reason=seal /var/lib/afldb-backup/seals/b04d1f2831f04cf7b4028fc3873ee509.seal: the unit entered inactive (monotonic 646121454656) after the dispatch (646120887125): it stopped or failed between the dispatch and this invocation (a restart inside th
+SCENARIO rearm-in PASS expect=attributed so_rc=0 inv=4f5df706d7234693860b4a5d1a113bd4 dump=afldb_prod-20261128-022015.dump sha256=9f1630559b739b9f85a40e7bebeabd02031e98112b3471c70df4e408bb18dc0d dispatch=catch-up delay=0.0s
+SCENARIO rearm-out PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO pgdump-fails PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO seal-interrupted PASS expect=refused so_rc=1 reason=published dump: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump: missing, or a component cannot be read
+SCENARIO genuine-rd PASS expect=attributed so_rc=0 inv=26df9adcc85b4e358bc9e49b3424fd8d dump=afldb_prod-20261128-022411.dump sha256=e82c953503f2c39326bfdb2194f6cbd6f108ad2a4ab4d213500ec373ed6bb53e dispatch=scheduled delay=335.0s
+SCENARIO rearm-in-rd PASS expect=attributed so_rc=0 inv=9f304023b8aa47b99cacdd71c688cf3c dump=afldb_prod-20261128-022743.dump sha256=5ded6cf6a516b77d697b1501c7f0eaf3c936e702977dfbe37b36367acb8ca13c dispatch=catch-up delay=448.7s
+SCENARIO post-pub-fail PASS expect=refused so_rc=1 reason=seal /var/lib/afldb-backup/seals/c37404bb864a4d69bf96ef011eed3996.seal has no valid completion record (the run did not finish after its seal): /var/lib/afldb-backup/seals/c37404bb864a4d69bf96ef011eed3996.done: missing, or a component cannot
+SCENARIO arm-sudo PASS installer refused 3 arm-descended root sessions (SUDO_USER; ancestor bash; ancestor sudo), state unchanged; owner install passed the session check; --as-arm PASS as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+image r7b-sysd-r8bf:1 removed
+containers left with label r7b.run=r8bf: 0; images with label r7b.run=r8bf: 0
+R7 BACKUP HARNESS RESULT PASS
+logs -> /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/dev-logs/backup-final
+containers left: 0 images left: 0
+host driver exit 0
+exit 0

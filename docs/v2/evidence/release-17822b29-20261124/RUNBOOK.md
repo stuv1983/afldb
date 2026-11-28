@@ -59,7 +59,12 @@
 > and pin, Astra's PASS at that review commit, a new owner approval and that day's evidence. Record:
 > [review-fixes-r4-20261127/README.md](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/README.md).
 
-Every production step except G0 is a pinned script piped over **one SSH connection** as arm (`tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`). Since r7, G0 is Stu's owner-path call (§4.1). Claude runs the others only under the owner's approval statement (§10). The owner runs only the `sudo` lines and the browser check. Never open a new connection at minute :16–:18 (streamanator's r2 check connects then): 10:16–10:18, 11:16–11:18 and 12:16–12:18. Never print `.env` values: names and counts only.
+Every production step except G0 is a pinned script piped over **one SSH connection** as arm (`tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`). Since r7, G0 is Stu's owner-path call (§4.1). Claude runs the others only under the owner's approval statement (§10). The owner runs only the `sudo` lines and the browser check. **r8:** arm's SSH connection carries only these unprivileged pinned
+scripts. Every privileged line (the §4.2 restart and journal reads, the §6 rollback restart, every §4.1a step) runs in the admin
+session of [OWNER-PROCEDURE.md](../backlog-20261121/r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md):
+`afldb-admin`'s own SSH login with its own key, whose `sudo` asks for the admin's password. It may also run in that procedure's admin
+root session, or at the console logged in as root. It never runs in an arm session, and a console login as arm does not count.
+Without that path the privileged lines have no qualifying session. Never open a new connection at minute :16–:18 (streamanator's r2 check connects then): 10:16–10:18, 11:16–11:18 and 12:16–12:18. Never print `.env` values: names and counts only.
 
 ## 0. Staging (workstation Git Bash, before 10:30)
 
@@ -147,7 +152,7 @@ Budgets, with worst-case values:
 | 12:15 | End of P6 and the journal count | Last P6 tick about 12:12, journal count 12:13–12:15 |
 | 11:42 | P6 start | 12:15 − 33 |
 | 11:36 | Acceptance start | 11:42 − 6 |
-| **11:35** | **Restart cutoff**: the owner issues `sudo systemctl restart afldb` no later than this | 11:36 − 1 |
+| **11:35** | **Restart cutoff**: the owner issues `sudo systemctl restart afldb` (r8: in the admin session) no later than this | 11:36 − 1 |
 | **11:30** | **Promotion cutoff**: P4 refuses after it. Promotion is permitted up to and including 11:30:00.000 and refused from 1 ms later. P4 checks it at its start, requires `release.mjs host-gate --not-after` to state that the tool enforces it, and `release.mjs promote --not-after` checks it again after all validation, immediately before the links move. A refusal moves no link and writes no event | 11:35 − 2 (P4) − 3 (handover margin) |
 
 **The asked-for 11:00–12:30 does not fit the worst case.** From 11:00, the steps before promotion take 5+4+2+2+25+2 = 40 minutes in the worst case. Promotion would come at 11:40, past the 11:30 cutoff: the release would defer with nothing served changed. It fits only with a build near Sunday's 5 minutes (promotion about 11:21), which leaves 9 minutes of slack for everything.
@@ -277,14 +282,22 @@ A retry cannot supply the missing scheduled evidence. An attended copy would nee
 
 The qualifying backup is the 02:20 run of the gate date. Complete these before it starts, in this order:
 * outside 02:15–02:50;
-* as root reached by a path that does **not** pass through arm's login: the console, or a separate administrative account with its
-  own key that arm cannot write to (R7 independent review round 1, **F1**). `sudo` typed in an arm SSH session does not qualify: a
+* as root reached by a path that does **not** pass through arm's login (R7 independent review round 1, **F1**). r8 defines that path
+  in [OWNER-PROCEDURE.md](../backlog-20261121/r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md): the console logged in
+  **as root** (Phase 0), or the admin root session of `afldb-admin` with its own key and password (Phase 1), checked read-only
+  (Phase 2) before any install. A console login as arm does not qualify. `sudo` typed in an arm SSH session does not qualify: a
   hostile arm login environment (`~/.bashrc`, `~/.profile`, PATH, an alias or function named `sudo`) can capture or reuse that root,
   and then neither G1 (sealed backup) nor G2 (owner verifier) holds. No such path exists on production today; creating it is a
   host-account change that needs the owner's approval, and production `sudoers` has not been checked. Every later root action (the
   `sudo -u postgres` steps, every root step of this runbook and of the plan) must use the same path. Until then MED-2 and MED-3
   stay OPEN;
 * from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
+  **r8:** the revision becomes `<R8-PIN:tested-rev>`, and the digests below become `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682`,
+  `3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd` and `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`.
+  * The archive is made in the owner's **workstation** clone and hashed there, carried over the admin path, and re-verified in the
+    admin root session against the workstation value.
+  * Never copy bytes from arm's checkout, never run git as root in it, and never read an expected digest from a file on production.
+  * Both installers refuse a root session that descends from arm (`REFUSED: root session descends from arm`).
 
 None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are unchanged. Production's checkout keeps
 `scheduled-backup.sh` `234fca6a…`: the verifier ports `status` itself, and the repository's opt-in `7e2b470a…` is not needed there.
@@ -296,7 +309,10 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * Run `install-backup.sh <staging>` as root.
    * Add the `pg_ident.conf` line `afldbbackup afldb-backup afldb_backup` and the `pg_hba.conf` line
      `local afldb_prod afldb_backup peer map=afldbbackup` before any broader `local` line, then run `SELECT pg_reload_conf()`.
-   * Run `verify-backup-install.sh` as root, and as arm in a **new** login. Both must print `BACKUP INSTALL RESULT PASS`.
+   * Run `verify-backup-install.sh` as root, and as arm in a **new** login. Both must print `BACKUP INSTALL RESULT PASS`. **r8:**
+     both runs are made from the admin root session: `verify-backup-install.sh`, then `verify-backup-install.sh --as-arm`. Root drops
+     to arm via `setpriv … --reset-env`, `bash --noprofile --norc` and stdin `/dev/null`, so there is no arm login. The pg edits and
+     the reload (`runuser -u postgres`) run in the same session.
 2. **Production, verifier** ([R7 verify README](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md) §8, §10).
    * Preconditions: step 1 is done, because the verifier joins `afldb-backup-read`. The host has `/usr/bin/python3.12`, group
      `systemd-journal` and `/usr/lib/postgresql/16/bin/psql`, and `sshd_config` starts with `Include /etc/ssh/sshd_config.d/*.conf`.
@@ -305,12 +321,18 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * Run `install-verify.sh --role prod --key <staging>/afldb_verify.pub`.
    * As postgres, apply `verifier-db.sql`, add the two `pg-auth-lines.txt` lines above the first other `local` line, and reload.
    * Run `verify-verify-install.sh --role prod` as root.
-3. **streamanator** (owner, root there).
+   * r8: all of step 2 runs in the admin root session; "as postgres" is `runuser -u postgres` there, and `afldb_verify.pub` travels
+     over the admin path and is fingerprint-checked against the workstation.
+3. **streamanator** (owner, root there). r8:
+   * How the owner reaches root there is UNKNOWN. streamanator's arm is in `docker`, `lxd` and `sudo`, all root-equivalent, so
+     `G0B PASS` is attested by a host arm controls until the owner decides otherwise (OWNER-PROCEDURE §8).
+   * The pull-source change is an unprivileged edit of arm's own files, with no root step.
    * Run `install-verify.sh --role offhost --key …`, then `verify-verify-install.sh --role offhost`.
    * The off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged).
 4. **Workstation.** `V7` is a fresh `git archive` export of
    `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at `7d69302007568d3141a567c8eba89e4ee473c9a6`.
-   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…`.
+   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…` (r8: `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e` at
+     `<R8-PIN:tested-rev>`, in the owner's own clone).
    * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
      `streamanator` (role offhost).
 
@@ -318,7 +340,8 @@ Until all four are done and a sealed timer run exists for the gate date, G0 STOP
 
 ### 4.2 Owner blocks (short lines, one per line)
 
-Restart, after P4 and no later than 11:35. It also applies after a rollback's `links`:
+Restart, after P4 and no later than 11:35. It also applies after a rollback's `links`. r8: type this block and the journal lines
+below in the admin session (OWNER-PROCEDURE), never in an arm session:
 
 ```
 sudo systemctl restart afldb
@@ -404,7 +427,7 @@ Rollback triggers (decided with the owner):
 Procedure (no data, checkout or `.env` change; about 15 min; start no later than 12:15):
 
 1. `tr -d '\r' < r1-rollback.sh | $S bash -s -- links` gives `ROLLBACK RESULT LINKS SWITCHED`. It refuses unless `current` is a 17822b29e6de-* release. It runs `release.mjs rollback --attended --to 7d92042fd110-XWruOm_9nLCSMY8nGPqYU --ledger-head 118_fixtures_unconfirmed_participants.sql`, after which `current` is the 7d92042f release and `previous` is the 17822b29 one.
-2. The owner runs the restart block of §4.2 and reports the InvocationID and the `serving build XWruOm_9nLCSMY8nGPqYU release 7d92042fd110-…` line.
+2. The owner runs the restart block of §4.2 (r8: in the admin session, never in an arm session) and reports the InvocationID and the `serving build XWruOm_9nLCSMY8nGPqYU release 7d92042fd110-…` line.
 3. `tr -d '\r' < r1-rollback.sh | $S bash -s -- verify <INV> <NEW_BUILD>` gives `ROLLBACK RESULT VERIFIED (1-3)`:
    * status --expect the old id;
    * post-install-check, where the 17822b29 build must answer 404;

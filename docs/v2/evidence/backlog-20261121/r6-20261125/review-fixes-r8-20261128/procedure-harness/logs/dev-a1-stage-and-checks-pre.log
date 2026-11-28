@@ -1,0 +1,15 @@
+== dev-a1 2026-11-28T03:10:35Z admin root session: re-verify the tar, stage, Phase 2 checks before any change
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step stage 2026-11-28T03:10:34Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+/home/afldb-admin/afldb-r8-stage.tar: OK
+afldb-owner-checks.sh: OK
+afldb-backup-run: OK
+afldb-backup-seal: OK
+70-afldb-backup-sealed.conf: OK
+sha256sum: WARNING: 2 computed checksums did NOT match
+sealed-origin.sh: OK
+install-backup.sh: FAILED
+verify-backup-install.sh: FAILED
+backup.sh: OK
+R8P STAGE STOP: backup bundle

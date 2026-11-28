@@ -14,9 +14,19 @@
 #   OWNER VERDICT <G0|A2|VERSION> <PASS|STOP> transport=<production|rehearsal> ... [reason=...]
 # g0 runs G0a (production) and then, only if G0a is an authenticated PASS, G0b (streamanator) with the dump and sha256 taken ONLY
 # from the authenticated G0a RESULT line. NG-PRE consumes only "OWNER VERDICT A2 PASS"; release G0 only "OWNER VERDICT G0 PASS".
-# Exit: 0 PASS, 1 STOP, 2 usage.
+# What a verdict establishes (r8, R8 DEPENDENCIES.md; printed as one SCOPE line before each A2/G0 verdict):
+#   OWNER VERDICT A2 PASS: the pinned root-owned verifier on the authenticated production host, at at=, found every A-2 check passing
+#     for THESE seven arguments (the live host matched them). It does NOT establish that the arguments are right: they come from the
+#     Tuesday record, printed by arm-run scripts over arm's login. Lines marked ARM-PRODUCED report data arm's processes wrote (an
+#     authentic reading of arm's data, not an independent fact). backup-origin=attributed alone rests on root/PID 1 evidence only.
+#   OWNER VERDICT G0 PASS: the sealed timer run (root seal, PID 1) produced the named dump with this sha256, and streamanator holds a
+#     copy with those bytes (re-hashed by root) after a root cron dispatch at 03:10; the lines linking that dispatch to the copy (the
+#     pull log) are ARM-PRODUCED.
+#   A verdict is authentic (G2: this call's nonce, the pinned bundle, the host key, at= within 300 s, exit = ssh status) only while
+#   root on both hosts is independent of arm (F1, an owner action); authentic is not the same as "every input is true".
+# Exit: 0 PASS, 1 STOP, 2 usage. version: 0 only when BOTH hosts answer PASS (r8; r7 exited 0 even when a host answered STOP).
 set -uo pipefail; export LC_ALL=C
-BUNDLE_SHA=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
+BUNDLE_SHA=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
 PROD_NAME=afldb-prod; OFF_NAME=streamanator; OFF_ADDR=10.0.40.100; PROD_ALIAS=afldb
 SSHBIN=${AFLDB_VERIFY_SSH:-C:/Windows/System32/OpenSSH/ssh.exe}
 KEY=$HOME/.ssh/afldb_verify; TRANSPORT=production; CFG=
@@ -109,19 +119,23 @@ case $MODE in
     if ! call "$OFF_T" G0B "$OFF_NAME" g0b "$D" "$DUMP" "$SHA" || ! argfields "date=$D" "dump=$DUMP" "sha256=$SHA"; then
       verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N g0b-nonce=${V[nonce]:-} dump=$DUMP sha256=$SHA reason=\"$V_WHY\""; fi
     [ "${V[verdict]}" = PASS ] || verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N g0b-nonce=${V[nonce]} exit=${V[exit]} dump=$DUMP sha256=$SHA reason=\"the off-host verifier answered STOP\""
+    echo "G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced $DUMP with sha256 $SHA on production and that streamanator holds a root-re-hashed copy with those bytes after a root cron dispatch; the pull-log lines linking dispatch and copy are ARM-PRODUCED"
     verdict G0 PASS "date=$D invocation=$INV dump=$DUMP sha256=$SHA dispatch=$DISP g0a-nonce=$A_N g0a-at=$A_AT g0a-boot=$A_BOOT g0b-nonce=${V[nonce]} g0b-at=${V[at]}";;
   a2)
     [ $# = 7 ] && [ "$1" = accepted ] && [[ $2 =~ ^[0-9a-f]{12}-[A-Za-z0-9_-]{1,64}$ && $3 =~ ^r3:(yes|no)$ && $4 =~ ^r4:(yes|no)$ \
       && $5 =~ ^(10:00|14:00)$ && $6 =~ ^tue:(released|rolledback|deferred)$ && $7 =~ ^inv:[0-9a-f]{32}$ ]] || usage
     if ! call "$PROD_T" A2 "$PROD_NAME" a2 "$@" || ! argfields "outcome=$1" "current=$2" "r3=$3" "r4=$4" "window=$5" "tue=$6" "inv=${7#inv:}"; then
       verdict A2 STOP "current=$2 tue=$6 inv=${7#inv:} window=$5 nonce=${V[nonce]:-} reason=\"$V_WHY\""; fi
+    echo "A2 SCOPE: a PASS establishes that the live production host matched these seven arguments ($*) at at=${V[at]}; the arguments themselves come from the Tuesday record, printed by arm-run scripts over arm's login, and nothing here checks them; ARM-PRODUCED lines are arm's data read authentically; backup-origin=${V[f.backup-origin]:-none} rests on root and PID 1 evidence only"
     verdict A2 "${V[verdict]}" "current=$2 tue=$6 inv=${7#inv:} window=$5 day=${V[f.day]:-none} backup-origin=${V[f.backup-origin]:-none} nonce=${V[nonce]} at=${V[at]} boot=${V[boot]} exit=${V[exit]}";;
   version)
     [ $# = 0 ] || usage
+    VSTOP=0
     for t in "$PROD_T:$PROD_NAME:prod" "$OFF_T:$OFF_NAME:offhost"; do
       IFS=: read -r tt hn rl <<< "$t"
-      if call "$tt" VERSION "$hn" version && argfields "role=$rl"; then echo "OWNER VERDICT VERSION PASS transport=$TRANSPORT host=$hn role=$rl nonce=${V[nonce]}"
-      else echo "OWNER VERDICT VERSION STOP transport=$TRANSPORT host=$hn reason=\"$V_WHY\""; fi
-    done;;
+      if call "$tt" VERSION "$hn" version && argfields "role=$rl" && { [ "${V[verdict]}" = PASS ] || { V_WHY="the verifier answered VERSION STOP"; false; }; }; then echo "OWNER VERDICT VERSION PASS transport=$TRANSPORT host=$hn role=$rl nonce=${V[nonce]}"
+      else echo "OWNER VERDICT VERSION STOP transport=$TRANSPORT host=$hn reason=\"$V_WHY\""; VSTOP=1; fi
+    done
+    [ "$VSTOP" = 0 ] && exit 0; exit 1;;
   *) usage;;
 esac

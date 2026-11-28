@@ -1,0 +1,8 @@
+== dev-a1 2026-11-28T03:11:37Z console: id of every identity, fixture-password scan of every log
+   id root: uid=0(root) gid=0(root) groups=0(root)
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm)
+   id afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo)
+   id afldb-backup: id: 'afldb-backup': no such user
+   id afldb-verify: id: 'afldb-verify': no such user
+   id postgres: uid=101(postgres) gid=104(postgres) groups=104(postgres),101(ssl-cert)
+R8P SECRET-SCAN fixture-password-occurrences 0

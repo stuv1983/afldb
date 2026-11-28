@@ -9,7 +9,13 @@ AEDT, fallback 14:00-15:00 the same day**, on run d's verdict (`r6-kernel-check-
 **"IF BOOT RECOVERY IS STILL UNCERTAIN, PAUSE BEFORE REBOOTING."** This runbook is therefore **NO-GO by default**: it turns GO only
 when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, through a root path that does not pass through arm's login (r7 F1:
 an SSH session as arm lets a hostile arm login environment reuse the owner's sudo; see install precondition 0 and
-`review-fixes-r7-20261128/README.md` §4 item 9); Claude
+`review-fixes-r7-20261128/README.md` §4 item 9). **r8 session rule:** every privileged block of this plan is typed in the admin
+session of `r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md` (`afldb-admin`'s own SSH login with its own key; `sudo` there
+asks for the admin's password), in its admin root session, or at the Recovery Console logged in **as root**. That covers C-1, C-2 and
+NG-FALLBACK's undo, D-1, D-3, D-4, E-1, F-3, F-5, G-1 and the rollback acceptance; the `sudo` prefixes in those blocks are unchanged
+and work in all three. arm's SSH session carries only the unprivileged pinned scripts of `r6-20261125/`. A console login as arm is
+not a privileged path. Until OWNER-PROCEDURE Phases 0-1 exist on production, these steps have no qualifying session, and the plan
+stays NO-GO; Claude
 runs the read-only scripts of `r6-20261125/` and records. The ISSUE-348 load, R5 disposal, R7 and anything else are NOT in scope.
 
 **Prepared without production contact** (run e's only production session was the ISSUE-348 privilege check). Production facts come
@@ -136,7 +142,7 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
   network; **it is not a recovery path**. The **Recovery Console** "is an older, browser-based connection option based on VNC. Using
   it is like plugging a keyboard and monitor directly into the Droplet. The Recovery Console is available even if a Droplet has lost
   network access or the sshd process has failed", and "it requires password authentication on the Droplet and doesn't fully support
-  features like copying and pasting". So **NG-CONSOLE** means: the owner opened the **Recovery Console**, logged in as `arm` by typing
+  features like copying and pasting". So **NG-CONSOLE** (r8: with a **root** or `afldb-admin` login, not `arm`; see B-1) means: the owner opened the **Recovery Console**, logged in as `arm` by typing
   the password (not pasting), ran `uname -r` and saw `6.8.0-137-generic`, then `exit`. A login prompt alone proves nothing (reviewer
   F-003). Limits stated honestly: the kernel command line ends `console=ttyS0`, so systemd's emergency-mode output goes to the serial
   line, not to the VNC screen (tty1 shows kernel messages and the login prompt); root is locked on the cloud image, so emergency mode
@@ -154,7 +160,7 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 
 | # | Owner step (panel) | Pass |
 |---|---|---|
-| B-1 | Before 09:55: open the **Recovery Console**; log in as `arm` (typed password); `uname -r` → `6.8.0-137-generic`; `exit`. Note where the panel's power-cycle and power-off actions are (do not use them) | NG-CONSOLE met; record time |
+| B-1 | Before 09:55: open the **Recovery Console**; log in as `arm` (typed password); `uname -r` → `6.8.0-137-generic`; `exit`. **r8:** log in as **root** (OWNER-PROCEDURE Phase 0), or as `afldb-admin`, never as arm: arm's startup files can fake `uname`. If no root or admin console login exists, NG-CONSOLE is not met. Note where the panel's power-cycle and power-off actions are (do not use them) | NG-CONSOLE met; record time |
 | B-2 | **From 08:30** (after the 03:30 verification; a live snapshot runs while the site serves): Backups & Snapshots → Take Live Snapshot, name `afldb-prod-pre-r6-20261125`. Wait for the progress bar to finish and the snapshot to be **listed**. Locate (do not run) its restore action | snapshot listed as complete before 10:00; record name, time, size shown |
 
 **What the snapshot is (reviewer F-013).** A full copy of the droplet disk: `.env` with every production secret, the database files,
@@ -178,6 +184,8 @@ from memory. Firmware (BIOS or UEFI, printed by A-2) does not change any command
 `/boot/grub/grubenv` in both cases; on UEFI `/boot/efi` must be mounted for `update-grub` (A-2 prints the mounts).
 
 ### 3.1 C-1 owner read steps (sudo, read-only apart from the saved copy), 09:40-09:55
+
+r8: typed in the admin session (OWNER-PROCEDURE), never in an arm session.
 
 ```bash
 S=20261125; sudo cp -p /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S && sudo sha256sum /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S   # record (the two equal)
@@ -222,6 +230,8 @@ time are his; not required by this runbook).
 
 ### 3.3 C-2 owner: apply option B (10:00-10:15; one block; only if NG-GRUBREAD holds)
 
+r8: the block and its NG-FALLBACK undo are typed in the admin session (OWNER-PROCEDURE), never in an arm session.
+
 ```bash
 printf '%s\n' '# AFLDB R6 2026-11-25: temporary; removed in step F5 of ATTENDED-PLAN-R6-20261125.md' 'GRUB_DEFAULT=saved' \
   | sudo tee /etc/default/grub.d/99-afldb-r6.cfg >/dev/null && sudo chmod 0644 /etc/default/grub.d/99-afldb-r6.cfg
@@ -245,7 +255,7 @@ A2 also `afldb-backup.timer` and `afldb-backup-verify.timer`. A-2 lists **every*
 
 | # | Owner, at or after **10:18** (after the 10:17 r2 check; 14:18 in the fallback) | Pass |
 |---|---|---|
-| D-1 | `sudo systemctl stop afldb-settle-afl-api.timer` **first**, then every other `afldb*` timer A-2 showed `active` (settle-afltables, settle-afl-api-brownlow, email-intake if present) **except** `afldb-backup.timer` and `afldb-backup-verify.timer` | — |
+| D-1 | (r8: D-1, D-3 and D-4 in the admin session, never in an arm session) `sudo systemctl stop afldb-settle-afl-api.timer` **first**, then every other `afldb*` timer A-2 showed `active` (settle-afltables, settle-afl-api-brownlow, email-intake if present) **except** `afldb-backup.timer` and `afldb-backup-verify.timer` | — |
 | D-2 | `systemctl is-active afldb-settle-afl-api.service afldb-settle-afltables.service afldb-settle-afl-api-brownlow.service afldb-email-intake.service afldb-backup.service afldb-backup-verify.service` | all `inactive` (a unit not installed also prints `inactive`); a running one: wait for it, never kill it |
 | D-3 | apt gate, **immediately before E-1**: the block below | `inactive` twice, and the three other commands print nothing (NG-APT) |
 
@@ -267,10 +277,10 @@ FAILED there). If that cannot be met, **expect exactly one R2 alarm email per ho
 
 | # | Step | Who | Pass / next |
 |---|---|---|---|
-| E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25). Record T0 | Owner | — |
+| E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25), typed in the admin session (r8), never in an arm session. Record T0 | Owner | — |
 | E-2 | Workstation: `bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh"` from T0+2 min, at most once a minute (HTTPS, not SSH) | Claude | `R6 PUBLIC RESULT PASS`; a Cloudflare error page while down is expected |
 | E-3 | SSH only after E-2 passes, or on the fixed schedule **T0+3, T0+6, T0+10** (one attempt each; the first SSH is F-2 itself), never a loop. HTTPS answering while SSH times out = the home IPS, not the host: wait for the next slot | Claude | — |
-| E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; logs in as `arm`, `uname -r`, `systemctl --failed`) → §6 | Owner | — |
+| E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; logs in as `arm`, `uname -r`, `systemctl --failed`) → §6. r8: log in as root or `afldb-admin`, not as `arm`, whose startup files can fake both commands | Owner | — |
 | F-1 | The r4 amendment's block "Wednesday F-1 (r4)" (changed in place, 27 Nov): it runs `r6-public-smoke.sh` and `a1-s9-public-smoke.sh` with `BUILD_ID` derived from the validated handoff `CURRENT_ID` for every Tuesday outcome; never a `BUILD_ID` taken from P3b | Claude | `R6 F-1 RESULT PASS build <BUILD_ID>` (both smokes PASS) |
 | F-2 | `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" full 6.8.0-149-generic "$CURRENT_ID" "$PRE_BOOT_ID" "$PRE_INVOCATION_ID" "$RESTORE_SHA" "$R4" "$GRUB_BASELINE"` | Claude | `R6 POST RESULT PASS (6.8.0-149-generic)` with one `NOTE GRUB inputs … differ` (option B still applied): new boot_id, uptime < 2 h, `reboot-required` absent, units active, `pg_isready`, new InvocationID, NRestarts 0, 2 workers, equal revalidation-name counts, `current` unchanged, Caddyfile unchanged, loopback health 200, timers sane, no failed unit, ledger 118, `afldb_restore_test` unchanged |
 | F-3 | Owner: block F-3 below (counts and unit names only) | Owner | nothing from `postgresql`, `afldb` or `caddy`; anything else is recorded and judged |
@@ -280,12 +290,12 @@ FAILED there). If that cannot be met, **expect exactly one R2 alarm email per ho
 | F-6 | D-4 timers; `systemctl list-timers --all 'afldb*' --no-pager` | Owner | every timer of D-1 active with a next elapse, before 11:17 |
 | F-7 | Record (§9). `/root/grub.cfg.pre-r6-20261125` may stay (root-only) until 7 Jan | Claude | — |
 
-**F-3 (owner):**
+**F-3 (owner; r8: in the admin session, never in an arm session):**
 ```bash
 sudo journalctl -b -p err --no-pager | wc -l
 sudo journalctl -b -p err --no-pager -o cat --output-fields=SYSLOG_IDENTIFIER | sort | uniq -c | sort -rn | head -n 15   # count per source, no message text
 ```
-**F-5 (owner, one block):**
+**F-5 (owner, one block; r8: in the admin session, never in an arm session):**
 ```bash
 sudo rm /etc/default/grub.d/99-afldb-r6.cfg
 sudo update-grub 2>&1 | grep -E 'Found linux image|done'        # both images listed
@@ -310,7 +320,7 @@ with all units healthy) is the A1 application rollback (`A1-A2` runbook §3.2), 
 
 | Case | Owner action | Then |
 |---|---|---|
-| G-1: 149 is up but fails F-2/F-3 | D-1..D-3 again, then `sudo systemctl reboot` (no GRUB command: `next_entry` was consumed by the 149 boot, so GRUB boots `saved_entry` = 137) | E-2..E-4, then the acceptance below |
+| G-1: 149 is up but fails F-2/F-3 | D-1..D-3 again, then `sudo systemctl reboot` (r8: all in the admin session) (no GRUB command: `next_entry` was consumed by the 149 boot, so GRUB boots `saved_entry` = 137) | E-2..E-4, then the acceptance below |
 | G-2: 149 never comes up (E-4: panic, hang, emergency mode, no login) | panel **power cycle**, Recovery Console open | GRUB boots 137 (`saved_entry`); acceptance below |
 | G-3: 137 does not come up either | Recovery Console → recovery ISO (§2.2), or **restore the B-2 snapshot** (all writes since 08:30 lost; the 02:20 dump off-host is the data complement); host loss: `docs/backup-restore.md` §6 procedure B | owner decisions, recorded; nothing else is attempted in the window |
 
@@ -326,10 +336,10 @@ attempt on Wed 25 Nov** unless the owner decides otherwise.
 
 | Item | GO when | Evidence |
 |---|---|---|
-| **NG-OWNER** | owner present with `sudo` from 09:40 to the end of the window, Recovery Console and panel open | owner |
+| **NG-OWNER** | owner present with `sudo` from 09:40 to the end of the window, Recovery Console and panel open. r8: that `sudo` is the admin session's (OWNER-PROCEDURE Phases 0-1 done and verified twice), not arm's | owner |
 | **NG-PRE** | r7: **only** `OWNER VERDICT A2 PASS transport=production` (wrapper exit 0) from `afldb-verify-call.sh a2` with the §1 arguments. Its `backup-origin=attributed` field is recorded separately. An `R6 PRE RESULT PASS` printed by `r6-pre-verify.sh` run as arm is **not** GO evidence | A-2 owner-path output and its OWNER VERDICT line |
 | **NG-OFFHOST** | (r3:yes) r7: A-4r7 `OWNER VERDICT G0 PASS transport=production date=2026-11-25`, with its `dump=`/`sha256=` identical to A-2's `OFFHOST-COMPARE`. A-1 and A-4 (arm-run) are recorded as information and do not count as GO | A-4r7 (A-1, A-4 information) |
-| **NG-CONSOLE** | B-1 done today: Recovery Console, `arm` login by typed password, `uname -r` = `6.8.0-137-generic` | owner statement + time |
+| **NG-CONSOLE** | B-1 done today: Recovery Console, `arm` login by typed password, `uname -r` = `6.8.0-137-generic`. r8: a **root** (or `afldb-admin`) login, not `arm` (B-1) | owner statement + time |
 | **NG-DATA** | NG-PRE section 5 and NG-OFFHOST PASS for Wednesday. r7: `backup-origin=attributed` on the A-2 owner verdict, NG-OFFHOST's owner G0 PASS, and the `dispatch=` kind recorded. Section 5's restore-chain lines are reported as `ARM-PRODUCED`: the weekly restore runs as arm. Record the B-2 snapshot status and the owner's recovery decision. | panel, A-2 owner path, A-4r7 |
 | **NG-GRUBREAD** | C-1 shapes 1-6 as expected | owner output (UUIDs redacted) |
 | **NG-FALLBACK** | C-2 applied and every check as commented | owner output |
@@ -942,30 +952,53 @@ arm, or the release `r1-g0-dump.sh` over arm's ssh. They may be run and recorded
 02:15–02:50, as root reached by a path that does NOT pass through arm's login. Nothing writes the production checkout
 `/home/arm/projects/afldb`; every install runs from a root-owned staging directory outside `/home` holding a `git archive` of the
 pinned revision: the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).**
+**r8 (28 Nov 2026) supersedes the pins and the root path below**, following `r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md`:
+* **Pins.** The revision is `<R8-PIN:tested-rev>`, and the digests are `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682`, `3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd` and
+  `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`.
+* **Bytes.** They come only from a `git archive` made in the owner's workstation clone, hashed there, carried over the admin path and
+  re-verified in the admin root session against the workstation value. They never come from arm's checkout, git is never run as root
+  there, and no expected digest is read from a file on production.
+* **Session.** Every step below runs in the admin root session or at the console as root. The installers refuse a root session that
+  descends from arm (`REFUSED: root session descends from arm`).
 0. **Root path (R7 independent review round 1, F1; owner decision, not done).** Root today is reached through arm's login (the
    owner's `sudo` in an arm SSH session), so a hostile arm login environment (`~/.bashrc`, `~/.profile`, PATH, an alias or function
    named `sudo`) can capture or reuse it. G1 and G2 hold only if the installs below and every later root action (the
    `sudo -u postgres` steps, every root step of this plan) use a root path that does not pass through arm's login: the console, or a
    separate administrative account with its own key that arm cannot write to. Setting that up is a host-account change that needs
    owner approval; production `sudoers` has not been checked. Until then MED-2 and MED-3 stay OPEN whatever the rehearsals show.
+   **r8:** OWNER-PROCEDURE Phases 0-2 are this precondition:
+   * a console login **as root** (if none is possible: STOP, F1 stays open);
+   * `afldb-admin` with its own key and password, verified twice;
+   * the read-only owner checks.
+   Phase 4 (arm out of sudo) is a separate owner decision, after which the checks must PASS.
 1. Production, sealed backup ([R7 backup README](r6-20261125/review-fixes-r7-20261128/backup/README.md) §5). The base
    `afldb-backup.service`/`.timer` must be root-owned copies, not links into the checkout. The r6 attest drop-in must NOT be installed.
    `/usr/share/zoneinfo/Australia/Melbourne` must be a root-owned regular file. Then: check `backup/SHA256SUMS` (`d0023d10…`) and
    `sha256sum -c`; run `install-backup.sh <staging>` as root; add the `pg_ident.conf` line `afldbbackup afldb-backup afldb_backup` and
    the `pg_hba.conf` line `local afldb_prod afldb_backup peer map=afldbbackup` before any broader `local` line, then
    `SELECT pg_reload_conf()`; run `verify-backup-install.sh` as root and as arm in a **new** login. Both must print
-   `BACKUP INSTALL RESULT PASS`.
+   `BACKUP INSTALL RESULT PASS`. **r8:** both runs are made from the admin root session: `verify-backup-install.sh`, then
+   `verify-backup-install.sh --as-arm`, where root drops to arm via `setpriv … --reset-env`, `bash --noprofile --norc` and stdin
+   `/dev/null`. There is no arm login. The pg edits and the reload (`runuser -u postgres`) run in the same session.
 2. Production, verifier ([R7 verify README](r6-20261125/review-fixes-r7-20261128/verify/README.md) §8, §10). Step 1 must be done
    first, because the verifier joins group `afldb-backup-read`. It also needs `/usr/bin/python3.12`, group `systemd-journal`,
    `/usr/lib/postgresql/16/bin/psql`, `Include /etc/ssh/sshd_config.d/*.conf` at the top of `sshd_config`, and a NEW key pair
    `~/.ssh/afldb_verify` on Stu's workstation, never arm's key. Then: check `verify/SHA256SUMS` (`221b254a…`); run
    `install-verify.sh --role prod --key <staging>/afldb_verify.pub`; as postgres, apply `verifier-db.sql` and the two
    `pg-auth-lines.txt` lines above the first other `local` line, then reload; finally `verify-verify-install.sh --role prod` as root.
+   **r8:** all of it runs in the admin root session. The "as postgres" step is `runuser -u postgres` there. `afldb_verify.pub`
+   travels over the admin path and is fingerprint-checked against the workstation.
 3. streamanator (owner, root there): `install-verify.sh --role offhost --key …` and `verify-verify-install.sh --role offhost`. The
    off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged). Status probes that need the
-   nightly's freshness set `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
+   nightly's freshness set `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`. **r8:**
+   * How the owner reaches root on streamanator is UNKNOWN. streamanator's arm is in `docker`, `lxd` and `sudo`, all
+     root-equivalent, so until the owner decides otherwise `G0B PASS` is attested by a host arm controls. It can forge the off-host
+     claim, not the dump bytes (OWNER-PROCEDURE §8).
+   * The pull-source change is an unprivileged edit of arm's own files: the production `authorized_keys` forced `rrsync -ro` path,
+     and streamanator's pull configuration.
 4. Workstation: `V7` is a fresh `git archive` export of `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify`
-   at `7d69302007568d3141a567c8eba89e4ee473c9a6`. Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…`. Then
+   at `7d69302007568d3141a567c8eba89e4ee473c9a6`. Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…`
+   (r8: at `<R8-PIN:tested-rev>`, `3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd`, `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`, in the owner's own clone). Then
    `bash "$V7/afldb-verify-call.sh" version` must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for `streamanator`
    (role offhost).
 Until all four are done and a sealed timer run exists for the gate date, A-2 and A-4r7 STOP, by design. Rollback: R7 backup README §6.

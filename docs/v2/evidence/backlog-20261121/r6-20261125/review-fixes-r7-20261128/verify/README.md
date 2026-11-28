@@ -19,6 +19,19 @@ exits 0 only for PASS. Release G0 consumes only `OWNER VERDICT G0 PASS`; NG-PRE 
 separate `backup-origin=` field on the same line. `--rehearsal <ssh-config> --key <key>` exists only for the harness, and it prints
 `transport=rehearsal` in every verdict, so a rehearsal verdict can never be pasted as a production one.
 
+`version` prints one `OWNER VERDICT VERSION` line per host and exits 0 only when both are PASS (r8; r7 exited 0 even when a host
+answered STOP).
+
+**What a PASS establishes (r8).** Before an A2 or G0 verdict the wrapper prints one `SCOPE` line:
+* `A2 SCOPE:` an `OWNER VERDICT A2 PASS` establishes that the live production host matched **these seven arguments** at `at=`. The
+  arguments come from the Tuesday record, printed by arm-run scripts over arm's login, and nothing here checks them. PASS lines marked
+  `[ARM-PRODUCED ...]` are authentic readings of arm's data, not independent facts. `backup-origin=attributed` rests on root and
+  PID 1 evidence only.
+* `G0 SCOPE:` the sealed timer run (root seal, PID 1) produced the named dump with that sha256, and streamanator holds a root-re-hashed
+  copy with those bytes after a root cron dispatch; the pull-log lines linking that dispatch to the copy are ARM-PRODUCED.
+A verdict is **authentic** (§3) only while root on both hosts is independent of arm (§10, F1; R7 README §4 item 20 for
+streamanator); authentic is not the same as "every input is true" (R8 `DEPENDENCIES.md` §1).
+
 ## 2. Executing identity and the path to the gate code
 
 1. Stu's Windows OpenSSH client connects to `afldb-verify@<address from ssh -G afldb>` with `-F none` (no alias, no ProxyCommand),
@@ -79,8 +92,9 @@ result for the night under test, reported apart from the gate verdict (DESIGN 5.
 
 ## 6. Trusted inputs (and what each core trusts)
 
-Trusted: root, PID 1 (`systemctl show`, `busctl`), sshd, journald's trusted fields (`_UID`, `_SYSTEMD_INVOCATION_ID`,
-`_TRANSPORT`), root-owned files, the two service accounts (afldb-backup, afldb-verify), and the PostgreSQL server's own answers to
+Trusted: root, PID 1 (`systemctl show`, `busctl`), sshd, journald's trusted fields (`_UID`, `_SYSTEMD_UNIT`,
+`_SYSTEMD_INVOCATION_ID`, `_TRANSPORT`; r8: **not** the `MESSAGE` of an entry whose sender runs arm's code, such as the restore line
+of `afldb-backup-verify.service`, which runs arm's checkout script as arm: §9 item 1), root-owned files, the two service accounts (afldb-backup, afldb-verify), and the PostgreSQL server's own answers to
 the peer role `afldb_verify` as **facts about the catalogue as it stands**. Untrusted data: everything uid arm owns or writes. Data
 from arm is read only through the root facts reader (below), as bytes, sanitised to printable ASCII before printing, and never
 executed, sourced or loaded.
@@ -91,7 +105,7 @@ restore test runs as arm). The authenticated `afldb_verify` login proves only th
 about those objects is arm-influenced data. A-2's `ledger 118` and the `afldb_restore_test` comment and connection-count lines are
 therefore arm-decided (R7 README §4) and are printed through `san()` like every other arm-derived value. If arm's role were a
 superuser it could also act as OS user `postgres`, which owns `pg_hba.conf`/`pg_ident.conf` (both peer maps): unchecked on
-production (R7 README §4, item 9).
+production (R7 README §4, item 17, which r8 states precisely: what such a role could and could not do).
 
 - **G0 (production)**: origin, dump and its digest exclusively from `sealed_origin <date>` (the R7/backup library, sourced from the
   bundle copy). The sealed run's failure record is PID 1's `Result=` of afldb-backup.service; arm's `.state` markers are reported as arm-produced.
@@ -127,11 +141,19 @@ gives the `pg_ident.conf` line `afldbverify afldb-verify afldb_verify` and the `
 `local afldb_prod afldb_verify peer map=afldbverify`, which must sit **above** the first other `local` line. Then reload PostgreSQL.
 The staging directory is root-only, so feed the SQL on stdin from the root shell:
 `runuser -u postgres -- psql -X -v ON_ERROR_STOP=1 -d afldb_prod < /root/<staging>/verifier-db.sql`.
+That root shell is the admin root session of `../../review-fixes-r8-20261128/OWNER-PROCEDURE.md` (r8): `afldb-admin`'s own SSH
+login, then `sudo -k; sudo /usr/bin/bash --noprofile --norc`. The provider console logged in as root also qualifies. The
+`runuser`, the `pg_ident`/`pg_hba` edits and the reload (`runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'`) all run
+there, never in an arm session. The comments in `verifier-db.sql` (`sudo -u postgres psql …`) and `pg-auth-lines.txt`
+(`sudo systemctl reload …`) mean the same commands typed in that session.
 
 ## 9. Remaining arm dependencies (labelled ARM-PRODUCED in the output where they appear)
 
 1. The weekly restore evidence: arm's `last-verify.json`, FAILED markers in arm's `.state`, the restored dump file (the restore runs
-   as arm). The journal side of it is trusted; the state files are not.
+   as arm). r8 correction: the journal side is not trusted as a whole. `afldb-backup-verify.service` runs arm's checkout script as
+   arm, so the restore line's content and the exit status behind `Result=success` are arm-authored; only the journald trusted fields
+   (`_SYSTEMD_UNIT`, `_SYSTEMD_INVOCATION_ID`, receipt time) and PID 1's timer and start facts are trusted: they prove that the
+   scheduled unit ran and when, not what it restored.
 2. The application itself: release directories, `release.json`, `events.log`, and the HTTP answers of `/api/health` and
    `_buildManifest.js` are produced by arm's processes. The verifier proves which release directory the running MainPID uses (kernel
    cwd) but not that its content is what was built.
@@ -143,6 +165,12 @@ The staging directory is root-only, so feed the SQL on stdin from the root shell
 The complete list after the independent review (round 1), including the path to root (F1), the database-decided A-2 lines, the
 worker count, `events.log`'s restart note, the arm-served off-host pull, denial, and the unchecked PostgreSQL superuser question, is
 in the R7 README §4; this section is not narrower than that list.
+
+r8: every A-2 PASS line that rests on arm's data now carries `[ARM-PRODUCED ...]` (InvocationID against the attested argument, the
+worker count, `current`, the release status port, the env counts, the A1 baseline, the restore service result, the markers, the
+backup status, `ledger 118`, `afldb_restore_test`), and so do G0b's copy, crontab, invocation and scheduled-pull lines. The seven A-2
+arguments themselves are arm-printed (R7 README §4 item 19), and streamanator's root is reachable by streamanator's arm today (item
+20). The full classification is R8 `DEPENDENCIES.md`.
 
 ## 10. Install
 
@@ -156,8 +184,26 @@ done).
 owner's `sudo` inside an arm SSH session), so a hostile arm login environment can capture or reuse it: it could install a different
 verifier, edit `authorized_keys`, the sshd drop-in or the peer maps, and every verdict would then be arm's. G2 holds only if this
 install and every later root action (the `postgres` steps of §8, any re-install or rollback) use a root path that does not pass
-through arm's login: the console, or a separate administrative account with its own key that arm cannot write to. Creating it is a
+through arm's login. r8 defines that path in `../../review-fixes-r8-20261128/OWNER-PROCEDURE.md`:
+* the provider console logged in **as root** (Phase 0), or
+* the admin root session: `afldb-admin`'s own key and password, then `sudo -k; sudo /usr/bin/bash --noprofile --norc` (Phase 1).
+
+None of these qualifies: `sudo` in an arm SSH session, `ssh afldb … sudo`, or a console login as arm. Creating that path is a
 host-account change that needs owner approval; production `sudoers` has not been checked.
+
+The block below runs in that session:
+* The "root-owned staging copy" is a `git archive` of the r8 tested revision, made in the owner's workstation clone, carried over the
+  admin path, and re-verified in the admin root session against the workstation's `sha256sum` of the tar and of `SHA256SUMS`
+  (wrapper `BUNDLE_SHA` `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`). This file is itself listed in the packet
+  `SHA256SUMS`, so the tested revision and the packet digest cannot be written here: they are in the r8 record's pin table
+  (`../../review-fixes-r8-20261128/README.md`), which the owner reads in the workstation clone. No byte and no expected digest comes
+  from arm's checkout or from any file on production.
+* `afldb_verify.pub` travels the same way, and its `ssh-keygen -lf` fingerprint must equal the workstation's.
+* `install-verify.sh` refuses (r8) a root session that descends from arm: an ancestor with real or effective uid arm,
+  `SUDO_USER`/`SUDO_UID` = arm, or loginuid = arm. It prints `REFUSED: root session descends from arm` before any change.
+* The streamanator line needs the same kind of independent root path on streamanator. How the owner reaches it is UNKNOWN, and
+  streamanator's arm is in `docker`, `lxd` and `sudo` (OWNER-PROCEDURE §8), so `G0B PASS` is not independent of streamanator's arm
+  until the owner decides.
 
 ```text
 # as root, from a root-owned staging copy of verify/ (never from arm's checkout):
@@ -199,12 +245,29 @@ read-only check, and **never writes arm's checkout**.
 9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `1153df78…`). Any later
    change there must be copied here and followed by `build-sums.sh` (the wrapper's pinned bundle digest changes with it).
 10. Harness image adds `python3`, `cron` and `tzdata` to r6's package list (the verifier needs python3.12; G0B needs a real cron).
+11. **r8, `install-verify.sh` trust order.** r7 sourced the staging `bundle/lib.sh` before checking that the staging was trusted, so
+    a staging copy an arm process could write (the case the check exists to refuse) ran arm's `lib.sh` as root. r8 refuses `/home`,
+    checks every component with a verbatim copy of `trusted_path` and lib.sh's digest against `bundle/SHA256SUMS` before sourcing
+    it, and checks `verify-verify-install.sh` (trusted, equal to its packet `SHA256SUMS` line) before any change.
+12. **r8, installer guard.** `install-verify.sh` refuses, before any change, a root session that descends from arm (an ancestor
+    with arm's real or effective uid, `SUDO_USER`/`SUDO_UID` = arm, or loginuid = arm), printing
+    `REFUSED: root session descends from arm: <test>`. A tripwire for `sudo` in an arm session, not a proof of the F1 root path.
+13. **r8, wrapper.** `version` exits 1 unless both hosts answer an authenticated PASS; `A2 SCOPE:` and `G0 SCOPE:` lines (§1) are
+    printed before the verdict. A-2 and G0b PASS lines resting on arm's data carry `[ARM-PRODUCED ...]` (§9). No check changed.
+14. Harness image (r8) adds `sudo`, used only inside the prod container by scenario h.
 
 ## 12. Rehearsal (`../verify-harness/`)
 
 ```text
-bash verify-harness/r7v-run.sh [--verify-rev <rev>] <RID>        # from the workstation (Git Bash); DEV host only
+bash verify-harness/r7v-run.sh [--verify-rev <rev>] [--log-dir <dir>] <RID>   # from the workstation (Git Bash); DEV host only
 ```
+
+r8 added `--log-dir` (dev runs write under R8 `dev-logs/`, so the recorded r7 logs are never overwritten) and three scenarios:
+**h installer-guard** (arm gets sudo inside the prod container only; the workstation logs in as arm by ssh and runs
+`sudo install-verify.sh`, plainly and with `SUDO_*` removed: both REFUSED, the verifier's state digest unchanged), **i staging-libsh**
+(a hostile `bundle/lib.sh` in an arm-owned, a group-writable and a tampered staging copy is never sourced; CONTRAST: the r7 blob ran it
+as root), **j version-exit** (control exit 0; an off-host VERSION STOP gives exit 1; CONTRAST: the r7 blob exited 0). Scenarios a and
+c also require the SCOPE line and the ARM-PRODUCED labels, and c reports A-2's `backup-origin=` and the whole-A-2 exit separately.
 
 Two disposable containers on streamanator (`--network none`, never `--privileged`, label `r7v.run=<RID>`), whose PID 1 is the real
 systemd 255. `afldb-prod` has a fixed-offset Melbourne zone so the **real afldb-backup.timer** fires at 02:20 local about two

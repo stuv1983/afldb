@@ -47,7 +47,7 @@ rootfacts g0b "$DAY" "$D" || failed "the root facts reader failed: $RF_WHY"
 [ "${RF[sidecar_lines]:-}" = 1 ] || failed 'sidecar missing or multiline'
 awk -v h="$S" -v n="$D" 'NF==2 && $1==h {sub(/^\*/, "", $2); if ($2==n) good=1} END {exit !good}' <<< "${RF[sidecar_line]:-}" || failed 'sidecar dump/checksum differs from production'
 [[ ${RF[dump_sha256]:-} = "$S" ]] || failed 'recomputed off-host checksum differs from production'
-echo "COPY VERIFIED $D sha256=$S (bytes re-hashed by the root facts reader, named sidecar, verified marker, no hold)"
+echo "COPY VERIFIED $D sha256=$S (bytes re-hashed by the root facts reader, named sidecar, verified marker, no hold) [the bytes: root re-hash; sidecar, marker and hold: ARM-PRODUCED]"
 
 # ---- B. The scheduled origin
 SCHED='10 3 * * *'
@@ -57,7 +57,7 @@ LINE="$SCHED $CMD"
 CT=${RF[crontab_line]:-}
 [[ $(grep -cxF "$LINE" <<< "$CT") = 1 ]] &&
   grep -A1 '^# AFLDB-A2-r3' <<< "$CT" | grep -qxF "$LINE" || unproven 'cron r3 marker+job pair missing or ambiguous in the crontab'
-echo "SCHEDULE crontab pair present: $SCHED"
+echo "SCHEDULE crontab pair present: $SCHED [ARM-PRODUCED: read from the root-only spool, but arm edits its crontab]"
 W0=$(TZ=Australia/Melbourne date -d "$DAY 03:10" +%s); W1=$((W0+60)); DEADLINE=$((W0+2100))
 J=$(timeout -k 5 120 "$PY" -I -S "$VPY" journal-cron "$W0" "$W1") || unproven 'cron journal unreadable'
 dpid=(); dtime=()
@@ -91,7 +91,7 @@ done < <(awk '$2=="BEGIN" && NF==5' <<< "$LOGL")
 [[ ${#matches[@]} -ge 1 ]] || unproven 'no wrapper invocation links to this dispatch (a manual run, an invocation logged before lineage recording, or a recycled PID)'
 [[ ${#matches[@]} = 1 ]] || unproven 'more than one wrapper invocation links to this dispatch'
 read -r run start <<< "${matches[0]}"
-echo "INVOCATION linked to dispatch: $(san "$run" 80) (lineage contains pid ${dpid[0]}, started within 5 s of the journal record)"
+echo "INVOCATION linked to dispatch: $(san "$run" 80) (lineage contains pid ${dpid[0]}, started within 5 s of the journal record) [ARM-PRODUCED: the pull log is arm's; the dispatch is root cron's journald record]"
 mapfile -t E < <(awk -v r="$run" '$2=="END" && $3==r && NF==4' <<< "$LOGL")
 [[ ${#E[@]} = 1 ]] || failed "scheduled invocation $(san "$run" 80) has no unique completion record (not finished, or crashed); a retry cannot replace it"
 read -r et tag er rc <<< "${E[0]}"
@@ -102,7 +102,7 @@ mapfile -t V < <(awk -v r="$run" -v d="dump=$D" -v s="sha256=$S" '$2=="VERIFIED"
 [[ ${#V[@]} = 1 ]] || unproven "the scheduled invocation succeeded but did not itself verify $D with this checksum"
 vtime=$(date -d "${V[0]%% *}" +%s 2>/dev/null) || unproven 'invalid verification time'
 (( vtime >= start && vtime <= fin )) || unproven 'verification record lies outside the invocation'
-echo "PASS scheduled pull date=$DAY dispatch_pid=${dpid[0]} $(san "$run" 80) completion=$(san "$et" 40) rc=0"
+echo "PASS scheduled pull date=$DAY dispatch_pid=${dpid[0]} $(san "$run" 80) completion=$(san "$et" 40) rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]"
 echo "OFFHOST-COMPARE $D $S"
 echo 'RESULT SCHEDULED-COPY-VERIFIED'
 finish 0

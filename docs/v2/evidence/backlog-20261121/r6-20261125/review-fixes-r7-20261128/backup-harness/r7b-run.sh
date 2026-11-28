@@ -3,14 +3,16 @@
 # the listed worktree files to a private streamanator workspace, runs r7b-host.sh there, pulls the logs back into
 # backup-harness/logs/, removes the workspace (and, unless --image/--keep-image, the image it built).
 # Usage (Git Bash on the workstation):
-#   bash r7b-run.sh [--verify-rev <rev>] [--image <tag>] [--keep-image] <RID> [scenario ...]
+#   bash r7b-run.sh [--verify-rev <rev>] [--image <tag>] [--keep-image] [--log-dir <dir>] <RID> [scenario ...]
+#   --log-dir DIR     r8: pull the logs into DIR (absolute, or relative to the worktree) instead of backup-harness/logs/, whose
+#                     r7b-<scenario>.log files are the recorded r7 runs and must not be overwritten (r8 dev runs: R8/dev-logs/...).
 #   --verify-rev REV  before sending, compare every worktree file sent with its blob at REV (git show REV:<path> | sha256sum); any
 #                     difference refuses the run. The result is sent as presend.txt and printed in every scenario log.
 #   --image TAG       reuse an existing harness image on streamanator instead of building r7b-sysd-<RID>:1 (kept afterwards).
 # Exit 0 only when the host prints "R7 BACKUP HARNESS RESULT PASS".
 set -uo pipefail
-VREV=; HOSTOPT=()
-while :; do case ${1:-} in --verify-rev) VREV=${2:?revision}; shift 2;; --image) HOSTOPT+=(--image "${2:?tag}"); shift 2;; --keep-image) HOSTOPT+=(--keep-image); shift;; *) break;; esac; done
+VREV=; HOSTOPT=(); LOGDIR=
+while :; do case ${1:-} in --verify-rev) VREV=${2:?revision}; shift 2;; --image) HOSTOPT+=(--image "${2:?tag}"); shift 2;; --keep-image) HOSTOPT+=(--keep-image); shift;; --log-dir) LOGDIR=${2:?dir}; shift 2;; *) break;; esac; done
 RID=${1:?rid}; shift
 [[ $RID =~ ^[A-Za-z0-9-]+$ ]] || { echo "STOP the run id must be [A-Za-z0-9-]+"; exit 2; }
 WT=/d/dev/afldb-closeout-20261127
@@ -45,8 +47,9 @@ echo "workspace $WS"
 tar -C "$WT" -cf - "${SENT[@]}" | "${SSH[@]}" "mkdir -m 700 '$WS/fix' && tar -C '$WS/fix' -xf - && find '$WS/fix' -type f | wc -l"
 "${SSH[@]}" "cat > '$WS/presend.txt'" < "$STAGE/presend.txt"
 "${SSH[@]}" "bash '$WS/fix/$R7/backup-harness/r7b-host.sh' '$WS' '$RID' ${HOSTOPT[*]} $*"; RC=$?
-mkdir -p "$WT/$R7/backup-harness/logs"
-"${SSH[@]}" "tar -C '$WS/logs' -cf - ." | tar -C "$WT/$R7/backup-harness/logs" -xf -
+case $LOGDIR in "") LD=$WT/$R7/backup-harness/logs;; /*) LD=$LOGDIR;; *) LD=$WT/$LOGDIR;; esac
+mkdir -p "$LD"; echo "logs -> $LD"
+"${SSH[@]}" "tar -C '$WS/logs' -cf - ." | tar -C "$LD" -xf -
 "${SSH[@]}" "rm -rf '$WS'; ls -d \"\$HOME\"/r7b-ws.* 2>/dev/null; echo containers left: \$(docker ps -a --filter label=r7b.run=$RID -q | wc -l) images left: \$(docker images --filter label=r7b.run=$RID -q | wc -l)"
 echo "host driver exit $RC"
 exit $RC

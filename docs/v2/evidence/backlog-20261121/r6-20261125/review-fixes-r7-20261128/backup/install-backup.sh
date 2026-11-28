@@ -3,6 +3,8 @@
 # NOT RUN ON PRODUCTION. Run by the OWNER, as root reached by a path that does NOT pass through arm's login (the console, or a
 # separate administrative account with its own key; not sudo in an arm SSH session: R7 independent review round 1, F1; README 5):
 #   bash <staging>/install-backup.sh <staging>
+# r8: before any change it REFUSES a root session that descends from arm (an ancestor with arm's uid, SUDO_USER/SUDO_UID = arm, or
+# loginuid = arm), printing "REFUSED: root session descends from arm: <test>"; a tripwire for that mistake, not proof of F1.
 # <staging> is a root-owned directory (not under /home, no group/other write anywhere on its path) holding exactly the reviewed
 # bundle: SHA256SUMS, afldb-backup-run, afldb-backup-seal, 70-afldb-backup-sealed.conf, sealed-origin.sh, install-backup.sh,
 # verify-backup-install.sh and backup.sh (= the repository's tools/maintenance/backup.sh, byte-identical).
@@ -26,6 +28,35 @@ CODE=/usr/local/lib/afldb-backup; DR=/var/lib/afldb-backup; DID=/etc/systemd/sys
 DI=$DID/70-afldb-backup-sealed.conf; R6DI=$DID/60-afldb-backup-attest.conf
 
 [ "$(id -u)" = 0 ] || die "run as root (uid $(id -u))"
+# r8 installer guard (R8 DEPENDENCIES.md, F1): refuse, BEFORE ANY CHANGE, a root session that descends from arm. Three tests, each
+# named when it fires: (ancestor) a process from $$ up to PID 1 (PPid in /proc/<pid>/status) has arm's uid as its real or effective
+# uid; (SUDO_USER/SUDO_UID) SUDO_USER=arm or SUDO_UID=<arm's uid>; (loginuid) /proc/$$/loginuid = arm's uid (unset, 4294967295, is
+# allowed). A TRIPWIRE for the documented mistake (sudo in an arm login), NOT a proof of independence: root that arm already holds can
+# start this script outside its own process tree, with a clean environment and an unset loginuid. F1 remains an owner action.
+arm_guard() {
+  local au pid=$$ hops=0 st k a b ru eu pp nm lu; local -a why=()
+  au=$(id -u arm 2>/dev/null); [[ $au =~ ^[0-9]+$ ]] || { GUARD_WHY="there is no user arm on this host"; return 2; }
+  while :; do
+    st=$(cat -- "/proc/$pid/status" 2>/dev/null) || { why+=("test ancestor: /proc/$pid/status unreadable, the walk to PID 1 cannot complete"); break; }
+    ru=; eu=; pp=; nm=
+    while read -r k a b _; do case $k in Name:) nm=$a;; Uid:) ru=$a; eu=$b;; PPid:) pp=$a;; esac; done <<< "$st"
+    if [ "$ru" = "$au" ] || [ "$eu" = "$au" ]; then why+=("test ancestor: pid $pid (${nm//[^A-Za-z0-9_.:-]/?}) has real/effective uid $ru/$eu, arm is $au"); fi
+    [ "$pid" = 1 ] && break
+    [[ $pp =~ ^[0-9]+$ ]] && [ "$pp" != 0 ] || break   # PPid 0: the top of this PID namespace
+    pid=$pp; hops=$((hops + 1)); [ "$hops" -lt 4096 ] || { why+=("test ancestor: no PID 1 within 4096 hops"); break; }
+  done
+  [ "${SUDO_USER:-}" = arm ] && why+=("test SUDO_USER: SUDO_USER=arm")
+  [ -n "${SUDO_UID:-}" ] && [ "${SUDO_UID:-}" = "$au" ] && why+=("test SUDO_UID: SUDO_UID=$au (arm)")
+  lu=$(cat /proc/$$/loginuid 2>/dev/null); [[ $lu =~ ^[0-9]+$ ]] || lu=unreadable
+  [ "$lu" = "$au" ] && why+=("test loginuid: /proc/$$/loginuid=$au (arm)")
+  if [ "${#why[@]}" -gt 0 ]; then GUARD_WHY=$(printf '%s; ' "${why[@]}"); GUARD_WHY=${GUARD_WHY%; }; return 1; fi
+  a=${SUDO_USER:-unset}; b=${SUDO_UID:-unset}
+  GUARD_OK="no ancestor of pid $$ has arm's uid ($hops hops to pid $pid), SUDO_USER=${a//[^A-Za-z0-9_.-]/?} SUDO_UID=${b//[^0-9a-z]/?}, loginuid=$lu"
+}
+arm_guard; g=$?
+[ "$g" = 2 ] && die "$GUARD_WHY"
+if [ "$g" != 0 ]; then printf 'REFUSED: root session descends from arm: %s\n' "$GUARD_WHY"; printf 'BACKUP INSTALL RESULT FAIL (nothing was changed)\n'; exit 1; fi
+say "session check: $GUARD_OK (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 4 item 9)"
 [ -n "$STG" ] && [[ $STG =~ ^(/[A-Za-z0-9_.@-]+)+$ ]] || die "usage: install-backup.sh <absolute root-owned staging directory>"
 case "$STG/" in /home/*) die "the staging directory must not be under /home";; */./*|*/../*) die "the staging path must be plain (no . or ..)";; esac
 # Trusted staging: no symbolic link, every component root-owned and not group/other-writable, and every bundle file too.
@@ -112,8 +143,9 @@ OWNER STEPS STILL REQUIRED (not done by this script):
       pg_ident.conf, add:   afldbbackup afldb-backup afldb_backup
       pg_hba.conf, add BEFORE any broader 'local' line:
                             local afldb_prod afldb_backup peer map=afldbbackup
-      then:                 sudo -u postgres psql -c 'SELECT pg_reload_conf()'
- 2. Run verify-backup-install.sh as root, then as arm in a NEW login (both must print BACKUP INSTALL RESULT PASS).
+      then, in this root session:  runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'
+ 2. In this root session: bash verify-backup-install.sh, then bash verify-backup-install.sh --as-arm (arm's checks, run as arm
+    through setpriv without arm's login); both must end BACKUP INSTALL RESULT PASS. A run in an arm login is INFO only.
  3. streamanator: change the off-host pull source to <prod>:/var/lib/afldb-backup/published/ (offhost-pull.sh is unchanged).
  4. Status probes: AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state for `scheduled-backup.sh status`.
  5. Leave the timer as it is: the next 02:20 run is the first sealed one (seals/<invocation>.seal + published/<dump>).

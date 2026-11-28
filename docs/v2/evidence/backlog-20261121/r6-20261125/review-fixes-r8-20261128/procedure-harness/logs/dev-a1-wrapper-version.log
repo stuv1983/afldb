@@ -1,0 +1,8 @@
+== dev-a1 2026-11-28T03:11:00Z workstation: afldb-verify-call.sh version (verify key; one host in this harness)
+== afldb-verify-call 2026-11-28T03:10:57Z mode=version transport=rehearsal pinned-bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e key=C:/Users/stuar/AppData/Local/Temp/tmp.raHt4ZVZFx/verify
+
+[ssh stderr] afldb-verify@r8p-host: Permission denied (publickey,password).
+OWNER VERDICT VERSION STOP transport=rehearsal host=afldb-prod reason="0 RESULT lines (need exactly 1; ssh exit 255)"
+
+[ssh stderr] banner exchange: Connection to UNKNOWN port -1: Connection refused
+OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator reason="0 RESULT lines (need exactly 1; ssh exit 255)"
