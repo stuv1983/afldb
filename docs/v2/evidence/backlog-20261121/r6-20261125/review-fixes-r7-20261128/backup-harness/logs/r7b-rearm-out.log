@@ -1,61 +1,62 @@
 == R7 sealed-backup scenario rearm-out
-host streamanator (arm); started 2026-11-27T23:39:49Z; container r7b-t5c2c2280-rearm-out; image r7b-sysd-t5c2c2280:1
-[FIXTURE] fake Melbourne offset 2:50:00: local 2026-11-28 02:32:00 is real 2026-11-27T23:42:00Z
-[TRANSPORT] workstation 2026-11-27T23:37:24Z: 16 worktree files, CR stripped (none expected)
-[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 5c2c2280e4688a063a5f943512e4460e250b1135 (git show <rev>:<path> | sha256sum)
+host streamanator (arm); started 2026-11-28T01:02:34Z; container r7b-t7d693020-rearm-out; image r7b-sysd-t7d693020:1
+[FIXTURE] fake Melbourne offset 1:27:00: local 2026-11-28 02:32:00 is real 2026-11-28T01:05:00Z
+[TRANSPORT] workstation 2026-11-28T01:00:21Z: 16 worktree files, CR stripped (none expected)
+[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 7d69302007568d3141a567c8eba89e4ee473c9a6 (git show <rev>:<path> | sha256sum)
    EQUAL 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
-   EQUAL 33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   EQUAL 793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
    EQUAL f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
-   EQUAL 48827fb1791d3a1e6d9cfd827be1f4e6c5471c2d6292de01b246b7e2c54f98f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
-   EQUAL f5d80c2b476fc7bd746f55c7005c07b9c0169f4704d2e9f7bc53cd72137644c6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
-   EQUAL 29674856399cb600256beb97a54f151ea177b7f9de6b7542e3589ecdec104123  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
-   EQUAL aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   EQUAL 1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   EQUAL f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   EQUAL f286ea7b7372d20ced0ac45380e5927e8461f490c1c20c83022f5abe6330eb9e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   EQUAL d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
    EQUAL 8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
-   EQUAL 75f96c7fc7c6f712e67b461770c0e83e2d667b6995ad3465d6f12049073c8e5b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
-   EQUAL 89bdad0c912655b152b847ce1c08030c41cbef4c83a092ec8bc97704256ddbc0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   EQUAL 0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   EQUAL 4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
    EQUAL df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
    EQUAL a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
    EQUAL 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
    EQUAL edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
    EQUAL 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
    EQUAL c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
-   result: every sent file equals its blob at 5c2c2280e4688a063a5f943512e4460e250b1135
+   result: every sent file equals its blob at 7d69302007568d3141a567c8eba89e4ee473c9a6
 inputs (sha256, as sent):
    c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
    edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
    76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
-   89bdad0c912655b152b847ce1c08030c41cbef4c83a092ec8bc97704256ddbc0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
-   75f96c7fc7c6f712e67b461770c0e83e2d667b6995ad3465d6f12049073c8e5b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
    8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
    f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
-   aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
    2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
-   33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
-   f5d80c2b476fc7bd746f55c7005c07b9c0169f4704d2e9f7bc53cd72137644c6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
-   48827fb1791d3a1e6d9cfd827be1f4e6c5471c2d6292de01b246b7e2c54f98f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
-   29674856399cb600256beb97a54f151ea177b7f9de6b7542e3589ecdec104123  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f286ea7b7372d20ced0ac45380e5927e8461f490c1c20c83022f5abe6330eb9e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
    df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
    a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
    7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
-container id: 76f29d70d1e45d5904e565e76ee7d238a67a44f3f6fbc44e007622aa0dfd93b7
+container id: a889ed061e4738a29b7af5f45561f7fb52cc444d5312aaa25debbba56c7bb555
 
 == environment
 [REAL-SYSTEMD] systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS; PID 1: systemd
-[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-27T23:39:59, local 2026-11-28 02:29:59 AEDT; planned moment real 23:42:00Z = local 2026-11-28 02:32:00 AEDT
-[HARNESS] scenario rearm-out: expect=refused kind=scheduled timer=at-td lock-hold=0 seal-hold=0 retention-fixture=0 arm-suite=0 refusal='0 seals .* in the .* 02:20-02:31 window'
+[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-28T01:02:42, local 2026-11-28 02:29:42 AEDT; planned moment real 01:05:00Z = local 2026-11-28 02:32:00 AEDT
+[HARNESS] scenario rearm-out: expect=refused kind=scheduled timer=at-td lock-hold=0 seal-hold=0 retention-fixture=0 arm-suite=0 production-timing=0 refusal='0 seals .* in the .* 02:20-02:31 window'
 fs.protected_hardlinks=1 fs.protected_symlinks=1 kernel.yama.ptrace_scope=1
 
 == PostgreSQL 16 fixture database afldb_prod [REAL server, FIXTURE contents]
-[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-8420c62bf68edc0b; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
+[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-06fbf9ded0d23146; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
 
 == units [REAL deploy/ files] and the timer timing drop-in [FIXTURE]
+timer effective: AccuracyUSec=1s RandomizedDelayUSec=0 Persistent=yes 
 service edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8 timer 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84 failed c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61
 
 == owner install from a root-owned staging directory [REAL install-backup.sh]
 staging /opt/r7b-staging: -rw-r--r-- root:root 70-afldb-backup-sealed.conf; -rw-r--r-- root:root SHA256SUMS; -rw-r--r-- root:root afldb-backup-run; -rw-r--r-- root:root afldb-backup-seal; -rw-r--r-- root:root backup.sh; -rw-r--r-- root:root install-backup.sh; -rw-r--r-- root:root sealed-origin.sh; -rw-r--r-- root:root verify-backup-install.sh; 
-SHA256SUMS aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
+SHA256SUMS d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
 install-backup.sh /opt/r7b-staging (root): exit 0
-   | bundle /opt/r7b-staging verified: SHA256SUMS aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab (compare with README.md before going on; the install continues only on a match you have checked)
+   | bundle /opt/r7b-staging verified: SHA256SUMS d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6 (compare with README.md before going on; the install continues only on a match you have checked)
    | accounts: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) (a session started before this sees the new group only after a new login)
    | sealed_origin_install: PASS (trusted paths, pinned digests, effective unit)
    | OWNER STEPS STILL REQUIRED (not done by this script):
@@ -77,7 +78,7 @@ verify-backup-install.sh as root BEFORE the owner's PostgreSQL step: exit 1 (exp
    | BACKUP INSTALL RESULT FAIL
 [FIXTURE] owner step 1 applied as printed: pg_hba first line 'local afldb_prod afldb_backup peer map=afldbbackup', pg_ident 'afldbbackup afldb-backup afldb_backup', pg_reload_conf()
 verify-backup-install.sh as root: exit 0
-   | == verify-backup-install 2026-11-27T23:40:42Z as uid=0(root) gid=0(root) groups=0(root)
+   | == verify-backup-install 2026-11-28T01:03:25Z as uid=0(root) gid=0(root) groups=0(root)
    | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
    | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
    | PASS the r6 attest drop-in is absent
@@ -94,7 +95,7 @@ verify-backup-install.sh as root: exit 0
    | PASS afldb-backup authenticates by peer as afldb_backup (no secret)
    | BACKUP INSTALL RESULT PASS
 verify-backup-install.sh as arm (new login, env -i): exit 0
-   | == verify-backup-install 2026-11-27T23:40:45Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | == verify-backup-install 2026-11-28T01:03:28Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
    | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
    | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
    | PASS the r6 attest drop-in is absent
@@ -157,33 +158,33 @@ verify-backup-install.sh as arm (new login, env -i): exit 0
    drwx------ afldb-backup:afldb-backup links=2 directory /var/lib/afldb-backup/staging
    drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/state
    arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); afldb-backup: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); r7reader: uid=1500(r7reader) gid=1500(r7reader) groups=1500(r7reader),997(afldb-backup-read)
-[FIXTURE] timer stamp set to the previous night's dispatch: 2026-11-27 02:20:03.000000000 +0250; the timer is NOT started before the 02:20 elapse
-[HARNESS] setup done 72 s before the planned moment; window 2026-11-28 02:20:00 AEDT .. 02:31:00
-[REAL-SYSTEMD] root (attended re-arm) started afldb-backup.timer at 02:32:00.170
-[REAL-SYSTEMD] invocation d7ef90ac4a1447bb8aae9b0ffc9d4c0d job 214 state activating/start
+[FIXTURE] timer stamp set to the previous night's dispatch: 2026-11-27 02:20:03.000000000 +0127; the timer is NOT started before the 02:20 elapse
+[HARNESS] setup done 90 s before the planned moment; window 2026-11-28 02:20:00 AEDT .. 02:31:00
+[REAL-SYSTEMD] root (attended re-arm) started afldb-backup.timer at 02:32:00.109
+[REAL-SYSTEMD] invocation c3244c4215714f5cbe01cc4cbb35a9a1 job 214 state activating/start
 
 == after the run (REAL-SYSTEMD, root)
-timer: LastTriggerUSec=Sat 2026-11-28 02:32:00 AEDT LastTriggerUSecMonotonic=1w 7h 40min 40.990156s Result=success ActiveEnterTimestampMonotonic=632440989363  busctl LastTriggerUSec=t 1795822920168707
-service: Result=success NRestarts=0 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive SubState=dead InvocationID=d7ef90ac4a1447bb8aae9b0ffc9d4c0d 
+timer: LastTriggerUSec=Sat 2026-11-28 02:32:00 AEDT LastTriggerUSecMonotonic=1w 9h 3min 40.928684s Result=success ActiveEnterTimestampMonotonic=637420927624  busctl LastTriggerUSec=t 1795827900107235
+service: Result=success NRestarts=0 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive SubState=dead InvocationID=c3244c4215714f5cbe01cc4cbb35a9a1 
 failed unit: Result=success ExecMainStartTimestamp= ; marker: cat: /home/arm/backups/afldb-scheduled/.state/FAILED-unit: No such file or directory
 journal (root) of afldb-backup.service:
-   | Nov 28 02:32:00.174011 r7b-rehearsal systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]: ==> Backing up afldb_prod to /var/lib/afldb-backup/staging/afldb_prod-20261128-023200.dump
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]:     wrote 108K in 0s
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]:     archive readable, 5 objects
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]:     a dump is not proven until restored: tools/maintenance/restore-test.sh
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]: ==> Pruning backups older than the newest 1
-   | Nov 28 02:32:00.575751 r7b-rehearsal bash[1616]: ==> Done. 1 backup(s) of afldb_prod retained in /var/lib/afldb-backup/staging
-   | Nov 28 02:32:00.584705 r7b-rehearsal bash[1616]: backup ok: afldb_prod-20261128-023200.dump 110150 bytes sha256 a5d0f702c65bd55a offhost=skipped
-   | Nov 28 02:32:00.707788 r7b-rehearsal env[1660]: afldb-backup-seal: sealed d7ef90ac4a1447bb8aae9b0ffc9d4c0d (catch-up, trigger afldb-backup.timer, dispatch 1795822920168707) and published afldb_prod-20261128-023200.dump sha256 a5d0f702c65bd55a
-   | Nov 28 02:32:00.709414 r7b-rehearsal systemd[1]: afldb-backup.service: Deactivated successfully.
-   | Nov 28 02:32:00.709650 r7b-rehearsal systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
-seals:
-   -rw-r--r-- root:root links=1 size=813 /var/lib/afldb-backup/seals/d7ef90ac4a1447bb8aae9b0ffc9d4c0d.seal
-      afldb-backup-seal/3
-      sealer_sha256=33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83
+   | Nov 28 02:32:00.110035 r7b-rehearsal systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]: ==> Backing up afldb_prod to /var/lib/afldb-backup/staging/afldb_prod-20261128-023200.dump
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]:     wrote 108K in 0s
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]:     archive readable, 5 objects
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]:     a dump is not proven until restored: tools/maintenance/restore-test.sh
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]: ==> Pruning backups older than the newest 1
+   | Nov 28 02:32:00.574513 r7b-rehearsal bash[1794]: ==> Done. 1 backup(s) of afldb_prod retained in /var/lib/afldb-backup/staging
+   | Nov 28 02:32:00.584528 r7b-rehearsal bash[1794]: backup ok: afldb_prod-20261128-023200.dump 110150 bytes sha256 f4a4477c659006c0 offhost=skipped
+   | Nov 28 02:32:00.711924 r7b-rehearsal env[1840]: afldb-backup-seal: sealed c3244c4215714f5cbe01cc4cbb35a9a1 (catch-up, trigger afldb-backup.timer, dispatch 1795827900107235) and published afldb_prod-20261128-023200.dump sha256 f4a4477c659006c0
+   | Nov 28 02:32:00.713713 r7b-rehearsal systemd[1]: afldb-backup.service: Deactivated successfully.
+   | Nov 28 02:32:00.713916 r7b-rehearsal systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+seals and completion records:
+   -rw-r--r-- root:root links=1 size=854 /var/lib/afldb-backup/seals/c3244c4215714f5cbe01cc4cbb35a9a1.seal
+      afldb-backup-seal/4
+      sealer_sha256=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5
       unit=afldb-backup.service
-      invocation=d7ef90ac4a1447bb8aae9b0ffc9d4c0d
+      invocation=c3244c4215714f5cbe01cc4cbb35a9a1
       job=214
       job_type=start
       active_state=activating
@@ -192,21 +193,28 @@ seals:
       exec_main_status=0
       service_user=afldb-backup
       inactive_enter_mono=0
-      inactive_exit_mono=632440995437
-      exec_main_start_mono=632440995210
+      inactive_exit_mono=637420931464
+      exec_main_start_mono=637420931247
       trigger_unit=afldb-backup.timer
-      trigger_timer_realtime_usec=1795822920168707
-      timer_last_trigger_usec=1795822920168707
-      timer_last_trigger_mono=632440990156
-      timer_active_enter_mono=632440989363
+      trigger_timer_realtime_usec=1795827900107235
+      timer_last_trigger_usec=1795827900107235
+      timer_last_trigger_mono=637420928684
+      timer_active_enter_mono=637420927624
+      timer_active_enter_usec=1795827900106176
       dispatch_kind=catch-up
       dump=afldb_prod-20261128-023200.dump
-      dump_sha256=a5d0f702c65bd55a53aa2b1ecbaf1f5a7509649624aba81040660803206c65e6
+      dump_sha256=f4a4477c659006c0b41049d76cfdccae5372b96926cb8478ea8c66330f940a9b
       dump_bytes=110150
       boot_id=c3524e4759ab4e0f8050875471b56b12
-      sealed_realtime_usec=1795822920687812
+      sealed_realtime_usec=1795827900689105
+   -rw-r--r-- root:root links=1 size=219 /var/lib/afldb-backup/seals/c3244c4215714f5cbe01cc4cbb35a9a1.done
+      afldb-backup-done/1
+      invocation=c3244c4215714f5cbe01cc4cbb35a9a1
+      dump=afldb_prod-20261128-023200.dump
+      dump_sha256=f4a4477c659006c0b41049d76cfdccae5372b96926cb8478ea8c66330f940a9b
+      completed_realtime_usec=1795827900709532
 published: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read afldb_prod-20261128-023200.dump;-r--r----- root:afldb-backup-read afldb_prod-20261128-023200.dump.sha256;
-state: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read last-backup.json; last-backup.json: {"epoch":1795822920,"ts":"2026-11-27T23:42:00Z","file":"afldb_prod-20261128-023200.dump","sha256":"a5d0f702c65bd55a53aa2b1ecbaf1f5a7509649624aba81040660803206c65e6","bytes":110150,"offhost":"skipped"}
+state: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read last-backup.json; last-backup.json: {"epoch":1795827900,"ts":"2026-11-28T01:05:00Z","file":"afldb_prod-20261128-023200.dump","sha256":"f4a4477c659006c0b41049d76cfdccae5372b96926cb8478ea8c66330f940a9b","bytes":110150,"offhost":"skipped"}
 staging (root): drwx------ afldb-backup:afldb-backup .;drwxr-xr-x root:root ..;
 
 == sealed_origin 2026-11-28, run by r7reader (not arm, not root; groups r7reader,afldb-backup-read) from the INSTALLED library [REAL]
@@ -226,4 +234,4 @@ staging (root): drwx------ afldb-backup:afldb-backup .;drwxr-xr-x root:root ..;
 [HARNESS] ok refusal reason matches /0 seals .* in the .* 02:20-02:31 window/
 [HARNESS] ok the catch-up was sealed (trigger timer, catch-up) at 02:32, outside the window
 SCENARIO rearm-out PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
-== controller exit 0 (2026-11-27T23:42:04Z); container removed
+== controller exit 0 (2026-11-28T01:05:03Z); container removed

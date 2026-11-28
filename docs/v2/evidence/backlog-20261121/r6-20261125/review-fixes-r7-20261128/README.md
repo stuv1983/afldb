@@ -1,13 +1,15 @@
 # R6 r7: sealed backup production (MED-3) and an owner verifier independent of arm (MED-2) (28 November 2026)
 
-**Status: PROPOSED. Nothing installed. Production was not contacted. R6 stays NO-GO. PR 5 stays draft. Independent review pending.**
+**Status: PROPOSED, review round 1 fixed (see "Review round 1 fixes" below). Nothing installed. Production was not contacted. R6 stays
+NO-GO. PR 5 stays draft. MED-2 and MED-3 stay OPEN: F1 (the root path, an owner decision) and owner installation.**
 
 Everything ran on the workstation (Git Bash) and on the DEV host streamanator as `arm`:
 * in private `mktemp` workspaces and disposable docker containers (`--network none` except image builds, never `--privileged`);
 * without host sudo, `lxc`/`lxd`, host packages or host accounts;
 * removing everything it created.
 
-MED-2 and MED-3 stay **OPEN** in the trackers until the independent reviewer's verdict. Contract: [DESIGN.md](DESIGN.md), whose §7
+MED-2 and MED-3 stay **OPEN** in the trackers: the independent review (round 1) found F1, which only the owner can close, and owner
+installation is pending. Contract: [DESIGN.md](DESIGN.md), whose §7
 holds the coordinator's deviation record. Implementations: [backup/README.md](backup/README.md), [verify/README.md](verify/README.md).
 
 | Item | Value |
@@ -23,6 +25,84 @@ holds the coordinator's deviation record. Implementations: [backup/README.md](ba
 | Sealed-backup bundle, NOT installed (`backup/SHA256SUMS` `aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab`) | run `2c62ff91…`, sealer `33ab0cc3…`, drop-in `70-afldb-backup-sealed.conf` `f8a18580…`, `sealed-origin.sh` `48827fb1…`, `install-backup.sh` `f5d80c2b…`, `verify-backup-install.sh` `29674856…`, `backup.sh` (repository, byte-identical) `df609046…` |
 | Owner-verifier bundle, NOT installed | `verify/bundle/SHA256SUMS` `5333d2155a1fa26de5e86af3e866f17c0ba0c207a00f94e6682d4fc3a85576e4` (= the wrapper's pinned `BUNDLE_SHA`); packet `verify/SHA256SUMS` `ee4963bd…`; wrapper `afldb-verify-call.sh` `7ef95621…`; `bundle/sealed-origin.sh` byte-identical to `backup/sealed-origin.sh` |
 | Sitting artefacts | `sha256sum -c SHA256SUMS-SITTING`: 4 OK (unchanged) |
+
+The table above is round 0 (tested `5c2c2280`, delivered `2136f102`). The current values are in the next section.
+
+## Review round 1 fixes (28 November 2026)
+
+The independent review of `2136f102` is [INDEPENDENT-REVIEW.md](INDEPENDENT-REVIEW.md); its reproduction logs are
+`logs/review-*.log` (committed with this record). One fix round, under the same rules: scoped git, no push, no trailers, DEV only.
+
+| Item | Value |
+|---|---|
+| **Tested revision (round 1)** | **`7d69302007568d3141a567c8eba89e4ee473c9a6`** |
+| First round-1 commit (superseded) | `c84d88c0c85494bbaa31d6a0c2c6bf1004a9d9ba`: its sealer joined the seal's first two lines (a missing argument separator), so every seal had 25 lines and was refused as malformed. Backup run `tc84d88c0`: `R7 BACKUP HARNESS RESULT FAIL (12 scenario(s) not as expected)`, exit 1. Verify run `tc84d88c0`: STOP in setup, `Connection reset by peer` from streamanator (network), cleaned up by hand (2 containers, the image, the workspace). Logs: `backup-harness/logs/failed-tc84d88c0/`, `verify-harness/logs/failed-tc84d88c0/`. `7d693020` adds the one space and re-pins. |
+| Pin revision | `0cbe621f7868a6f72c8881d710f5b0a63a4e37f9`: the ATTENDED-PLAN r7 note and RUNBOOK §4.1a name `7d693020` instead of "the pinned revision" |
+| Sealed-backup bundle (`backup/SHA256SUMS`) | `aada42cb…` → **`d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6`**: sealer `793e94be…`, `sealed-origin.sh` `1153df78…`, `install-backup.sh` `f433b81a…`, `verify-backup-install.sh` `f286ea7b…`; run, drop-in, `backup.sh` unchanged |
+| Owner verifier | `bundle/SHA256SUMS` = wrapper `BUNDLE_SHA` `5333d215…` → **`df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e`**; packet `verify/SHA256SUMS` `ee4963bd…` → **`221b254a26cb541c6f22aae3b5d076e468fb88f3b7841fe3b94863e1121c9c4d`**; wrapper `fe49c3dd…`; `build-sums.sh --check` PASS |
+| R6 manifest / release `scripts/SHA256SUMS` | **unchanged** (`426c07ff…` / `52900a0e…`): `git diff 5c2c2280 7d693020` over the 16 manifest files, `tools/maintenance` and the release `scripts/` is empty |
+
+### Changes per finding
+
+* **F1 (HIGH), not fixable in code; owner decision.** Stated in DESIGN §1, backup README §5 and §9, verify README §10, §5 below, the
+  release RUNBOOK §4.1a and the ATTENDED-PLAN install preconditions (new item 0), and in `install-backup.sh`'s header. "Trusted root
+  session" is gone everywhere: G1 and G2 hold only if the installs and every later root action use a root path that does not pass
+  through arm's login (the console, or a separate administrative account with its own key). Creating it is a host-account change
+  needing owner approval; production `sudoers` is unchecked.
+* **F2 (MED).** `a2-core.sh` prints the catalogue answer (ledger, `afldb_restore_test` comment, connection count) line by line
+  through `san()`; every other external print was checked (dpkg, grub, apt, systemd output are root data; `pgrep` was already
+  sanitised). The dispatcher maps every non-printable byte of every core line to `?` and prefixes `[neutralised] ` to any line
+  **containing** `AFLDB-VERIFY RESULT` or `OWNER VERDICT`. The wrapper's new `show` maps every byte outside printable ASCII (ESC and
+  CR included) to `?` in stdout and ssh stderr and prefixes `[relayed, neutralised] ` to every relayed line containing either
+  string except the final authenticated RESULT line; authentication still reads the unmodified answer. verify README §6 is
+  corrected (the catalogue's contents are arm's) and §3 documents the three layers. Harness scenario **g** replays the reviewer's
+  forged comment (non-superuser role, `SET ROLE`, same bytes).
+* **F3 (MED).** Seal format `afldb-backup-seal/4` (26 lines) adds `timer_active_enter_usec` (the timer's realtime
+  `ActiveEnterTimestamp`, from PID 1 via `busctl`). `dispatch_kind=catch-up` when that activation is at or after 02:20:00 Melbourne
+  of the dispatch's date, or the dispatch came < 5 s after activation; otherwise `scheduled`. The gate recomputes the label from
+  the sealed stamps and refuses a differing one. DESIGN §3.2 and §3.4 rewritten. New scenarios with **no** timing drop-in, i.e. the
+  real deploy timer's `RandomizedDelaySec=10min`, `AccuracySec=1min`: `genuine-rd` (scheduled) and `rearm-in-rd` (re-arm at
+  02:20:15: catch-up). The other scenarios keep the fixture timing because their holds, the restart and the 02:32 re-arm need the
+  dispatch at a known second (`r7b-container.sh` header).
+* **F4 (LOW).** The sealer's last step writes `seals/<invocation>.done` (root 0644, five exact lines, `mv -n`, never overwritten);
+  `sealed_origin` rule 6 requires it after rule 5 (DESIGN §3.6). New scenario `post-pub-fail`: a root directory at
+  `state/last-backup.json` makes the sealer fail after publication; `systemctl reset-failed` then clears `Result=`; refused.
+* **F5 (LOW).** `afldb-verify-rootfacts@.service`: `RuntimeMaxSec=900` (ignored for `Type=oneshot`) → `TimeoutStartSec=900`, equal
+  to the client's own `timeout 900`, so the reader never outlives its caller. `sha256_of` refuses a file over 16 GiB (far above one
+  dump of `afldb_prod`, and hashable well inside 900 s at either host's sha256 rate) and a file that grows while hashed: a STOP,
+  never an unbounded root job.
+* **INFO.** `sealed_origin_install` refuses any `ExecCondition`, `ExecStartPre`, `ExecStop`, `ExecStopPost` or `ExecReload`
+  command and a `.env` (file or link) in `/usr/local/lib/afldb-backup`. `afldb-verify-py` http mode refuses redirects (a 3xx is
+  its own status). `realpath`: recorded in the reader (no content opened; the string is only compared with an arm-chosen cwd; see
+  §4 item 12), not changed. The timer's own settings are not checked by the gate: they only move the dispatch, whose moment the gate
+  checks against the window and whose kind it now recomputes; changing them needs root. The "never ran production timing" INFO is
+  closed by `genuine-rd` and `rearm-in-rd`; "a whole A-2 PASS has never been observed" stays (§7).
+* **Missing dependencies.** All nine items of the review's list are added to §4 (items 9–17), none dropped.
+
+### Runs at `7d693020` (finished 2026-11-28 12:13 AEDT, before the 2026-11-29 23:59 limit)
+
+| Run | Command | RID | Exit | Decisive line | Log |
+|---|---|---|---|---|---|
+| (a) sealed backup, 13 scenarios | `bash R7/backup-harness/r7b-run.sh --verify-rev 7d693020… t7d693020` | `t7d693020` | 0 | `R7 BACKUP HARNESS RESULT PASS`; `containers left: 0 images left: 0` | `backup-harness/logs/r7b-*.log`, `r7b-transport-t7d693020.log` |
+| (b) owner verifier, 7 scenarios | `bash R7/verify-harness/r7v-run.sh --verify-rev 7d693020… t7d693020` | `t7d693020` | 0 | `R7 VERIFY HARNESS RESULT PASS`; `removed 2 container(s); left: containers 0, images 0, workspace removed` | `verify-harness/logs/t7d693020-*.log` |
+| (c) driver proof | not re-run | — | — | packet bytes unchanged (R6 manifest `426c07ff…`, release `52900a0e…`), and every fenced block of the ATTENDED-PLAN and RUNBOOK is byte-identical to `bfa09946` (sha256 of the extracted blocks equal) | round 0 |
+| (d) release rehearsal | not re-run | — | — | same reason | round 0 |
+
+Both runs' transport verified every sent file against its blob at `7d693020`. New and changed scenario lines (verbatim, cut):
+* a `genuine-rd`: `SCENARIO genuine-rd PASS expect=attributed so_rc=0 … dispatch=scheduled delay=153.7s`; `timer effective:
+  AccuracyUSec=1min RandomizedDelayUSec=10min`; `production timing, scheduled: activation before 02:20:00, dispatch 69 s after 02:20:00`.
+* a `rearm-in-rd`: `SCENARIO rearm-in-rd PASS expect=attributed so_rc=0 … dump=afldb_prod-20261128-022812.dump … dispatch=catch-up
+  delay=477.1s`; `ok F3 exercised: the catch-up dispatch came 477 s after activation (>= 5 s, the old rule said scheduled)`.
+* a `post-pub-fail`: `SCENARIO post-pub-fail PASS expect=refused so_rc=1 reason=seal … has no valid completion record (the run did not
+  finish after its seal)`; `seal, published dump (… re-hash = seal) and sidecar exist, no completion record; Result=success after
+  reset-failed; refused anyway`.
+* a: the ten round-0 scenarios PASS as before (genuine/perm/review2 attributed scheduled; rearm-in catch-up 0.0 s; the refusals with
+  their round-0 reasons); every attributed scenario also found its completion record.
+* b `g`: `SCENARIO g PASS forged-comment: the forged text reached the wrapper only as data (1 line(s) '[relayed, neutralised] ...',
+  0 ESC, 0 control bytes); genuine verdict and exit unchanged (OWNER VERDICT A2 STOP … exit 1)`. a–f PASS as in round 0.
+
+**Not done / still open.** F1 (owner: root path, `sudoers` check); §4 item 17 (whether arm's PostgreSQL role is a superuser, to
+check on the host); a whole A-2 PASS (dated 2026-11-25); owner installation. MED-2 and MED-3 stay OPEN. Nothing was pushed.
 
 ## 1. G1: the identified timer invocation produced the exact accepted dump (MED-3)
 
@@ -244,19 +324,52 @@ This merges both READMEs (backup §9, verify §9); nothing is dropped. Where the
 8. **The weekly `afldb-backup-verify.service`** still runs as arm with a fresh dump in `/home/arm/backups/afldb-scheduled`. Its dumps
    are never gate-eligible.
 
+Added after the independent review (round 1), all nine items of its list, none dropped:
+
+9. **The path to root (F1, HIGH).** On production root is reached through arm's login: the owner's `sudo` in an arm SSH session,
+   for both installs, the `sudo -u postgres` steps and every root step of the plan. A hostile arm login environment can capture or
+   reuse that root, and with root it can replace the sealer, the seals, the verifier, `authorized_keys` and the peer maps. **G1 and
+   G2 hold only if the installs and every later root action use a root path that does not pass through arm's login** (the console,
+   or a separate administrative account with its own key). Not fixable in code; a host-account change needing owner approval.
+   Production `sudoers` has not been checked.
+10. **Two A-2 PASS lines are decided by arm through the database:** `ledger 118`, and the `afldb_restore_test` comment and its
+    connection count (`a2-core.sh`). arm's role writes the ledger and creates and comments that database. Item 7 covered database
+    content only as a property of the dump; the verify README §6 is corrected (it called the catalogue trusted).
+11. **The raw psql output channel to Stu's terminal (F2).** Fixed in round 1: every such line is printed through `san()`, the
+    dispatcher and the wrapper sanitise and neutralise again (verify README §3). It remains arm's **data**, shown as data.
+12. **Both sides of "process cwd = the release" are arm's.** The process is arm's and can `chdir`; the directory it is compared
+    with is resolved through arm-owned links (`a2-core.sh`, `afldb-verify-rootfacts` `current_realpath`). Item 2's "proves which
+    release directory the running MainPID uses" is therefore only "the MainPID's cwd equals the path arm's `current` link resolves to".
+13. **The worker count**: arm's processes.
+14. **`events.log` decides whether the "restarted since the last attested PASS" note appears**; arm can suppress it. What holds is
+    the PID 1 `InvocationID` comparison.
+15. **Production arm serves the off-host pull.** streamanator pulls over production arm's login, so production arm chooses the bytes
+    sent. G0b's comparison with the sha256 of the authenticated G0a line limits this to denial. Item 4 covered streamanator's arm only.
+16. **Denial.** arm can force G0 and A-2 to STOP at will (markers, process names, port 3100, large files, `/tmp`, a full disk, a
+    stopped service). Not a forging risk: a STOP never becomes a PASS.
+17. **Unknown, to check on the host:** whether arm's PostgreSQL role is a superuser. If it is, it can act as OS user `postgres`
+    (for example `COPY … TO PROGRAM`), which owns `pg_hba.conf` and `pg_ident.conf`, the files holding both peer maps, so it could
+    let arm authenticate as `afldb_backup` or `afldb_verify`. Check before installing (`SELECT rolsuper FROM pg_roles WHERE rolname
+    = <arm's role>`, as postgres, through the F1 root path).
+
 ## 5. Installation prerequisites and order (owner; nothing here was installed)
 
 All of these must be met **before the qualifying 02:20 backup**, the 02:20 run of the gate date. They run:
 * outside 02:15–02:50;
-* from a trusted root session;
-* from root-owned staging directories outside `/home` that hold a `git archive` of the pinned revision.
+* as root reached by a path that does **not** pass through arm's login: the console, or a separate administrative account with its
+  own key that arm cannot write to (review round 1, **F1**; §4 item 9). `sudo` in an arm SSH session does not qualify. No such path
+  exists on production today; creating it is a host-account change needing owner approval, and production `sudoers` is unchecked.
+  Every later root action (the `postgres` steps, rollback, every root step of the plan) uses the same path;
+* after checking that arm's PostgreSQL role is not a superuser (§4 item 17);
+* from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision
+  `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
 
 Nothing writes the production checkout, so P1/P2's clean-tree checks are unchanged. The operator text is in the release runbook §4.1a
 and the R6 plan's r7 note.
 
 1. **Production, R7/backup** (backup README §5).
    * Preconditions: the base units are root-owned copies, not links; no r6 attest drop-in; the zone file is a root-owned regular file.
-   * Check `SHA256SUMS` `aada42cb…`, then run `install-backup.sh`.
+   * Check `SHA256SUMS` `d0023d10…` (review round 1), then run `install-backup.sh`.
    * Add the `pg_ident`/`pg_hba` lines before any broader `local` line, then reload.
    * `verify-backup-install.sh` must print `BACKUP INSTALL RESULT PASS` as root and as arm in a new login.
 2. **Production, R7/verify** (verify README §8, §10). It needs group `afldb-backup-read`, so step 1 comes first.
@@ -270,7 +383,7 @@ and the R6 plan's r7 note.
    * The pull source becomes `<prod>:/var/lib/afldb-backup/published/`.
    * Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
 4. **Workstation.**
-   * Stage `verify/` from the pinned revision and run `sha256sum -c SHA256SUMS`.
+   * Stage `verify/` from `7d693020` and run `sha256sum -c SHA256SUMS` (`221b254a…`; wrapper `BUNDLE_SHA` `df3457cc…`).
    * Run `afldb-verify-call.sh version`. It must print `OWNER VERDICT VERSION PASS` for both hosts.
 
 Until then, and until a sealed timer run exists for the gate date, G0 and A-2 STOP, by design. Rollback: backup README §6.

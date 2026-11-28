@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### R6 r7 review round 1 (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `7d693020`; nothing installed or deployed; MED-2 and MED-3 stay open on F1 and owner installation)
+
+- **Sealed backup: seal format `afldb-backup-seal/4` and a completion record.** The seal records the timer's realtime activation; `dispatch_kind` is catch-up when the timer activated at or after 02:20:00 Melbourne of the dispatch's date or the dispatch came within 5 s, and `sealed_origin` recomputes it (it no longer depends on `RandomizedDelaySec`). The sealer writes `seals/<invocation>.done` last and the gate requires it, so a run that failed after publication is never eligible. The gate also refuses `ExecCondition`/`ExecStartPre`/`ExecStop*`/`ExecReload` commands and a `.env` in the code directory.
+- **Owner verifier: relayed text is data.** The A-2 catalogue answer is printed through `san()`; the dispatcher and the wrapper map non-printable bytes to `?` and neutralise relayed lines containing `OWNER VERDICT` or `AFLDB-VERIFY RESULT`; the root facts reader has `TimeoutStartSec=900` and a 16 GiB hash cap; the HTTP probe refuses redirects.
+- **Stated owner dependency (F1):** both guarantees need a root path on production that does not pass through arm's login; the runbook and plan install preconditions say so and name the tested revision.
+- Validation: backup harness (13 scenarios, including production timer timing) and verifier harness (7 scenarios, including the reviewer's forged-comment attack) PASS at `7d693020` ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/README.md)).
+
 ### R6 r7: sealed backup production and an owner verifier independent of arm (28 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, independent review pending; nothing installed or deployed)
 
 - **`tools/maintenance/scheduled-backup.sh status` has an explicit opt-in, `AFLDB_BACKUP_SEALED_STATE_DIR=<absolute path>`.** It has no

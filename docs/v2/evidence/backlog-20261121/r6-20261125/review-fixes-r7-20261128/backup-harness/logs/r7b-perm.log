@@ -1,61 +1,62 @@
 == R7 sealed-backup scenario perm
-host streamanator (arm); started 2026-11-27T23:39:37Z; container r7b-t5c2c2280-perm; image r7b-sysd-t5c2c2280:1
-[FIXTURE] fake Melbourne offset 2:38:00: local 2026-11-28 02:20:00 is real 2026-11-27T23:42:00Z
-[TRANSPORT] workstation 2026-11-27T23:37:24Z: 16 worktree files, CR stripped (none expected)
-[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 5c2c2280e4688a063a5f943512e4460e250b1135 (git show <rev>:<path> | sha256sum)
+host streamanator (arm); started 2026-11-28T01:02:22Z; container r7b-t7d693020-perm; image r7b-sysd-t7d693020:1
+[FIXTURE] fake Melbourne offset 1:15:00: local 2026-11-28 02:20:00 is real 2026-11-28T01:05:00Z
+[TRANSPORT] workstation 2026-11-28T01:00:21Z: 16 worktree files, CR stripped (none expected)
+[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 7d69302007568d3141a567c8eba89e4ee473c9a6 (git show <rev>:<path> | sha256sum)
    EQUAL 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
-   EQUAL 33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   EQUAL 793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
    EQUAL f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
-   EQUAL 48827fb1791d3a1e6d9cfd827be1f4e6c5471c2d6292de01b246b7e2c54f98f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
-   EQUAL f5d80c2b476fc7bd746f55c7005c07b9c0169f4704d2e9f7bc53cd72137644c6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
-   EQUAL 29674856399cb600256beb97a54f151ea177b7f9de6b7542e3589ecdec104123  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
-   EQUAL aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   EQUAL 1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   EQUAL f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   EQUAL f286ea7b7372d20ced0ac45380e5927e8461f490c1c20c83022f5abe6330eb9e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   EQUAL d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
    EQUAL 8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
-   EQUAL 75f96c7fc7c6f712e67b461770c0e83e2d667b6995ad3465d6f12049073c8e5b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
-   EQUAL 89bdad0c912655b152b847ce1c08030c41cbef4c83a092ec8bc97704256ddbc0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   EQUAL 0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   EQUAL 4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
    EQUAL df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
    EQUAL a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
    EQUAL 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
    EQUAL edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
    EQUAL 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
    EQUAL c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
-   result: every sent file equals its blob at 5c2c2280e4688a063a5f943512e4460e250b1135
+   result: every sent file equals its blob at 7d69302007568d3141a567c8eba89e4ee473c9a6
 inputs (sha256, as sent):
    c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
    edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
    76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
-   89bdad0c912655b152b847ce1c08030c41cbef4c83a092ec8bc97704256ddbc0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
-   75f96c7fc7c6f712e67b461770c0e83e2d667b6995ad3465d6f12049073c8e5b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
    8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
    f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
-   aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
    2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
-   33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
-   f5d80c2b476fc7bd746f55c7005c07b9c0169f4704d2e9f7bc53cd72137644c6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
-   48827fb1791d3a1e6d9cfd827be1f4e6c5471c2d6292de01b246b7e2c54f98f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
-   29674856399cb600256beb97a54f151ea177b7f9de6b7542e3589ecdec104123  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f286ea7b7372d20ced0ac45380e5927e8461f490c1c20c83022f5abe6330eb9e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
    df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
    a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
    7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
-container id: af8a52a4567ca0a8b277f282091c02716b0c4f015fea541b3e96a5e0109d94e1
+container id: 79cfaee824383a8f8fb21978a0d4cae53ff162fe985faf023dd5f591cc3c07eb
 
 == environment
 [REAL-SYSTEMD] systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS; PID 1: systemd
-[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-27T23:39:45, local 2026-11-28 02:17:45 AEDT; planned moment real 23:42:00Z = local 2026-11-28 02:20:00 AEDT
-[HARNESS] scenario perm: expect=attributed kind=scheduled timer=early lock-hold=1 seal-hold=1 retention-fixture=0 arm-suite=1 refusal=''
+[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-28T01:02:29, local 2026-11-28 02:17:29 AEDT; planned moment real 01:05:00Z = local 2026-11-28 02:20:00 AEDT
+[HARNESS] scenario perm: expect=attributed kind=scheduled timer=early lock-hold=1 seal-hold=1 retention-fixture=0 arm-suite=1 production-timing=0 refusal=''
 fs.protected_hardlinks=1 fs.protected_symlinks=1 kernel.yama.ptrace_scope=1
 
 == PostgreSQL 16 fixture database afldb_prod [REAL server, FIXTURE contents]
-[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-0839565f8f3cf8c4; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
+[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-6a5775d85c034435; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
 
 == units [REAL deploy/ files] and the timer timing drop-in [FIXTURE]
+timer effective: AccuracyUSec=1s RandomizedDelayUSec=0 Persistent=yes 
 service edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8 timer 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84 failed c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61
 
 == owner install from a root-owned staging directory [REAL install-backup.sh]
 staging /opt/r7b-staging: -rw-r--r-- root:root 70-afldb-backup-sealed.conf; -rw-r--r-- root:root SHA256SUMS; -rw-r--r-- root:root afldb-backup-run; -rw-r--r-- root:root afldb-backup-seal; -rw-r--r-- root:root backup.sh; -rw-r--r-- root:root install-backup.sh; -rw-r--r-- root:root sealed-origin.sh; -rw-r--r-- root:root verify-backup-install.sh; 
-SHA256SUMS aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
+SHA256SUMS d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
 install-backup.sh /opt/r7b-staging (root): exit 0
-   | bundle /opt/r7b-staging verified: SHA256SUMS aada42cbcf31cd6a5c434ff4e5bb31c7b0028c2b6e84507a87f5482cc7708bab (compare with README.md before going on; the install continues only on a match you have checked)
+   | bundle /opt/r7b-staging verified: SHA256SUMS d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6 (compare with README.md before going on; the install continues only on a match you have checked)
    | accounts: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) (a session started before this sees the new group only after a new login)
    | sealed_origin_install: PASS (trusted paths, pinned digests, effective unit)
    | OWNER STEPS STILL REQUIRED (not done by this script):
@@ -77,7 +78,7 @@ verify-backup-install.sh as root BEFORE the owner's PostgreSQL step: exit 1 (exp
    | BACKUP INSTALL RESULT FAIL
 [FIXTURE] owner step 1 applied as printed: pg_hba first line 'local afldb_prod afldb_backup peer map=afldbbackup', pg_ident 'afldbbackup afldb-backup afldb_backup', pg_reload_conf()
 verify-backup-install.sh as root: exit 0
-   | == verify-backup-install 2026-11-27T23:40:28Z as uid=0(root) gid=0(root) groups=0(root)
+   | == verify-backup-install 2026-11-28T01:03:12Z as uid=0(root) gid=0(root) groups=0(root)
    | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
    | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
    | PASS the r6 attest drop-in is absent
@@ -94,7 +95,7 @@ verify-backup-install.sh as root: exit 0
    | PASS afldb-backup authenticates by peer as afldb_backup (no secret)
    | BACKUP INSTALL RESULT PASS
 verify-backup-install.sh as arm (new login, env -i): exit 0
-   | == verify-backup-install 2026-11-27T23:40:31Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | == verify-backup-install 2026-11-28T01:03:15Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
    | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
    | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
    | PASS the r6 attest drop-in is absent
@@ -157,13 +158,13 @@ verify-backup-install.sh as arm (new login, env -i): exit 0
    drwx------ afldb-backup:afldb-backup links=2 directory /var/lib/afldb-backup/staging
    drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/state
    arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); afldb-backup: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); r7reader: uid=1500(r7reader) gid=1500(r7reader) groups=1500(r7reader),997(afldb-backup-read)
-[REAL-SYSTEMD] timer started at 02:18:34: next elapse Sat 2026-11-28 02:20:00 AEDT
+[REAL-SYSTEMD] timer started at 02:18:18: next elapse Sat 2026-11-28 02:20:00 AEDT
 [FIXTURE] HOLD: root psql session r7b-lock holds ACCESS EXCLUSIVE on afldb_prod.fixture (pg_dump will wait)
-[HARNESS] setup done 86 s before the planned moment; window 2026-11-28 02:20:00 AEDT .. 02:31:00
-[REAL-SYSTEMD] invocation 909783cb05dd4d9fac9267b8667dc83a job 214 state activating/start
-[FIXTURE] HOLD engaged: pg_dump of invocation 909783cb05dd4d9fac9267b8667dc83a is waiting on the fixture lock (CREATION stage held open)
-staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr-xr-x 6 root         root         4096 02:18:23 ..;-rw------- 1 afldb-backup afldb-backup    0 02:20:00 afldb_prod-20261128-022000.dump.partial;
-[FIXTURE-ATTACK] arm permission suite at stage creation (invocation 909783cb05dd4d9fac9267b8667dc83a, unit activating/start): 79 attempts
+[HARNESS] setup done 102 s before the planned moment; window 2026-11-28 02:20:00 AEDT .. 02:31:00
+[REAL-SYSTEMD] invocation 5fbde4e8e2044b02b218c8ebd40e9c89 job 214 state activating/start
+[FIXTURE] HOLD engaged: pg_dump of invocation 5fbde4e8e2044b02b218c8ebd40e9c89 is waiting on the fixture lock (CREATION stage held open)
+staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr-xr-x 6 root         root         4096 02:18:06 ..;-rw------- 1 afldb-backup afldb-backup    0 02:20:00 afldb_prod-20261128-022000.dump.partial;
+[FIXTURE-ATTACK] arm permission suite at stage creation (invocation 5fbde4e8e2044b02b218c8ebd40e9c89, unit activating/start): 79 attempts
    ARMPROBE stage=creation id: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); Groups:	997 1000 ; cgroup 0::/
    ATTEMPT creation read-staging-dir rc=2 result=REFUSED errno=EACCES err=ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
       cmd: ls -A /var/lib/afldb-backup/staging
@@ -715,25 +716,25 @@ staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr
       drwxr-xr-x root:root links=1 directory /etc/systemd
       drwxr-xr-x root:root links=1 directory /etc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT creation SIGSTOP pid 1753 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1753) - Operation not permitted
-      cmd: kill -STOP 1753
-      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1753
-      dr-xr-xr-x root:root links=770 directory /proc
+   ATTEMPT creation SIGSTOP pid 1917 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1917) - Operation not permitted
+      cmd: kill -STOP 1917
+      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1917
+      dr-xr-xr-x root:root links=823 directory /proc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT creation SIGSTOP pid 1759 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1759) - Operation not permitted
-      cmd: kill -STOP 1759
-      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1759
-      dr-xr-xr-x root:root links=770 directory /proc
+   ATTEMPT creation SIGSTOP pid 1924 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1924) - Operation not permitted
+      cmd: kill -STOP 1924
+      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1924
+      dr-xr-xr-x root:root links=823 directory /proc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT creation SIGSTOP pid 1760 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1760) - Operation not permitted
-      cmd: kill -STOP 1760
-      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1760
-      dr-xr-xr-x root:root links=770 directory /proc
+   ATTEMPT creation SIGSTOP pid 1925 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1925) - Operation not permitted
+      cmd: kill -STOP 1925
+      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1925
+      dr-xr-xr-x root:root links=823 directory /proc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT creation SIGSTOP pid 1767 (/usr/lib/postgresql/16/bin/pg_dump postgresql://afldb_backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1767) - Operation not permitted
-      cmd: kill -STOP 1767
-      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1767
-      dr-xr-xr-x root:root links=772 directory /proc
+   ATTEMPT creation SIGSTOP pid 1932 (/usr/lib/postgresql/16/bin/pg_dump postgresql://afldb_backup, uid 999) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (1932) - Operation not permitted
+      cmd: kill -STOP 1932
+      dr-xr-xr-x afldb-backup:afldb-backup links=9 directory /proc/1932
+      dr-xr-xr-x root:root links=823 directory /proc
       drwxr-xr-x root:root links=1 directory /
    ATTEMPT creation systemctl kill SIGSTOP rc=1 result=REFUSED errno=DBUS-ACCESS-DENIED err=Failed to kill unit afldb-backup.service: Access denied
       cmd: systemctl kill --signal=SIGSTOP afldb-backup.service
@@ -764,12 +765,12 @@ staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr
 [HARNESS] ok arm suite creation: every SIGSTOP refused with EPERM
 [FIXTURE] HOLD armed: root strace will attach to the sealer and delay its first chown by 25 s (SEALING stage held open)
 [FIXTURE] fixture lock released at 02:20:03
-[FIXTURE] HOLD engaged: sealer pid 3446 delayed at its first chown; seal written, root copy unpublished; unit activating/start-post
-   seals: -rw-r--r-- 1 root root 814 Nov 28 02:20 909783cb05dd4d9fac9267b8667dc83a.seal;
-   published temporaries: -r-------- 1 root root              110150 Nov 28 02:20 .909783cb05dd4d9fac9267b8667dc83a.tmp;
+[FIXTURE] HOLD engaged: sealer pid 3614 delayed at its first chown; seal written, root copy unpublished; unit activating/start-post
+   seals: -rw-r--r-- 1 root root 855 Nov 28 02:20 5fbde4e8e2044b02b218c8ebd40e9c89.seal;
+   published temporaries: -r-------- 1 root root              110150 Nov 28 02:20 .5fbde4e8e2044b02b218c8ebd40e9c89.tmp;
    staging: drwx------ 2 afldb-backup afldb-backup   4096 Nov 28 02:20 .;drwxr-xr-x 6 root         root           4096 Nov 28 02:18 ..;-rw------- 1 afldb-backup afldb-backup 110150 Nov 28 02:20 afldb_prod-20261128-022000.dump;-rw------- 1 afldb-backup afldb-backup     98 Nov 28 02:20 afldb_prod-20261128-022000.dump.sha256;
-[HARNESS] root hash of the run's staging dump during the hold: 8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0
-[FIXTURE-ATTACK] arm permission suite at stage sealing (invocation 909783cb05dd4d9fac9267b8667dc83a, unit activating/start-post): 94 attempts
+[HARNESS] root hash of the run's staging dump during the hold: 2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4
+[FIXTURE-ATTACK] arm permission suite at stage sealing (invocation 5fbde4e8e2044b02b218c8ebd40e9c89, unit activating/start-post): 94 attempts
    ARMPROBE stage=sealing id: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); Groups:	997 1000 ; cgroup 0::/
    ATTEMPT sealing read-staging-dir rc=2 result=REFUSED errno=EACCES err=ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
       cmd: ls -A /var/lib/afldb-backup/staging
@@ -953,113 +954,113 @@ staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr
       drwxr-xr-x root:root links=1 directory /etc/systemd
       drwxr-xr-x root:root links=1 directory /etc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing write 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal: Permission denied
-      cmd: echo x >> /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing write 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal: Permission denied
+      cmd: echo x >> /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing replace 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing replace 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing overwrite 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing overwrite 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing unlink 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: rm -f /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing unlink 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: rm -f /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing chmod 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Operation not permitted
-      cmd: chmod 666 /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing chmod 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Operation not permitted
+      cmd: chmod 666 /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing hardlink 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-1' => '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Operation not permitted
-      cmd: ln /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal /home/arm/r7b-hl-1
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing hardlink 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-1' => '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Operation not permitted
+      cmd: ln /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal /home/arm/r7b-hl-1
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing rename-within 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal' to '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal.r7b': Permission denied
-      cmd: mv /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal.r7b
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT sealing rename-within 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal' to '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal.r7b': Permission denied
+      cmd: mv /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal.r7b
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing write .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp: Permission denied
-      cmd: echo x >> /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing write .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp: Permission denied
+      cmd: echo x >> /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing replace .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp': Permission denied
-      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing replace .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp': Permission denied
+      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing overwrite .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp': Permission denied
-      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing overwrite .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp': Permission denied
+      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing unlink .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp': Permission denied
-      cmd: rm -f /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing unlink .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp': Permission denied
+      cmd: rm -f /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing chmod .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp': Operation not permitted
-      cmd: chmod 666 /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing chmod .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp': Operation not permitted
+      cmd: chmod 666 /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing hardlink .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-2' => '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp': Operation not permitted
-      cmd: ln /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp /home/arm/r7b-hl-2
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing hardlink .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-2' => '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp': Operation not permitted
+      cmd: ln /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp /home/arm/r7b-hl-2
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing rename-within .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp' to '/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp.r7b': Permission denied
-      cmd: mv /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp.r7b
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing rename-within .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp' to '/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp.r7b': Permission denied
+      cmd: mv /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp.r7b
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
@@ -1457,18 +1458,18 @@ staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr
       drwxr-xr-x root:root links=1 directory /etc/systemd
       drwxr-xr-x root:root links=1 directory /etc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing read root-only temporary .909783cb05dd4d9fac9267b8667dc83a.tmp rc=1 result=REFUSED errno=EACCES err=cat: /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp: Permission denied
-      cmd: cat /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp > /dev/null
-      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp
+   ATTEMPT sealing read root-only temporary .5fbde4e8e2044b02b218c8ebd40e9c89.tmp rc=1 result=REFUSED errno=EACCES err=cat: /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp: Permission denied
+      cmd: cat /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp > /dev/null
+      -r-------- root:root links=1 regular file /var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp
       drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT sealing SIGSTOP pid 3446 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 0) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (3446) - Operation not permitted
-      cmd: kill -STOP 3446
-      dr-xr-xr-x root:root links=9 directory /proc/3446
-      dr-xr-xr-x root:root links=673 directory /proc
+   ATTEMPT sealing SIGSTOP pid 3614 (/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup, uid 0) rc=1 result=REFUSED errno=EPERM err=bash: line 1: kill: (3614) - Operation not permitted
+      cmd: kill -STOP 3614
+      dr-xr-xr-x root:root links=9 directory /proc/3614
+      dr-xr-xr-x root:root links=718 directory /proc
       drwxr-xr-x root:root links=1 directory /
    ATTEMPT sealing systemctl kill SIGSTOP rc=1 result=REFUSED errno=DBUS-ACCESS-DENIED err=Failed to kill unit afldb-backup.service: Access denied
       cmd: systemctl kill --signal=SIGSTOP afldb-backup.service
@@ -1498,9 +1499,9 @@ staging now (root): drwx------ 2 afldb-backup afldb-backup 4096 02:20:00 .;drwxr
 [HARNESS] ok arm suite sealing: 94 attempts, all refused
 [HARNESS] ok arm suite sealing: every SIGSTOP refused with EPERM
 strace (root, FIXTURE) log, chown lines:
-   | 3483  02:20:03.503856 fchownat(AT_FDCWD, "/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp", 0, 997, 0 <detached ...>
-[HARNESS] ok strace recorded the sealer's delayed chown (the sealing stage was really held): 3483  02:20:03.503856 fchownat(AT_FDCWD, "/var/lib/afldb-backup/published/.909783cb05dd4d9fac9267b8667dc83a.tmp", 0, 997, 0 <detached ...>
-[FIXTURE-ATTACK] arm permission suite at stage published (invocation 909783cb05dd4d9fac9267b8667dc83a, unit inactive/dead): 100 attempts
+   | 3651  02:20:03.582657 fchownat(AT_FDCWD, "/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp", 0, 997, 0 <detached ...>
+[HARNESS] ok strace recorded the sealer's delayed chown (the sealing stage was really held): 3651  02:20:03.582657 fchownat(AT_FDCWD, "/var/lib/afldb-backup/published/.5fbde4e8e2044b02b218c8ebd40e9c89.tmp", 0, 997, 0 <detached ...>
+[FIXTURE-ATTACK] arm permission suite at stage published (invocation 5fbde4e8e2044b02b218c8ebd40e9c89, unit inactive/dead): 100 attempts
    ARMPROBE stage=published id: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); Groups:	997 1000 ; cgroup 0::/
    ATTEMPT published read-staging-dir rc=2 result=REFUSED errno=EACCES err=ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
       cmd: ls -A /var/lib/afldb-backup/staging
@@ -1636,57 +1637,57 @@ strace (root, FIXTURE) log, chown lines:
       drwxr-xr-x root:root links=1 directory /etc/systemd
       drwxr-xr-x root:root links=1 directory /etc
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published write 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal: Permission denied
-      cmd: echo x >> /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published write 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=bash: line 1: /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal: Permission denied
+      cmd: echo x >> /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published replace 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published replace 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: mv -f /home/arm/evil.dump /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published overwrite 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published overwrite 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=cp: cannot create regular file '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: cp /home/arm/evil.dump /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published unlink 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Permission denied
-      cmd: rm -f /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published unlink 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=rm: cannot remove '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Permission denied
+      cmd: rm -f /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published chmod 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Operation not permitted
-      cmd: chmod 666 /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published chmod 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EPERM err=chmod: changing permissions of '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Operation not permitted
+      cmd: chmod 666 /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published hardlink 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-1' => '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal': Operation not permitted
-      cmd: ln /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal /home/arm/r7b-hl-1
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published hardlink 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EPERM err=ln: failed to create hard link '/home/arm/r7b-hl-1' => '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal': Operation not permitted
+      cmd: ln /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal /home/arm/r7b-hl-1
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
       drwxr-xr-x root:root links=1 directory /var
       drwxr-xr-x root:root links=1 directory /
-   ATTEMPT published rename-within 909783cb05dd4d9fac9267b8667dc83a.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal' to '/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal.r7b': Permission denied
-      cmd: mv /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal.r7b
-      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   ATTEMPT published rename-within 5fbde4e8e2044b02b218c8ebd40e9c89.seal rc=1 result=REFUSED errno=EACCES err=mv: cannot move '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal' to '/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal.r7b': Permission denied
+      cmd: mv /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal.r7b
+      -rw-r--r-- root:root links=1 regular file /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
       drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
       drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
       drwxr-xr-x root:root links=1 directory /var/lib
@@ -2281,27 +2282,27 @@ strace (root, FIXTURE) log, chown lines:
 [HARNESS] ok arm suite published: every SIGSTOP refused with EPERM
 
 == after the run (REAL-SYSTEMD, root)
-timer: LastTriggerUSec=Sat 2026-11-28 02:20:00 AEDT LastTriggerUSecMonotonic=1w 7h 40min 40.889298s Result=success ActiveEnterTimestampMonotonic=632355384991  busctl LastTriggerUSec=t 1795822920067849
-service: Result=success NRestarts=0 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive SubState=dead InvocationID=909783cb05dd4d9fac9267b8667dc83a 
+timer: LastTriggerUSec=Sat 2026-11-28 02:20:00 AEDT LastTriggerUSecMonotonic=1w 9h 3min 40.943531s Result=success ActiveEnterTimestampMonotonic=637319230802  busctl LastTriggerUSec=t 1795827900122082
+service: Result=success NRestarts=0 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive SubState=dead InvocationID=5fbde4e8e2044b02b218c8ebd40e9c89 
 failed unit: Result=success ExecMainStartTimestamp= ; marker: cat: /home/arm/backups/afldb-scheduled/.state/FAILED-unit: No such file or directory
 journal (root) of afldb-backup.service:
-   | Nov 28 02:20:00.079276 r7b-rehearsal systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]: ==> Backing up afldb_prod to /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]:     wrote 108K in 3s
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]:     archive readable, 5 objects
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]:     a dump is not proven until restored: tools/maintenance/restore-test.sh
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]: ==> Pruning backups older than the newest 1
-   | Nov 28 02:20:03.284879 r7b-rehearsal bash[1753]: ==> Done. 1 backup(s) of afldb_prod retained in /var/lib/afldb-backup/staging
-   | Nov 28 02:20:03.294011 r7b-rehearsal bash[1753]: backup ok: afldb_prod-20261128-022000.dump 110150 bytes sha256 8c3cdaea58aa5794 offhost=skipped
-   | Nov 28 02:20:06.910919 r7b-rehearsal env[3446]: afldb-backup-seal: sealed 909783cb05dd4d9fac9267b8667dc83a (scheduled, trigger afldb-backup.timer, dispatch 1795822920067849) and published afldb_prod-20261128-022000.dump sha256 8c3cdaea58aa5794
-   | Nov 28 02:20:06.912689 r7b-rehearsal systemd[1]: afldb-backup.service: Deactivated successfully.
-   | Nov 28 02:20:06.912910 r7b-rehearsal systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
-seals:
-   -rw-r--r-- root:root links=1 size=814 /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
-      afldb-backup-seal/3
-      sealer_sha256=33ab0cc3b3862dbe63d4999fafd1d721ffbbe720a70717c92c9a0c82dff3bb83
+   | Nov 28 02:20:00.124385 r7b-rehearsal systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]: ==> Backing up afldb_prod to /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]:     wrote 108K in 3s
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]:     archive readable, 5 objects
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]:     a dump is not proven until restored: tools/maintenance/restore-test.sh
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]: ==> Pruning backups older than the newest 1
+   | Nov 28 02:20:03.356640 r7b-rehearsal bash[1917]: ==> Done. 1 backup(s) of afldb_prod retained in /var/lib/afldb-backup/staging
+   | Nov 28 02:20:03.365543 r7b-rehearsal bash[1917]: backup ok: afldb_prod-20261128-022000.dump 110150 bytes sha256 2210f958ac22c4c9 offhost=skipped
+   | Nov 28 02:20:06.837035 r7b-rehearsal env[3614]: afldb-backup-seal: sealed 5fbde4e8e2044b02b218c8ebd40e9c89 (scheduled, trigger afldb-backup.timer, dispatch 1795827900122082) and published afldb_prod-20261128-022000.dump sha256 2210f958ac22c4c9
+   | Nov 28 02:20:06.837910 r7b-rehearsal systemd[1]: afldb-backup.service: Deactivated successfully.
+   | Nov 28 02:20:06.838111 r7b-rehearsal systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+seals and completion records:
+   -rw-r--r-- root:root links=1 size=855 /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
+      afldb-backup-seal/4
+      sealer_sha256=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5
       unit=afldb-backup.service
-      invocation=909783cb05dd4d9fac9267b8667dc83a
+      invocation=5fbde4e8e2044b02b218c8ebd40e9c89
       job=214
       job_type=start
       active_state=activating
@@ -2310,43 +2311,52 @@ seals:
       exec_main_status=0
       service_user=afldb-backup
       inactive_enter_mono=0
-      inactive_exit_mono=632440900694
-      exec_main_start_mono=632440900209
+      inactive_exit_mono=637420945811
+      exec_main_start_mono=637420945398
       trigger_unit=afldb-backup.timer
-      trigger_timer_realtime_usec=1795822920067849
-      timer_last_trigger_usec=1795822920067849
-      timer_last_trigger_mono=632440889298
-      timer_active_enter_mono=632355384991
+      trigger_timer_realtime_usec=1795827900122082
+      timer_last_trigger_usec=1795827900122082
+      timer_last_trigger_mono=637420943531
+      timer_active_enter_mono=637319230802
+      timer_active_enter_usec=1795827798409353
       dispatch_kind=scheduled
       dump=afldb_prod-20261128-022000.dump
-      dump_sha256=8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0
+      dump_sha256=2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4
       dump_bytes=110150
       boot_id=c3524e4759ab4e0f8050875471b56b12
-      sealed_realtime_usec=1795822923493292
+      sealed_realtime_usec=1795827903571495
+   -rw-r--r-- root:root links=1 size=219 /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.done
+      afldb-backup-done/1
+      invocation=5fbde4e8e2044b02b218c8ebd40e9c89
+      dump=afldb_prod-20261128-022000.dump
+      dump_sha256=2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4
+      completed_realtime_usec=1795827906834786
 published: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read afldb_prod-20261128-022000.dump;-r--r----- root:afldb-backup-read afldb_prod-20261128-022000.dump.sha256;
-state: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read last-backup.json; last-backup.json: {"epoch":1795822923,"ts":"2026-11-27T23:42:06Z","file":"afldb_prod-20261128-022000.dump","sha256":"8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0","bytes":110150,"offhost":"skipped"}
+state: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read last-backup.json; last-backup.json: {"epoch":1795827903,"ts":"2026-11-28T01:05:06Z","file":"afldb_prod-20261128-022000.dump","sha256":"2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4","bytes":110150,"offhost":"skipped"}
 staging (root): drwx------ afldb-backup:afldb-backup .;drwxr-xr-x root:root ..;
 
 == sealed_origin 2026-11-28, run by r7reader (not arm, not root; groups r7reader,afldb-backup-read) from the INSTALLED library [REAL]
-   SODIAG   sealed-origin: seal /var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal: invocation 909783cb05dd4d9fac9267b8667dc83a, job 214 created by afldb-backup.timer at 1795822920067849 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 85.5 s after timer activation, dump afldb_prod-20261128-022000.dump 110150 bytes sha256 8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0
+   SODIAG   sealed-origin: seal /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal: invocation 5fbde4e8e2044b02b218c8ebd40e9c89, job 214 created by afldb-backup.timer at 1795827900122082 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 101.7 s after timer activation, dump afldb_prod-20261128-022000.dump 110150 bytes sha256 2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4
    SO rc=0
    SO SO_REASON=
-   SO SO_INVOCATION=909783cb05dd4d9fac9267b8667dc83a
+   SO SO_INVOCATION=5fbde4e8e2044b02b218c8ebd40e9c89
    SO SO_DUMP=afldb_prod-20261128-022000.dump
-   SO SO_SHA=8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0
+   SO SO_SHA=2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4
    SO SO_BYTES=110150
    SO SO_DISPATCH_KIND=scheduled
-   SO SO_DISPATCH_DELAY_S=85.5
-   SO SO_TIMER_USEC=1795822920067849
-   SO SO_SEAL=/var/lib/afldb-backup/seals/909783cb05dd4d9fac9267b8667dc83a.seal
+   SO SO_DISPATCH_DELAY_S=101.7
+   SO SO_TIMER_USEC=1795827900122082
+   SO SO_SEAL=/var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.seal
 
 == verdict [HARNESS]
-[HARNESS] ok invocation 909783cb05dd4d9fac9267b8667dc83a (the service's last, root view)
-[HARNESS] ok dispatch=scheduled, 85.5 s after timer activation
+[HARNESS] ok invocation 5fbde4e8e2044b02b218c8ebd40e9c89 (the service's last, root view)
+[HARNESS] ok dispatch=scheduled, 101.7 s after timer activation
+[HARNESS] sealed timer activation 2026-11-28 02:18:18 AEDT (realtime), dispatch 2026-11-28 02:20:00 AEDT, the window opens 2026-11-28 02:20:00 AEDT
+[HARNESS] ok completion record /var/lib/afldb-backup/seals/5fbde4e8e2044b02b218c8ebd40e9c89.done written last (root 0644): afldb-backup-done/1 invocation=5fbde4e8e2044b02b218c8ebd40e9c89 dump=afldb_prod-20261128-022000.dump dump_sha256=2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de2
 [HARNESS] ok root re-hash of /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump = SO_SHA
-[HARNESS] ok the run's own 'backup ok' line (root journal) names afldb_prod-20261128-022000.dump and 8c3cdaea58aa5794
+[HARNESS] ok the run's own 'backup ok' line (root journal) names afldb_prod-20261128-022000.dump and 2210f958ac22c4c9
 [HARNESS] ok dump name afldb_prod-20261128-022000.dump is tonight's
-[HARNESS] ok the published dump holds tonight's nonce r7b-0839565f8f3cf8c4 (read by arm through afldb-backup-read)
+[HARNESS] ok the published dump holds tonight's nonce r7b-6a5775d85c034435 (read by arm through afldb-backup-read)
 [HARNESS] ok full digest: SO_SHA = root's hash of the staging dump taken during the sealing hold
-SCENARIO perm PASS expect=attributed so_rc=0 inv=909783cb05dd4d9fac9267b8667dc83a dump=afldb_prod-20261128-022000.dump sha256=8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0 dispatch=scheduled delay=85.5s
-== controller exit 0 (2026-11-27T23:42:14Z); container removed
+SCENARIO perm PASS expect=attributed so_rc=0 inv=5fbde4e8e2044b02b218c8ebd40e9c89 dump=afldb_prod-20261128-022000.dump sha256=2210f958ac22c4c9dc30d9e4700c9fa6c266e63a9e89de277cf7de41df7c3ba4 dispatch=scheduled delay=101.7s
+== controller exit 0 (2026-11-28T01:05:14Z); container removed

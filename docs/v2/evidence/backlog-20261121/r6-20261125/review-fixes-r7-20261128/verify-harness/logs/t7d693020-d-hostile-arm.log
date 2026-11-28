@@ -1,0 +1,231 @@
+== r7v-run t7d693020 2026-11-28T01:00:21Z workstation Office user stuar; worktree HEAD 7d69302007568d3141a567c8eba89e4ee473c9a6
+[HARNESS] inputs sent (sha256, worktree):
+   93f41153d33c71969843ed108fbc2caf6a0572b1484fc6a59e2b45097af7940d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-container.sh
+   476546e0822e05e03a2726c62c6a9604983d16353d303fef050866e2da616964  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh
+   72c80e01d001a2ac64be8657edcb0ff03a7eb468f77567ffc0886f999ee8ca62  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-run.sh
+   dcd20cfd33488f3eae31bd6e62c30888f2b7f6afb7558251154924df9d3bf354  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md
+   221b254a26cb541c6f22aae3b5d076e468fb88f3b7841fe3b94863e1121c9c4d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+   fe49c3dd2580b1e6573d49b484c83d6e715b409a5566e546d3cc38774d3a51fd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/afldb-verify-call.sh
+   ca739de772b31b466bdbb9c6295c8c4646f7b1746c71d7b618d92b606aee9bfb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/authorized_keys.template
+   15fdd32cb7bb960d569358eb0306cf7b5aec03a9289c5167929156b2b3c9215a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/build-sums.sh
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/60-afldb-verify.conf
+   df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+   3572d6c439f3dbc2ae1706b09579dda5d34d7af5c859eedcf509794fa1c04bc2  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-settle-failure-status.sh
+   cb2b936d12d43db0cc041fb0da56ee9412cf76aadc2895dad769400bc1c3c082  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts@.service
+   d26c74b5334eae450fe8be6129ed2159a4ac658d3c92bdd5240f4e711c55344f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0-core.sh
+   274118cdc31cb2c6cf7ac388a3ddd608296dc8d693108567807cb5f7c15ca443  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/lib.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/sealed-origin.sh
+   7ab4ba61ef0785dbc08f55124aa160021e00e032afb62989dbd09d199bc6f4b9  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/install-verify.sh
+   062f2dd3ed1791f92059cc38438942406ba80c98dc46b069375d3ac0c07bdd3f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/pg-auth-lines.txt
+   d7e71ed7bf8756d0b3d4d1bea38be7354f4c5cc22c79f6daa6fca0b9d7b99cd7  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verifier-db.sql
+   4b3d5ed11cf9cb833f5ad6cb20acd885e2d640a4cd18e1663f0c441fd29ce9ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verify-verify-install.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   af7a9d4769ec522dd66238a17e2afdac5f522ccbeb39392c62052a726dfaaead  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md
+   d0023d1060763ab8fe5db1ae1387ba7767f32f87b66f987bb1d5dd920d704cf6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f286ea7b7372d20ced0ac45380e5927e8461f490c1c20c83022f5abe6330eb9e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   7dee0dc7514a6ccd1eb05172b49b686739b09fa612fbad978755702e5d9bc07a  deploy/release.mjs
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  deploy/afldb-settle-failure-status.sh
+   183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e  deploy/host-policy/needrestart-afldb-hold.conf
+   4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810  deploy/host-policy/apt-52-afldb-unattended.conf
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against 7d69302007568d3141a567c8eba89e4ee473c9a6:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 7d69302007568d3141a567c8eba89e4ee473c9a6
+PASS bundle digest df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+[HARNESS] fresh keys: verify AAAAC3NzaC1lZDI1NTE5AAAA... other AAAAC3NzaC1lZDI1NTE5AAAA... arm AAAAC3NzaC1lZDI1NTE5AAAA...
+workspace /home/arm/r7v-ws.RhNq5R
+48
+
+== scenario d (2026-11-28T01:08:44Z)
+== r7v-t7d693020-prod hostile
+[FIXTURE-ATTACK] as arm: login files, shell functions and aliases, PATH shims, a replaced ~/.nvm node, edited checkout and .env
+[FIXTURE-ATTACK] arm's own login now: function /home/arm/bin:/home/arm/bin:/usr/sbin:/usr/bin:/sbin:/bin 
+== r7v-t7d693020-offhost hostile
+[FIXTURE-ATTACK] as arm: login files, shell functions and aliases, PATH shims, a replaced ~/.nvm node, edited checkout and .env
+[FIXTURE-ATTACK] arm's own login now: function /home/arm/bin:/home/arm/bin:/usr/sbin:/usr/bin:/sbin:/bin 
+$ bash afldb-verify-call.sh --rehearsal <cfg> --key <fresh verify key> g0 2026-11-28
+== afldb-verify-call 2026-11-28T01:08:44Z mode=g0 transport=rehearsal pinned-bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e key=C:/Users/stuar/AppData/Local/Temp/tmp.MbdzanxcCV/verify
+-- G0a: production, g0 2026-11-28
+== afldb-verify G0 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T01:08:49Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0 (verifier) 2026-11-28T01:08:49Z local Sat 2026-11-28 02:22:49 AEDT day 2026-11-28
+  sealed-origin: seal /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal: invocation 5464248086e54cfd9ee00bc020ace203, job 394 created by afldb-backup.timer at 1795827960670894 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 113.4 s after timer activation, dump afldb_prod-20261128-022000.dump 3994 bytes sha256 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795827960670894 us), invocation 5464248086e54cfd9ee00bc020ace203, root seal /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal; published dump afldb_prod-20261128-022000.dump 3994 B, full re-hash = seal = root sidecar
+DISPATCH scheduled 113.4 s after timer activation
+BACKUP-EVIDENCE r7 5464248086e54cfd9ee00bc020ace203 1795827960670894 afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 scheduled /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+PASS afldb-backup.service Result=success (PID 1: the last run did not fail)
+PASS no FAILED marker in /home/arm/backups/afldb-scheduled/.state (arm-produced evidence)
+INFO afldb-backup-verify.service last: success  0 (record; not a G0 criterion)
+G0 PROD RESULT PASS: the wrapper now runs g0b on streamanator with the dump and sha256 of this RESULT line
+AFLDB-VERIFY RESULT G0 PASS nonce=a00ede709eaa0fca137e2e69e5a4c70f host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:08:52Z exit=0 date=2026-11-28 invocation=5464248086e54cfd9ee00bc020ace203 dump=afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 dispatch=scheduled
+-- G0b: streamanator, g0b 2026-11-28 afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 (values from the authenticated G0a RESULT line only)
+== afldb-verify G0B host=streamanator role=offhost boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e identity: uid=999(afldb-verify) gid=996(afldb-verify) groups=996(afldb-verify),999(systemd-journal) at 2026-11-28T01:08:58Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0B (verifier) 2026-11-28T01:08:58Z host=streamanator day 2026-11-28 dump afldb_prod-20261128-022000.dump sha256 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+COPY VERIFIED afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 (bytes re-hashed by the root facts reader, named sidecar, verified marker, no hold)
+SCHEDULE crontab pair present: 10 3 * * *
+DISPATCH journal: pid=925 at 2026-11-28 03:10:01 AEDT (a root syslog entry: _UID=0, SYSLOG_PID=_PID)
+INVOCATION linked to dispatch: run=2026-11-28T01:08:02Z-926 (lineage contains pid 925, started within 5 s of the journal record)
+PASS scheduled pull date=2026-11-28 dispatch_pid=925 run=2026-11-28T01:08:02Z-926 completion=2026-11-28T01:08:02Z rc=0
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+RESULT SCHEDULED-COPY-VERIFIED
+R6 OFFHOST RESULT PASS
+AFLDB-VERIFY RESULT G0B PASS nonce=e4fc614d3aa6b83a6af0ab29e7c53508 host=streamanator boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:08:58Z exit=0 date=2026-11-28 dump=afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=5464248086e54cfd9ee00bc020ace203 dump=afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 dispatch=scheduled g0a-nonce=a00ede709eaa0fca137e2e69e5a4c70f g0a-at=2026-11-28T01:08:52Z g0a-boot=c3524e4759ab4e0f8050875471b56b12 g0b-nonce=e4fc614d3aa6b83a6af0ab29e7c53508 g0b-at=2026-11-28T01:08:58Z
+[HARNESS] wrapper exit 0
+$ bash afldb-verify-call.sh --rehearsal <cfg> --key <fresh verify key> a2 accepted 17822b29e6de-R7VfixtureBuild r3:yes r4:no 10:00 tue:released inv:9f496e4665014d7793ddc27cb4fd151f
+== afldb-verify-call 2026-11-28T01:08:59Z mode=a2 transport=rehearsal pinned-bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e key=C:/Users/stuar/AppData/Local/Temp/tmp.MbdzanxcCV/verify
+== afldb-verify A2 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T01:09:04Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R6 PRE (r7 verifier) 2026-11-28T01:09:04Z local Sat 2026-11-28 02:23:04 AEDT host=afldb-prod user=afldb-verify outcome=accepted current=17822b29e6de-R7VfixtureBuild r3:yes r4:no window=2026-11-28 10:00 tue:released attested=9f496e4665014d7793ddc27cb4fd151f
+FAIL today is not the scheduled Wednesday (2026-11-25); re-plan
+BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+-- 1. kernels and reboot state
+FAIL running 6.8.0-151-generic (expected 6.8.0-137-generic)
+INFO up since 2026-11-20 17:15:19
+     
+FAIL installed kernel images are '' (expected exactly 137 and 149): another kernel would change what boots; STOP, owner decision
+FAIL missing /boot/vmlinuz-6.8.0-149-generic
+FAIL missing /boot/initrd.img-6.8.0-149-generic
+FAIL missing /boot/vmlinuz-6.8.0-137-generic
+FAIL missing /boot/initrd.img-6.8.0-137-generic
+FAIL a modules directory is missing
+INFO reboot-required absent
+-- 2. boot facts for the GRUB decision (grub.cfg itself is root-only: owner step C1)
+INFO firmware BIOS (no /sys/firmware/efi)
+INFO root fs type overlay; /boot: on /; root source kind overlay
+     ls: cannot access '/etc/default/grub': No such file or directory
+     ls: cannot access '/etc/default/grub.d/': No such file or directory
+     ls: cannot access '/boot/grub/grubenv': No such file or directory
+INFO grubenv variables (non-padding lines): ''
+GRUB-BASELINE e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+INFO kernel.panic=0 kernel.panic_on_oops=0
+-- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+PASS apt-daily.service inactive
+PASS apt-daily-upgrade.service inactive
+PASS no apt/dpkg/unattended-upgrade process
+     unit-file: afldb-backup-failed.service     static   -
+     unit-file: afldb-backup.service            static   -
+     unit-file: afldb-verify-rootfacts@.service static   -
+     unit-file: afldb.service                   disabled enabled
+     unit-file: afldb-verify-rootfacts.socket   enabled  enabled
+     unit-file: afldb-backup.timer              disabled enabled
+PASS afldb-backup.timer active=active enabled=disabled triggers=afldb-backup.service (inactive) next=Sun 2026-11-29 02:20:00 AEDT
+PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Sat 2026-11-28 06:13:10 AEDT
+PASS apt-daily.timer active=active enabled=enabled triggers=apt-daily.service (inactive) next=Sat 2026-11-28 16:00:15 AEDT
+PASS dpkg-db-backup.timer active=active enabled=enabled triggers=dpkg-db-backup.service (inactive) next=Sun 2026-11-29 00:00:00 AEDT
+PASS e2scrub_all.timer active=active enabled=enabled triggers=e2scrub_all.service (inactive) next=Sun 2026-11-29 03:10:30 AEDT
+PASS fstrim.timer active=inactive enabled=enabled triggers=fstrim.service (inactive) next=none
+PASS motd-news.timer active=active enabled=enabled triggers=motd-news.service (inactive) next=Sat 2026-11-28 06:25:10 AEDT
+PASS systemd-tmpfiles-clean.timer active=active enabled=static triggers=systemd-tmpfiles-clean.service (inactive) next=Sat 2026-11-28 02:32:44 AEDT
+-- 4. services and the release (outcome accepted)
+PASS postgresql@16-main active
+PASS afldb active
+FAIL caddy inactive
+INVOCATION_ID 9f496e4665014d7793ddc27cb4fd151f
+PASS live InvocationID = the owner-attested 9f496e4665014d7793ddc27cb4fd151f (Tuesday released; from the sitting record)
+     MainPID=616
+     NRestarts=0
+     ActiveEnterTimestamp=Sat 2026-11-28 02:18:08 AEDT
+PASS exactly 2 worker processes
+PASS current = 17822b29e6de-R7VfixtureBuild
+INFO previous = releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU; checkout HEAD 17822b29e6de2b6248cd7ada4221800fd81e0003 (read as files: arm data)
+     release: current  17822b29e6de-R7VfixtureBuild revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID R7VfixtureBuild production
+     release: previous 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 7d92042fd1100000000000000000000000000000 BUILD_ID XWruOm_9nLCSMY8nGPqYU
+     release: process  616 runs in /home/arm/afldb-releases/releases/17822b29e6de-R7VfixtureBuild
+     release: health   200 status=ok database=ok
+     release: build    /_next/static/R7VfixtureBuild/_buildManifest.js 200 application/javascript
+     release: build    /_next/static/XWruOm_9nLCSMY8nGPqYU/_buildManifest.js 404 text/html (previous; expect 404)
+     release: activation service InvocationID 9f496e4665014d7793ddc27cb4fd151f NRestarts 0
+     release: STATUS PASS 17822b29e6de-R7VfixtureBuild
+PASS release status (r7 verifier port of release.mjs status, read-only): one result line 'STATUS PASS 17822b29e6de-R7VfixtureBuild', process cwd = the release, health and BUILD_ID manifests, no unattested restart
+PASS env counts 1/1 (arm-owned .env, counted by the root facts reader)
+     AFLDB_SETTLE_STATUS UNKNOWN
+     unit afldb-settle-afl-api.service: not loaded or unreadable (LoadState=not-found)
+     unit afldb-settle-afl-api-brownlow.service: not loaded or unreadable (LoadState=not-found)
+     timer afldb-settle-afl-api.timer: not loaded or unreadable
+INFO settle-failure-status rc 2 (packet R6 prerequisite 5: recorded before the reboot; pinned bundle copy)
+/usr/local/lib/afldb-verify/a2-core.sh: line 237: /etc/caddy/Caddyfile: No such file or directory
+FAIL Caddyfile  (r4:no expects 4f6972ec)
+PASS R1 host policy installed (both files equal the pinned repo digests)
+PASS A1 raw-head baseline present (post-reboot raw-head check runs)
+INFO R5 directory absent
+-- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+  sealed-origin: seal /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal: invocation 5464248086e54cfd9ee00bc020ace203, job 394 created by afldb-backup.timer at 1795827960670894 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 113.4 s after timer activation, dump afldb_prod-20261128-022000.dump 3994 bytes sha256 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795827960670894 us), invocation 5464248086e54cfd9ee00bc020ace203, root seal /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal; published dump afldb_prod-20261128-022000.dump 3994 B, full re-hash = seal = root sidecar
+DISPATCH scheduled 113.4 s after timer activation
+BACKUP-EVIDENCE r7 5464248086e54cfd9ee00bc020ace203 1795827960670894 afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 scheduled /var/lib/afldb-backup/seals/5464248086e54cfd9ee00bc020ace203.seal
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump 456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401
+FAIL restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window
+INFO last-verify.json (arm-produced): file=afldb_prod-20261128-033012.dump sha256=b3a96bd0f8fcb89a2e37af8170b07c5a1455203553b01d99fc24ef93d2176d90 attempts=1
+INFO last-backup.json (arm, weekly verify's): {"epoch":1795824248,"file":"afldb_prod-20261128-033012.dump","offhost":"skipped"}
+INFO sealed last-backup.json (root): {"epoch":1795827961,"ts":"2026-11-28T01:06:01Z","file":"afldb_prod-20261128-022000.dump","sha256":"456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401","bytes":3994,"offhost":"skipped"}
+FAIL last-verify.json and restored dump do not match the scheduled service invocation
+PASS no FAILED marker (afldb-backup.service Result=success, PID 1; arm .state clean)
+     STATUS ok   backup: afldb_prod-20261128-022000.dump 0h ago (sealed state /var/lib/afldb-backup/state/last-backup.json (root))
+     STATUS ok   restore verification: afldb_prod-20261128-033012.dump 1h ago (/home/arm/backups/afldb-scheduled/.state/last-verify.json (arm-produced))
+PASS backup status rc 0 (r7 port of scheduled-backup.sh status)
+INFO dumps held: published 1, arm directory 1
+     ledger|118|118_fixtures_unconfirmed_participants.sql
+     rt|afldb_restore_test|afldb.restore_test.v1 sha256=b3a96bd0f8fcb89a2e37af8170b07c5a1455203553b01d99fc24ef93d2176d90|0
+PASS ledger 118
+FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+-- 6. capacity
+     Filesystem      Size  Used Avail Use% Mounted on
+     overlay         232G  156G   65G  71% /
+     overlay         232G  156G   65G  71% /
+                    total        used        free      shared  buff/cache   available
+     Mem:           32018        5963        1729         320       25458       26054
+     Swap:           8191        2445        5746
+PASS root fs free 66528 MB >= 6144
+A2 BACKUP-ORIGIN attributed (reported separately from the whole A-2 status)
+
+R6 PRE RESULT STOP (13 FAIL line(s)): do not reboot; take them to the owner
+AFLDB-VERIFY RESULT A2 STOP nonce=909392269f2f795fc1cc348c7cb6db66 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:09:09Z exit=1 outcome=accepted current=17822b29e6de-R7VfixtureBuild r3=r3:yes r4=r4:no window=10:00 tue=tue:released inv=9f496e4665014d7793ddc27cb4fd151f day=2026-11-28 backup-origin=attributed
+OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=9f496e4665014d7793ddc27cb4fd151f window=10:00 day=2026-11-28 backup-origin=attributed nonce=909392269f2f795fc1cc348c7cb6db66 at=2026-11-28T01:09:09Z boot=c3524e4759ab4e0f8050875471b56b12 exit=1
+[HARNESS] wrapper exit 1
+[HARNESS] verdict comparison (nonce= and at= fields removed):
+   before g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=5464248086e54cfd9ee00bc020ace203 dump=afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 dispatch=scheduled g0a-boot=c3524e4759ab4e0f8050875471b56b12 exit 0
+   after  g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=5464248086e54cfd9ee00bc020ace203 dump=afldb_prod-20261128-022000.dump sha256=456d506be090cfea82f8b26c78c8c2cbd47efb926867503926437285fafca401 dispatch=scheduled g0a-boot=c3524e4759ab4e0f8050875471b56b12 exit 0
+   before a2: OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=9f496e4665014d7793ddc27cb4fd151f window=10:00 day=2026-11-28 backup-origin=attributed boot=c3524e4759ab4e0f8050875471b56b12 exit=1 exit 1
+   after  a2: OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=9f496e4665014d7793ddc27cb4fd151f window=10:00 day=2026-11-28 backup-origin=attributed boot=c3524e4759ab4e0f8050875471b56b12 exit=1 exit 1
+[HARNESS] PASS/FAIL line diff, g0 (information):
+[HARNESS] PASS/FAIL line diff, a2 (information; timer next= lines omitted):
+   30c30
+   < PASS root fs free 66534 MB >= 6144
+   ---
+   > PASS root fs free 66528 MB >= 6144
+== CONTRAST: the OLD path, as the runbook ran it: tr -d '\r' < <old gate> | ssh arm@<host> bash -s -- <args>
+-- old G0 (exit 0):
+   ERROR: ld.so: object '/home/arm/evil.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+   PASS forged by ~/.bashrc
+   G0 PROD RESULT PASS: forged
+   OFFHOST-COMPARE afldb_prod-20261128-022003.dump 0000000000000000000000000000000000000000000000000000000000000000
+   R6 OFFHOST RESULT PASS
+   R6 PRE RESULT PASS
+-- old A-2 (exit 0):
+   ERROR: ld.so: object '/home/arm/evil.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+   PASS forged by ~/.bashrc
+   G0 PROD RESULT PASS: forged
+   OFFHOST-COMPARE afldb_prod-20261128-022003.dump 0000000000000000000000000000000000000000000000000000000000000000
+   R6 OFFHOST RESULT PASS
+   R6 PRE RESULT PASS

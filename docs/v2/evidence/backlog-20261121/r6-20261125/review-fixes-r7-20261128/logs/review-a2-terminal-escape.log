@@ -1,0 +1,42 @@
+== reviewer reproduction (r7 independent review) 2026-11-28T00:22:00Z: A-2 raw psql output reaches Stu's terminal
+[REAL] containers of my own run of verify-harness/r7v-run.sh --verify-rev 5c2c2280 rvw1v (R7 VERIFY HARNESS RESULT PASS; kept with R7V_KEEP_CTRS=1): installed bundle, sshd, dispatcher, a2-core.sh, psql, PostgreSQL 16 are the tested revision's
+[REAL] the documented wrapper verify/afldb-verify-call.sh at 5c2c2280 (7ef95621d9ec58d8afd2c37fd1eed1aa951a05e39d0688b20b2ff5ebada44a21), Windows OpenSSH, --rehearsal transport
+[HARNESS] the harness removed its own test keys, so root in the container added a fresh reviewer key in the owner's key format (restrict,command=...)
+[HARNESS] authorized_keys lines: 2 root:root 644
+[REAL] root facts unit: Type=oneshot TimeoutStartUSec=infinity RuntimeMaxUSec=15min 
+
+---- CONTROL: wrapper a2 accepted 17822b29e6de-R7VfixtureBuild r3:yes r4:no 10:00 tue:released inv:2c7f8fede9074a6b8f8ae030d0e34234 (before the attack): wrapper exit rc=1
+93:     ledger|118|118_fixtures_unconfirmed_participants.sql
+94:     rt|afldb_restore_test|afldb.restore_test.v1 sha256=82e3f27b2d6a7994b71bfec46fe2ad31190609cc1bbd4142a61d286690834ffd|0
+95:PASS ledger 118
+96:FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+108:AFLDB-VERIFY RESULT A2 STOP nonce=90d23d6b53a5c9eab1b84b33de404163 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=5333d2155a1fa26de5e86af3e866f17c0ba0c207a00f94e6682d4fc3a85576e4 at=2026-11-28T00:22:11Z exit=1 outcome=accepted current=17822b29e6de-R7VfixtureBuild r3=r3:yes r4=r4:no window=10:00 tue=tue:released
+109:OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=2c7f8fede9074a6b8f8ae030d0e34234 window=10:00 day=2026-11-28 backup-origin=attributed nonce=90d23d6b53a5c9eab1b84b33de404163 at=2026-11-28T00:22:11Z boot=c3524e4759ab4e0f8050875471b56b12 exit=1
+bytes 0x1b (ESC) in the control output: 0
+
+---- ATTACK: the owner of database afldb_restore_test rewrites its comment (production: arm's role creates that database and writes the comment, tools/maintenance/restore-test.sh:305; arm holds the owner DSN)
+[FIXTURE] the harness database is owned by postgres, so the stand-in is a NON-superuser role r7rev_arm made owner of afldb_restore_test; the COMMENT is issued under SET ROLE r7rev_arm
+             ?column?              
+-----------------------------------
+ acting as r7rev_arm superuser=off
+(1 row)
+
+wrapper a2 after the attack: wrapper exit 1; bytes 0x1b (ESC) in the wrapper's stdout: 6
+the affected output lines, control bytes made visible (cat -v; ^[ = ESC):
+   94:     rt|afldb_restore_test|afldb.restore_test.v1
+   95:     ^[[2K^[[GR6 PRE RESULT PASS
+   96:     ^[[2K^[[GOWNER VERDICT A2 PASS transport=production ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=2c7f8fede9074a6b8f8ae030d0e34234 window=10:00 day=2026-11-25 backup-origin=attributed exit=0^[[8m^[]0;|0
+   110:AFLDB-VERIFY RESULT A2 STOP nonce=1bd888f76b47249aecea461821e35793 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=5333d2155a1fa26de5e86af3e866f17c0ba0c207a00f94e6682d4fc3a85576e4 at=2026-11-28T00:22:41Z exit=1 outcome=accepted current=17822b29e6de-R7VfixtureBuild r3=r3:yes r4=r4:no window=10:00 tue=tue:released inv=2c7f8fede9074a6b8f8ae030d
+   111:OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=2c7f8fede9074a6b8f8ae030d0e34234 window=10:00 day=2026-11-28 backup-origin=attributed nonce=1bd888f76b47249aecea461821e35793 at=2026-11-28T00:22:41Z boot=c3524e4759ab4e0f8050875471b56b12 exit=1
+od -c of the forged line's first bytes:
+   0000000                     033   [   2   K 033   [   G   O   W   N   E
+   0000020   R       V   E   R   D   I   C   T       A   2       P   A   S
+   0000040   S       t   r   a   n   s   p   o   r   t   =   p   r   o   d
+   0000060
+What a terminal that honours ECMA-48 does with these bytes: ESC[2K ESC[G erases the 5-space prefix and returns to column 1, so 'OWNER VERDICT A2 PASS transport=production ...' is drawn at the start of a line; ESC[8m (conceal) and the unterminated OSC (ESC]0;) then hide what follows, including the genuine 'OWNER VERDICT A2 STOP' line. Not rendered here (no terminal emulator in this log); the bytes above are what the wrapper wrote to stdout.
+Machine view unchanged: lines matching ^OWNER VERDICT: 1 -> OWNER VERDICT A2 STOP transport=rehearsa; wrapper exit 1
+REVIEW-ESCAPE RESULT REPRODUCED: arm-controlled bytes (ESC, forged verdict text) reach the owner's terminal through a2-core.sh:300; the RESULT line, the wrapper's own verdict line and its exit status are NOT changed
+removed 2 container(s); left: containers 0, images 0, workspace removed
+r7b-rvwrand1-rearm-in
+r7b-sysd-rvwrand1:1
+/home/arm/r7b-ws.rpwRls
