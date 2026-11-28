@@ -314,7 +314,7 @@ The qualifying backup is the 02:20 run of the gate date. Complete these before i
 * from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
   ~~**r8:** the revision becomes `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests below become `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`,
   `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.~~
-  **r9 (supersedes r8's pins):** the revision is `@@R9_REV@@`; backup `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (unchanged), verify packet `@@VERIFY_SUMS@@`, bundle `@@BUNDLE_SHA@@`, owner checks `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` (unchanged), phase4 `@@PHASE4_SUMS@@`, acceptance `@@ACCEPT_SUMS@@` (OWNER-PROCEDURE §0). The r8 wrapper has no off-host qualification rule: never use it.
+  **r9 (supersedes r8's pins):** the revision is `0c8de418da271068add1528c0a57e416ade51151`; backup `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (unchanged), verify packet `c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da`, bundle `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95`, owner checks `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` (unchanged), phase4 `1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8`, acceptance `0baf090cb0a40de46d1d563de7aa3085627c3d152c3740e394932026f081225e` (OWNER-PROCEDURE §0). The r8 wrapper has no off-host qualification rule: never use it.
   * The archive is made in the owner's **workstation** clone and hashed there, carried over the admin path, and re-verified in the
     admin root session against the workstation value.
   * Never copy bytes from arm's checkout, never run git as root in it, and never read an expected digest from a file on production.
@@ -355,7 +355,7 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
 4. **Workstation.** `V7` is a fresh `git archive` export of
    `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at `7d69302007568d3141a567c8eba89e4ee473c9a6`.
    * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is ~~`df3457cc…`~~ (r7) ~~`58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` at
-     `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`~~ (r8, superseded); r9: `@@BUNDLE_SHA@@` at `@@R9_REV@@`, in the owner's own clone.
+     `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`~~ (r8, superseded); r9: `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95` at `0c8de418da271068add1528c0a57e416ade51151`, in the owner's own clone.
    * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
      the qualified endpoint (`role=offhost … qualification=pinned qual-sha256=<pin>`). Without a pin the off-host line is
      `STOP … no qualified off-host endpoint`, with exit 1. r9: this call is an installation diagnostic; the gate evidence is

@@ -84,13 +84,13 @@ checks did not). They are filled when the coordinator commits:
 
 | Placeholder | What it pins | Expected `[WS]` command |
 |---|---|---|
-| `@@R9_REV@@` | the revision whose bytes are installed | `git rev-parse @@R9_REV@@^{commit}` |
-| `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` | `$R7/backup/SHA256SUMS` | `git show @@R9_REV@@:$R7/backup/SHA256SUMS \| sha256sum` |
-| `@@VERIFY_SUMS@@` | `$R7/verify/SHA256SUMS` | `git show @@R9_REV@@:$R7/verify/SHA256SUMS \| sha256sum` |
-| `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` | `$R8/owner-checks/SHA256SUMS` | `git show @@R9_REV@@:$R8/owner-checks/SHA256SUMS \| sha256sum` |
-| `@@BUNDLE_SHA@@` | the wrapper's pinned `BUNDLE_SHA` (verify README §1) | `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` at the tested revision |
-| `@@PHASE4_SUMS@@` | `$R9/phase4/SHA256SUMS` (r9, the Phase 4 entry/verify/back-out script) | `git show @@R9_REV@@:$R9/phase4/SHA256SUMS \| sha256sum` |
-| `@@ACCEPT_SUMS@@` | `$R9/accept/SHA256SUMS` (r9, the workstation gate acceptance checker) | `git show @@R9_REV@@:$R9/accept/SHA256SUMS \| sha256sum` |
+| `0c8de418da271068add1528c0a57e416ade51151` | the revision whose bytes are installed | `git rev-parse 0c8de418da271068add1528c0a57e416ade51151^{commit}` |
+| `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` | `$R7/backup/SHA256SUMS` | `git show 0c8de418da271068add1528c0a57e416ade51151:$R7/backup/SHA256SUMS \| sha256sum` |
+| `c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da` | `$R7/verify/SHA256SUMS` | `git show 0c8de418da271068add1528c0a57e416ade51151:$R7/verify/SHA256SUMS \| sha256sum` |
+| `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` | `$R8/owner-checks/SHA256SUMS` | `git show 0c8de418da271068add1528c0a57e416ade51151:$R8/owner-checks/SHA256SUMS \| sha256sum` |
+| `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95` | the wrapper's pinned `BUNDLE_SHA` (verify README §1) | `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` at the tested revision |
+| `1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8` | `$R9/phase4/SHA256SUMS` (r9, the Phase 4 entry/verify/back-out script) | `git show 0c8de418da271068add1528c0a57e416ade51151:$R9/phase4/SHA256SUMS \| sha256sum` |
+| `0baf090cb0a40de46d1d563de7aa3085627c3d152c3740e394932026f081225e` | `$R9/accept/SHA256SUMS` (r9, the workstation gate acceptance checker) | `git show 0c8de418da271068add1528c0a57e416ade51151:$R9/accept/SHA256SUMS \| sha256sum` |
 
 Paths used below:
 
@@ -186,14 +186,14 @@ Phase 2. Its authentication uses a key and a password arm never held.
 
 | # | Where | Command | Proves | Stop condition |
 |---|---|---|---|---|
-| 2.1.1 | [WS] | `git fetch; git rev-parse @@R9_REV@@^{commit}` | the pinned revision is present in the owner's own clone | unknown revision: STOP |
-| 2.1.2 | [WS] | `git archive --format=tar -o ~/afldb-r8-stage.tar @@R9_REV@@ $R7/backup $R7/verify $R8/owner-checks $R9/phase4/afldb-phase4.sh $R9/phase4/SHA256SUMS tools/maintenance/backup.sh` | the only acceptable source of bundle bytes | none |
+| 2.1.1 | [WS] | `git fetch; git rev-parse 0c8de418da271068add1528c0a57e416ade51151^{commit}` | the pinned revision is present in the owner's own clone | unknown revision: STOP |
+| 2.1.2 | [WS] | `git archive --format=tar -o ~/afldb-r8-stage.tar 0c8de418da271068add1528c0a57e416ade51151 $R7/backup $R7/verify $R8/owner-checks $R9/phase4/afldb-phase4.sh $R9/phase4/SHA256SUMS tools/maintenance/backup.sh` | the only acceptable source of bundle bytes | none |
 | 2.1.3 | [WS] | `sha256sum ~/afldb-r8-stage.tar`, plus the four `git show … \| sha256sum` commands of §0 for backup, verify, owner checks and phase4 (r9) | the TAR value is written down; the four SHA256SUMS values equal the pins | any pin differs: STOP |
 | 2.1.4 | [WS]→[ADM] | `ADM 'umask 077; set -C; cat > ~/afldb-r8-stage.tar' < ~/afldb-r8-stage.tar` | the bytes travel over the admin path, never through arm | `set -C` refusal (a file already there): remove it in [ADM-ROOT] and resend |
 | 2.1.5 | [ADM-ROOT] | `T=/home/afldb-admin/afldb-r8-stage.tar; stat -c '%U %a %s' $T; sha256sum $T` | owner `afldb-admin 600`, and **the TAR value of 2.1.3** (compared by eye) | different: STOP |
 | 2.1.6 | [ADM-ROOT] | `X=/root/afldb-r8-extract; rm -rf $X; install -d -m 0700 $X; tar -x --no-same-owner --no-same-permissions -f $T -C $X; chown -R root:root $X; chmod -R go-w $X` | root-owned extracted bytes, outside `/home` | tar error: STOP |
 | 2.1.7 | [ADM-ROOT] | `OC=/root/afldb-r8-owner-checks; install -d -m 0755 $OC; install -m 0644 $X/$R8/owner-checks/afldb-owner-checks.sh $X/$R8/owner-checks/SHA256SUMS $OC/; sha256sum $OC/SHA256SUMS; (cd $OC && sha256sum -c --strict SHA256SUMS)` | `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` and `OK` | different: STOP |
-| 2.1.8 | [ADM-ROOT] | `P4=/root/afldb-r9-phase4; install -d -m 0755 $P4; install -m 0644 $X/$R9/phase4/afldb-phase4.sh $X/$R9/phase4/SHA256SUMS $P4/; sha256sum $P4/SHA256SUMS; (cd $P4 && sha256sum -c --strict SHA256SUMS)` | `@@PHASE4_SUMS@@` and `OK` (r9) | different: STOP |
+| 2.1.8 | [ADM-ROOT] | `P4=/root/afldb-r9-phase4; install -d -m 0755 $P4; install -m 0644 $X/$R9/phase4/afldb-phase4.sh $X/$R9/phase4/SHA256SUMS $P4/; sha256sum $P4/SHA256SUMS; (cd $P4 && sha256sum -c --strict SHA256SUMS)` | `1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8` and `OK` (r9) | different: STOP |
 
 ### 2.2 Run
 
@@ -313,12 +313,12 @@ Phase 2 are that proof.
 | 3.5 | [ADM-ROOT] | `bash $BK/verify-backup-install.sh` | `BACKUP INSTALL RESULT PASS` (root checks) | FAIL: STOP |
 | 3.6 | [ADM-ROOT] | `bash $BK/verify-backup-install.sh --as-arm` | `BACKUP INSTALL RESULT PASS` for arm's checks. Root drops to arm with `setpriv --reuid=arm --regid=arm --init-groups --reset-env`, `/usr/bin/bash --noprofile --norc` and stdin `/dev/null`, so the fresh process carries `afldb-backup-read` without any arm login | FAIL: STOP. (This replaces "as arm in a new login".) |
 | 3.7 | [WS]→[ADM] | `ADM 'umask 077; set -C; cat > ~/afldb_verify.pub' < ~/.ssh/afldb_verify.pub`; on [WS] `ssh-keygen -lf ~/.ssh/afldb_verify.pub` (paper) | the verify public key travels over the admin path | none |
-| 3.8 | [ADM-ROOT] | `VF=/root/afldb-r8-verify; rm -rf $VF; cp -r $X/$R7/verify $VF; install -m 0644 /home/afldb-admin/afldb_verify.pub $VF/afldb_verify.pub; chown -R root:root $VF; chmod -R go-w $VF; ssh-keygen -lf $VF/afldb_verify.pub; sha256sum $VF/SHA256SUMS; (cd $VF && sha256sum -c --strict --quiet SHA256SUMS)` | the paper fingerprint (one ed25519 line), `@@VERIFY_SUMS@@`, no mismatch | different: STOP |
+| 3.8 | [ADM-ROOT] | `VF=/root/afldb-r8-verify; rm -rf $VF; cp -r $X/$R7/verify $VF; install -m 0644 /home/afldb-admin/afldb_verify.pub $VF/afldb_verify.pub; chown -R root:root $VF; chmod -R go-w $VF; ssh-keygen -lf $VF/afldb_verify.pub; sha256sum $VF/SHA256SUMS; (cd $VF && sha256sum -c --strict --quiet SHA256SUMS)` | the paper fingerprint (one ed25519 line), `c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da`, no mismatch | different: STOP |
 | 3.9 | [ADM-ROOT] | verify README §10 prerequisites, then `bash $VF/install-verify.sh --role prod --key $VF/afldb_verify.pub` | `INSTALL-VERIFY RESULT PASS`: the verifier account, forced command, facts socket and units are installed | `REFUSED …`: not [ADM-ROOT]. Other failure: STOP |
 | 3.10 | [ADM-ROOT] | `runuser -u postgres -- psql -X -v ON_ERROR_STOP=1 -d afldb_prod < $VF/verifier-db.sql`; add the `pg-auth-lines.txt` lines (ident map; the hba line directly after the `afldb_backup` line, both before any broader `local`); `runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'` | the verifier's read-only DB role and peer map | error: STOP |
 | 3.11 | [ADM-ROOT] | `bash $VF/verify-verify-install.sh --role prod` | `VERIFY-INSTALL RESULT PASS` | FAIL: STOP |
 | 3.12 | [ADM-ROOT] | the Phase 2 command again | still `BLOCKED` on B1, B2 and B3 (arm can sudo): the installs alone do not close F1 (rehearsed: `checks-post-install`) | any **new** FAIL: STOP |
-| 3.13 | [WS] | in the owner's clone at `@@R9_REV@@`: `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` (= `@@BUNDLE_SHA@@`), then `bash $R7/verify/afldb-verify-call.sh version` | **an installation diagnostic only** (r9): `OWNER VERDICT VERSION PASS … host=afldb-prod role=prod` shows that the installed verifier answers the verify key with the pinned bundle. The off-host line is `OWNER VERDICT VERSION STOP … reason="no qualified off-host endpoint"` (exit 1) until an endpoint is qualified (§8). While 3.12 is BLOCKED, arm can still reach root, so this is **not** an authentic verdict and authorises nothing: no release G0, no NG-PRE, no reboot. `afldb-gate-accept.sh` rejects any Phase 3 output (rehearsed: `ce1`–`ce4`, `n4`) | a production VERSION STOP: STOP and investigate in [ADM-ROOT] |
+| 3.13 | [WS] | in the owner's clone at `0c8de418da271068add1528c0a57e416ade51151`: `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` (= `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95`), then `bash $R7/verify/afldb-verify-call.sh version` | **an installation diagnostic only** (r9): `OWNER VERDICT VERSION PASS … host=afldb-prod role=prod` shows that the installed verifier answers the verify key with the pinned bundle. The off-host line is `OWNER VERDICT VERSION STOP … reason="no qualified off-host endpoint"` (exit 1) until an endpoint is qualified (§8). While 3.12 is BLOCKED, arm can still reach root, so this is **not** an authentic verdict and authorises nothing: no release G0, no NG-PRE, no reboot. `afldb-gate-accept.sh` rejects any Phase 3 output (rehearsed: `ce1`–`ce4`, `n4`) | a production VERSION STOP: STOP and investigate in [ADM-ROOT] |
 
 **STOP. Phase 3 ends here, and no Phase 3 output is GO evidence (r9).** After 3.5, 3.6, 3.11 and 3.13 pass, the owner checks are
 still BLOCKED on B1, B2 and B3 (3.12): both installs and the VERSION call pass while arm can still reach root. Neither release G0,
@@ -388,7 +388,7 @@ checks know, and every root action uses [ADM-ROOT].
 
 **Saved evidence (r9).** F1 can be closed on the saved, unedited outputs `~/afldb-r9-accept/afldb-r9-4.4.txt` and
 `afldb-r9-4.5.txt`. Closing F1 authorises no gate. A gate is GO only when, on [WS] in the owner's clone,
-`(cd $R9/accept && sha256sum -c --strict SHA256SUMS)` passes, `sha256sum $R9/accept/SHA256SUMS` equals `@@ACCEPT_SUMS@@`, and
+`(cd $R9/accept && sha256sum -c --strict SHA256SUMS)` passes, `sha256sum $R9/accept/SHA256SUMS` equals `0baf090cb0a40de46d1d563de7aa3085627c3d152c3740e394932026f081225e`, and
 
 ```
 bash $R9/accept/afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks ~/afldb-r9-accept/afldb-r9-4.4.txt \
@@ -504,7 +504,7 @@ only on the verdict, which STOPs in a container). Phase 4's own fixtures (group-
 back-out) are `$R9/phase4/p4-run.sh`. The base image `sha256:d71c0b28…` is tagged `grafana/alloy:latest`: an Ubuntu 24.04.4
 userland whose entrypoint the harnesses override (r9 note; earlier text called it plain Ubuntu 24.04).
 
-Re-run with `--verify-rev @@R9_REV@@` after the commit.
+Re-run with `--verify-rev 0c8de418da271068add1528c0a57e416ade51151` after the commit.
 
 The rehearsal does **not** exercise:
 
@@ -526,7 +526,7 @@ The rehearsal does **not** exercise:
 | 1.4–1.5b | `K=…; setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K`; the 1.5a shape test (one trailing CR stripped, then `KEY-SHAPE-OK`) and the 1.5b fingerprint test (`KEY-FP-MATCH`) | [CON] | the carried key is one bare ed25519 line and is the workstation's | no `KEY-SHAPE-OK` or no `KEY-FP-MATCH`: **STOP**, the carried key is malformed or not the workstation key |
 | 1.6–1.10 | `useradd -m -U -s /bin/bash afldb-admin`; `passwd afldb-admin`; `usermod -a -G sudo afldb-admin`; `chmod 0750 /home/afldb-admin`; `install … $K.line …/authorized_keys` (the type and key fields only); checks | [CON] | the admin account with its own key and password | any unexpected value |
 | 1.11–1.13 | `ADM`; `id; sudo -k; sudo -v; sudo -l`; twice, in new connections | [WS], [ADM] | the admin path reaches root, twice | host key mismatch or failure |
-| 2.1.1–2.1.3 | `git rev-parse @@R9_REV@@^{commit}`; `git archive … -o ~/afldb-r8-stage.tar`; `sha256sum` | [WS] | workstation bytes and expected digests | a pin differs |
+| 2.1.1–2.1.3 | `git rev-parse 0c8de418da271068add1528c0a57e416ade51151^{commit}`; `git archive … -o ~/afldb-r8-stage.tar`; `sha256sum` | [WS] | workstation bytes and expected digests | a pin differs |
 | 2.1.4 | `ADM 'umask 077; set -C; cat > ~/afldb-r8-stage.tar' < ~/afldb-r8-stage.tar` | [WS]→[ADM] | bytes over the admin path | none |
 | 2.1.5–2.1.8 | `sha256sum $T`; extract; stage owner checks and the Phase 4 script; `sha256sum -c` | [ADM-ROOT] | the same bytes on production | TAR or pin differs |
 | 2.2 | `env -i … afldb-owner-checks.sh --admin afldb-admin --admin-fp SHA256:…` | [ADM-ROOT] | the Phase 2 facts | expected BLOCKED (B1, B2, B3; B3 classified at 4.0) only; any other FAIL/UNKNOWN: resolve |

@@ -15,13 +15,13 @@ commit.
 
 ## [Unreleased]
 
-### R6 r9: Astra's three merge blockers (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `89e09ba4`; nothing installed or deployed; R6 NO-GO)
+### R6 r9: Astra's three merge blockers (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `0c8de418`; nothing installed or deployed; R6 NO-GO)
 
 - **Off-host G0b evidence must be independent.** The workstation wrapper accepts a G0B PASS only from an owner-qualified endpoint (pin `QUALIFIED-ENDPOINT`, absent by default; streamanator refused) carrying scheduled-transfer evidence (`dispatch-at`, `received-at`, `complete-at`, `received-sha256`, `rehash-sha256`, emitted by `g0b-core.sh`); otherwise G0 STOPs. The arm-attested option is withdrawn from the owner procedure, the release runbook and the R6 plan. A stubbed ssh client is labelled `transport=production-stub`. Owner qualification procedure: [QUALIFY-OFFHOST.md](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/offhost/QUALIFY-OFFHOST.md).
 - **Gate acceptance.** `afldb-gate-accept.sh` makes release G0 and R6 NG-PRE GO only on saved post-Phase-4 owner checks PASS, both re-verifications, a later version check and the gate verdict (exit 0), bound to one production boot and fresh; Phase 3's VERSION PASS is an installation diagnostic.
 - **Phase 4 entry and back-out.** `afldb-phase4.sh` (`entry`, `verify`, `backout`) admits only the `%sudo` membership or an explicitly disposed rule, refuses every other sudoers grant, records the pre-change state and restores it exactly with `visudo -c` validation.
 - **Operator hints.** `deploy/release.mjs`, `deploy/post-install-check.sh` and `docs/deployment.md` §3a direct the restart and journal reads to the independent admin root session instead of `sudo` in arm's session.
-- Validation: wrapper decision test 33/33, verify harness 12/12, acceptance 47/47, Phase 4 fixtures 25/25, procedure harness PASS (DEV, disposable containers); independent review with no CRIT/HIGH, R9-F-1..F-5 fixed ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/README.md)).
+- Validation: wrapper decision test 33/33, verify harness 12/12, acceptance 49/49, Phase 4 fixtures 25/25, procedure harness PASS (DEV, disposable containers); independent review with no CRIT/HIGH, R9-F-1..F-5, F-11, F-12 fixed ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/README.md)).
 
 ### R6 r8: independent admin path, owner procedure and read-only checks (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `12e46305`; nothing installed or deployed; MED-2 and MED-3 stay open on F1 and owner installation)
 

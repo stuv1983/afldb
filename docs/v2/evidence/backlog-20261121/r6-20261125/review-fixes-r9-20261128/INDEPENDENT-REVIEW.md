@@ -256,3 +256,33 @@ this check. The rescan (`:344`) and `sudo -l -U arm` (`:347`) still catch anythi
 ## Files written in round 2
 
 Only this section, appended to this file.
+
+---
+
+# Round 3 (T3 0c8de418da271068add1528c0a57e416ade51151)
+
+Date: 28 Nov 2026. Same reviewer and limits (no shell; nothing run, hashed or diffed). Re-read from disk at T3: part (b) and part
+(e) of the checker, the two new cases in the evidence summary, and the amended lines of OWNER-PROCEDURE and the RUNBOOK. `$R7` was
+not re-read; the coordinator states it is unchanged from T2. The checker digest in `accept/evidence/summary.txt:50` (`2258f2b4…`)
+equals `accept/SHA256SUMS:1`. The summary is a development run, not a run I made.
+
+| Finding | Status at T3 | Evidence |
+|---|---|---|
+| R9-F-11 (MED) | **closed**. Each of (a) and (b) must be at most 3 h before the verdict; (b) is timed from its first header, so the older one decides | `afldb-gate-accept.sh:112` (`B_T0`), `:195-203`; `summary.txt:40-41` (n32 stale 4.4, n33 stale 4.5, both `NO-GO failed=fresh`); OWNER-PROCEDURE.md:400 ("OLDER of"); RUNBOOK:233 ("each of (a) and (b)"). No "newer" wording remains in the checker, OWNER-PROCEDURE, the RUNBOOK or the PLAN |
+| R9-F-12 (LOW) | **closed** | RUNBOOK:238 names the pinned endpoint's `host=`, "never `streamanator`" |
+
+**New findings at T3:** none. A part with no time is skipped in (e) only after it has already failed above (`:199`), so the result
+stays NO-GO.
+
+**Q2 at T3: NO.** Phase 3 success cannot authorise release or reboot while the owner checks are BLOCKED. GO needs a post-change
+owner-checks PASS and a re-verification that are each at most 3 h older than the verdict and from the same production boot as the
+authenticated version and verdict lines, a version call after both, the whole wrapper verdict with exit 0, and a check within 1 h
+of that verdict. I found no remaining path in which GO coexists with BLOCKED owner checks, short of an access change inside that
+3 h window, which the procedure forbids and no saved-output checker can see.
+
+Q1 and Q3 are unchanged from round 2 (NO and NO). Still open as LOW or INFO, with no work required: R9-F-6, R9-F-7, R9-F-8,
+R9-F-9, R9-F-10, R9-F-13.
+
+## Files written in round 3
+
+Only this section, appended to this file.

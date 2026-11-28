@@ -1,0 +1,13 @@
+== r9p-t0c8de418 2026-11-28T08:44:37Z workstation: afldb-gate-accept.sh --gate release-g0 --rehearsal (post-phase4-g0): inputs r9p-t0c8de418-in-4.4-owner-checks.log r9p-t0c8de418-in-4.5-reverify.log r9p-t0c8de418-in-4.6-version.log r9p-t0c8de418-in-4.6b-g0.log exit 1
+== afldb-gate-accept 2026-11-28T08:44:35Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   1aa337b56db5aa00b6eb75419a00054ae56252872db8c47b944c79303f2dae07  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.4-owner-checks.log
+   526cc96e4dc352f94e893ea7e4057003e3ca2a5151003fc553a39fcb605604a3  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.5-reverify.log
+   509b91e51f48a2d3536c11f58b7bfdc49959d91cee033a92d2e9eeeaa5279238  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.6-version.log
+   fc79c9cc9017bb374b5ac2841fdee5e1db1d1b11e6b3173ea541fde7c89ffdfe  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.6b-g0.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T08:43:19Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T08:43:39Z, --as-arm 2026-11-28T08:43:41Z (arm has no admin group), verify-install 2026-11-28T08:43:44Z, bundle 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95, boot c3
+ACCEPT version FAIL release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP transport=rehearsal host=none role=o
+ACCEPT verdict FAIL the last line is not 'OWNER VERDICT G0 PASS transport=rehearsal ...': OWNER VERDICT G0 STOP transport=rehearsal ssh=ssh.exe date=2026-11-28 step=G0a nonce=6bc396826d41217efceef4a157616afa at=2026-11-2
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=version,verdict reason="version: release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP transport=rehearsal host=none role=o"
+exit 1

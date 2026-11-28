@@ -1,0 +1,14 @@
+== r9p-t0c8de418 2026-11-28T08:44:32Z workstation: afldb-gate-accept.sh --gate ng-pre --rehearsal (post-phase4): inputs r9p-t0c8de418-in-4.4-owner-checks.log r9p-t0c8de418-in-4.5-reverify.log r9p-t0c8de418-in-4.6-version.log r9p-t0c8de418-in-4.6a-a2.log exit 1
+== afldb-gate-accept 2026-11-28T08:44:29Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   1aa337b56db5aa00b6eb75419a00054ae56252872db8c47b944c79303f2dae07  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.4-owner-checks.log
+   526cc96e4dc352f94e893ea7e4057003e3ca2a5151003fc553a39fcb605604a3  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.5-reverify.log
+   509b91e51f48a2d3536c11f58b7bfdc49959d91cee033a92d2e9eeeaa5279238  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.6-version.log
+   eba301aa6f294b5f366d200571ecd2b9d3507a43eca7f616b327f5102873830d  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-t0c8de418-in-4.6a-a2.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T08:43:19Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T08:43:39Z, --as-arm 2026-11-28T08:43:41Z (arm has no admin group), verify-install 2026-11-28T08:43:44Z, bundle 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=b6c9bb1ccdb2489c274d1cc8c7a55ad2 at=2026-11-28T08:44:00Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict FAIL the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=9f130b1a20c76a27d1fe3a
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=verdict reason="verdict: the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=9f130b1a20c76a27d1fe3a"
+exit 1

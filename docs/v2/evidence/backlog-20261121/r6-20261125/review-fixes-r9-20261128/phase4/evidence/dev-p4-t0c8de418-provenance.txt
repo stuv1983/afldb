@@ -1,0 +1,11 @@
+== dev-p4-t0c8de418 provenance: p4-run.sh has no --verify-rev mode; it ran at worktree bytes, which equal T3 0c8de418da271068add1528c0a57e416ade51151 for every file it sends
+worktree HEAD 0c8de418da271068add1528c0a57e416ade51151 at 2026-11-28T08:39:17Z
+EQUAL d9083bc4a508c54fdf7c4e232db8e5046e80206798f5f80638d0f004b5e329a5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/afldb-phase4.sh
+EQUAL 1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/SHA256SUMS
+EQUAL 72e66a26e7157e4b4091c5cc469b515c73ee6097d4e10d95c050580f744e2770  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-run.sh
+EQUAL 427fec97c70504568e912a24a7665b91681cf929198a947da6db688702388754  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-host.sh
+EQUAL 1f8ab884a1f6c3bf6d23d905cac602b3408fe2ae1e709cee3990c569676706dc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-scen.sh
+EQUAL 287cdec9067277f89becc870f41fc331b80c4517f1114ba0a6bbb8f5c634693f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-ed-remove-arm.sh
+EQUAL 5f2f9d8bc6572a8007517ac3beed62e63520469c04f5ddd60bfd0b69251c59aa  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/owner-checks/afldb-owner-checks.sh
+EQUAL 70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/owner-checks/SHA256SUMS
+git status of $R9/phase4 and $R8/owner-checks (empty = clean):

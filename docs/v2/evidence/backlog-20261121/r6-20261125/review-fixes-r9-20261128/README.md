@@ -9,12 +9,12 @@ the owner's unresolved "before P4" ruling, the dated gates and the four complete
 | Item | Value |
 |---|---|
 | Base (r8 delivered head, Astra reviewed) | `c83abebddae12874be2674bce44123c79381444e` |
-| **Tested revision** | **`b2ef6bedb971375b47abf8c84e9c72890fd0f214`** (every executable, harness and runbook change; runbook pins as placeholders) |
-| Delivered head | the pin commit on top of `b2ef6bed`: OWNER-PROCEDURE placeholders filled, this record, the independent review, the T-run evidence, trackers. No executable differs from the tested revision (`git diff b2ef6bed HEAD` touches only `.md`, `.txt` and `.log` evidence) |
+| **Tested revision** | **`0c8de418da271068add1528c0a57e416ade51151`** (T3: every executable, harness and runbook change; runbook pins as placeholders). Earlier: T `b2ef6bed`, T2 `89e09ba4` (review fixes) |
+| Delivered head | the pin commit on top of `0c8de418`: RUNBOOK and PLAN placeholders filled too; OWNER-PROCEDURE placeholders filled, this record, the independent review, the T-run evidence, trackers. No executable differs from the tested revision (`git diff 0c8de418 HEAD` touches only `.md`, `.txt` and `.log` evidence) |
 | Owner verifier `bundle/SHA256SUMS` = wrapper `BUNDLE_SHA` | `58fceba6…` → **`3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95`** (`g0b-core.sh`, `afldb-verify-dispatch`, one `g0-core.sh` message) |
-| Owner verifier packet `R7/verify/SHA256SUMS` | `49e0fa7c…` → **`8b605119acb4cfe571cba8d8c963796447f8f37d962ead23d6f903f6d23144d5`** (`build-sums.sh --check` PASS) |
-| Phase 4 script `R9/phase4/SHA256SUMS` (new) | **`a4210feb99f8dbb34dfb9cc9bd8042ff1f5f36d149648643916154caaef86558`** (`afldb-phase4.sh` `a52364cd…`) |
-| Gate acceptance `R9/accept/SHA256SUMS` (new) | **`e6395776c4438b3ab8111d786a84b35724407a0f7cb330f2f184d6449c14ef64`** (`afldb-gate-accept.sh` `d3981f93…`, `test-gate-accept.sh` `d3b91bda…`) |
+| Owner verifier packet `R7/verify/SHA256SUMS` | `49e0fa7c…` → **`c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da`** (`build-sums.sh --check` PASS; wrapper `55c41fdc…` with the R9-F-3 stub label) |
+| Phase 4 script `R9/phase4/SHA256SUMS` (new) | **`1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8`** (`afldb-phase4.sh` `d9083bc4…`) |
+| Gate acceptance `R9/accept/SHA256SUMS` (new) | **`0baf090cb0a40de46d1d563de7aa3085627c3d152c3740e394932026f081225e`** (`afldb-gate-accept.sh` `2258f2b4…`, `test-gate-accept.sh` `878471c0…`) |
 | Unchanged | sealed-backup `R7/backup/SHA256SUMS` `e3a68821…`; owner checks `R8/owner-checks/SHA256SUMS` `70d05b10…`; R6 manifest `426c07ff…`; release `scripts/SHA256SUMS` `52900a0e…` |
 | `deploy/` hints | `release.mjs` `7dee0dc7…` → `4c99c7ae…`; `post-install-check.sh` `3d0bb2a9…` → `4cdb7d9a…` (line counts unchanged). The historical 24 Nov A2 packet `a1a2-20261124/a2-p0-entry.sh:49` pins the old `post-install-check.sh` and would STOP against this revision; it is a dated record and was not regenerated. The release-17822b29 packet is pinned to `17822b29` and is unaffected |
 | Fenced blocks of the ATTENDED-PLAN and the release RUNBOOK | **byte-identical** to `c83abebd` (extracted-block sha256 plan `fb8c413b…`, runbook `b66fa4e8…`): r9 changed table rows and prose only, so r7's printed-block driver proof and release rehearsal still apply |
@@ -85,7 +85,7 @@ already requires them to move to [ADM-ROOT] before arm's sudo is removed.
 
 ## Verification
 
-Development runs (worktree bytes equal to `b2ef6bed` for every file they exercise):
+Development runs at T (worktree bytes equal to `b2ef6bed`; superseded by the runs at T3 below):
 
 | Run | Result |
 |---|---|
@@ -95,9 +95,19 @@ Development runs (worktree bytes equal to `b2ef6bed` for every file they exercis
 | Phase 4 fixtures `phase4/p4-run.sh dev-p4g` (DEV, real sudo 1.9.15p5, gpasswd, visudo) | 20/20 PASS: group-only, its back-out, seven refusals (90-arm, User_Alias, %adm, admin group, include, uid, ALL, uid alias, continuation, negation, nsswitch), disposed and disposed-removed with byte-identical back-out, late grant, old r8 back-out losing the rule, unplanned edit, state tamper. Residue 0. `phase4/evidence/` |
 | Procedure harness `r9p-dev1` (DEV, the owner procedure end to end with phase4 and acceptance) | `R8 PROCEDURE HARNESS RESULT PASS`; `accept-counterexample-*` NO-GO (release-g0 `failed=owner-checks,reverify,version,verdict`; ng-pre `failed=owner-checks,reverify,verdict`); `accept-post-phase4-ng-pre` NO-GO `failed=verdict` only (A2 STOPs in a container), so parts a–c accept real post-change output. `phase4/evidence/procedure-r9p-dev1/` |
 
-Runs at the tested revision: @@T_RUNS@@
+Runs at the tested revision: all at `0c8de418da271068add1528c0a57e416ade51151` (T3; `$R7` is byte-identical between T2 and T3, `git diff 89e09ba4 0c8de418 -- $R7` empty):
 
-Independent review: [INDEPENDENT-REVIEW.md](INDEPENDENT-REVIEW.md). @@REVIEW_SUMMARY@@
+| Run | Result |
+|---|---|
+| Verify harness `t89e09ba4` (DEV, `--verify-rev 89e09ba4`: 46 sent files equal their blobs) | `R7 VERIFY HARNESS RESULT PASS`, 12/12 (a, c, g, h, i, d, e, f, j, k, b, l); residue 0. `offhost/evidence/dev-t89e09ba4/` |
+| Wrapper decision test at T2 | `R9Q LOCAL RESULT PASS (33 tests)` incl. the R9-F-3 stub label (T32/T33) |
+| Gate acceptance at T3 | `GATE ACCEPT TESTS RESULT PASS cases=49`, incl. freshness/boot/fixture/stub cases n20–n33; checker `2258f2b4…`. `accept/evidence/` |
+| Phase 4 fixtures `dev-p4-t0c8de418` (DEV, real sudo/visudo/gpasswd; sent files equal T3 blobs, provenance file) | `R9 PHASE4 HARNESS RESULT PASS (25 of 25 scenarios)` incl. dispose-etc-sudoers, dispose-removes-percent-sudo, refuse-mixed-line, refuse-dispose-percent-sudo, refuse-escaped-alias; residue 0 |
+| Procedure harness `r9p-t0c8de418` (DEV, `--verify-rev 0c8de418`) | `R8 PROCEDURE HARNESS RESULT PASS`, 45/45: counterexample NO-GO `failed=owner-checks,reverify,version,verdict` for both gates; post-Phase-4 ng-pre NO-GO `failed=verdict` only (A2 STOPs in a container; parts a–c accept real BOOT-ID-bound output); release-g0 `failed=version,verdict` (no qualified endpoint); phase4 entry/verify/backout PASS; residue 0. `phase4/evidence/procedure-r9p-t0c8de418/` |
+
+Earlier tested revisions: `b2ef6bed` (T; verify harness 12/12 at T, `offhost/evidence/dev-tb2ef6bed/`), superseded by the review fixes in `89e09ba4` (T2) and `0c8de418` (T3).
+
+Independent review: [INDEPENDENT-REVIEW.md](INDEPENDENT-REVIEW.md). Three rounds by a Claude agent (Fable), from the delivered files and test output. Round 1 at T: no CRIT/HIGH; MED R9-F-1 (checker accepted stale or non-production evidence), F-2 (`%sudo` in a disposed file), F-3 (stubbed ssh labelled production), F-4 (RUNBOOK/PLAN kept r8 pins); LOW F-5..F-8. Round 2 at T2: F-1..F-5 closed except R9-F-11 (MED, freshness from the newer of 4.4/4.5) and F-12 (LOW). Round 3 at T3: F-11 and F-12 closed, nothing new; no CRIT/HIGH/MED open. Answers at T3: **Q1 NO** (a streamanator PASS cannot authorise G0); **Q2 NO** (Phase 3 success cannot authorise release or reboot while owner checks are BLOCKED; the only residual is an access change inside the 3 h window, which the procedure forbids); **Q3 NO** (no unrelated grant passes entry; the back-out cannot lose a rule). Open LOW/INFO, no work required now: F-6 (pin-from-commit rule documented, not enforced), F-7 (dated window ends 29 Nov), F-8 (other `sudo` lines in docs, follow-up), F-9, F-10, F-13.
 
 ## Not exercised, owner actions
 
