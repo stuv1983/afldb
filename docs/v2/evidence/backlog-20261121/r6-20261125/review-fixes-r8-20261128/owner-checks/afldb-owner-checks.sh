@@ -56,12 +56,16 @@ as_arm() { setpriv --reuid=arm --regid=arm --init-groups --reset-env "$@" < /dev
 # and every caller turns that into FAIL "probe did not complete"; no caller ever reads PASS from absent output. Residual: a hostile
 # concurrent arm process can also write into the probe's stdout (/proc/<pid>/fd/1, same uid) and so could forge a completed probe;
 # each probe therefore has a root-side companion (E1: E2; C6/F5: the root-side key and trust checks; D4: D1/D2; E0: B1/B2).
+# r8 review R8-F-15: the probe runs under a root-owned /usr/bin/timeout (outside setpriv, so arm cannot kill or stop the timer): a
+# probe that arm stops (SIGSTOP) or that hangs is killed after 60 s (SIGKILL 5 s later), exits non-zero, leaves PROBE_OK=0, and the
+# caller reports FAIL "probe did not complete". A missing timeout binary also leaves PROBE_OK=0 (fail-closed).
 PROBE_OK=0; PROBE_OUT=
 arm_probe() {
   local body=$1 nonce o rc last; shift
   nonce=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n'); PROBE_OK=0; PROBE_OUT=
-  o=$(as_arm /usr/bin/env "R8_PROBE_NONCE=$nonce" /usr/bin/bash --noprofile --norc -c "$body"'
-printf "\nR8-PROBE-DONE %s\n" "$R8_PROBE_NONCE"' _ "$@" 2>/dev/null); rc=$?
+  o=$(/usr/bin/timeout --kill-after=5 60 setpriv --reuid=arm --regid=arm --init-groups --reset-env \
+        /usr/bin/env "R8_PROBE_NONCE=$nonce" /usr/bin/bash --noprofile --norc -c "$body"'
+printf "\nR8-PROBE-DONE %s\n" "$R8_PROBE_NONCE"' _ "$@" < /dev/null 2>/dev/null); rc=$?
   last=$(tail -n 1 <<< "$o")
   if [ "$rc" = 0 ] && [ "$last" = "R8-PROBE-DONE $nonce" ]; then PROBE_OK=1; PROBE_OUT=$(sed '$d' <<< "$o"); fi
   PROBE_RC=$rc
@@ -174,22 +178,96 @@ done
 [ "$pka" = 0 ] && chk C2 PASS "no polkit .rules file mentions arm ($pk file(s) read in /etc/polkit-1/rules.d and /usr/share/polkit-1/rules.d)"
 pkla=$(grep -rlE '(unix-user|unix-group):arm' /etc/polkit-1/localauthority /var/lib/polkit-1/localauthority 2>/dev/null | tr '\n' ' ')
 [ -z "$pkla" ] && chk C2b PASS "no polkit .pkla grants to arm; $pk .rules file(s) read" || chk C2b FAIL "polkit .pkla files name arm: $pkla"
-# root-run units (r8 review R8-F-9): EVERY path a root-run service executes, every absolute-path argument that is a file, every
-# EnvironmentFile and the Environment are judged, not only paths containing /home/. Root-run = User unset/root, or any command with
-# the + / ! / !! prefix (privileged, no-setuid, ambient). A path passes when every symbolic link on the way is root-owned and the
-# resolved path passes trust_comp (no component arm-owned, group/other-writable, ACL-bearing or a link). User=arm units run as arm,
-# so they are not a root route: they are reported. Timer, socket and path units activate a service, and that service is judged here.
-trust_res() {
-  local p=$1 cur= rest comp
-  rest=${p#/}
-  while [ -n "$rest" ]; do comp=${rest%%/*}; cur=$cur/$comp
-    if [ -L "$cur" ] && [ "$(stat -c %u -- "$cur")" != 0 ]; then TC_WHY="$cur is a symbolic link not owned by root"; return 1; fi
-    [[ $rest == */* ]] && rest=${rest#*/} || rest=; done
-  trust_comp "$(realpath -m -- "$p")"
+# root-run units (r8 review R8-F-9, R8-F-14): EVERY path a root-run service executes, every absolute-path argument that is a file,
+# every EnvironmentFile and the Environment are judged, not only paths containing /home/. Root-run = User unset/root, or any command
+# with the + / ! / !! prefix (privileged, no-setuid, ambient). C3 asks "can arm modify it?" (arm_mod): the path is walked from /,
+# and every symbolic link on the way is followed and its target walked too (so the directories holding each link are judged); a
+# bare command name is resolved through systemd's fixed search path, judging every candidate up to the first that exists. A
+# component FAILs only when arm can write it: owned by arm; group-writable by a group arm is in; world-writable (a directory with the
+# sticky bit excepted); an ACL entry granting write to arm or one of arm's groups (getfacl); a link owned by arm; or the component
+# is absent below a directory arm can write. Other group-writable or ACL-bearing components, sticky world-writable directories and
+# links owned by another non-root user are REPORTED as path(owner:group:mode), not failed. A component that cannot be evaluated is
+# UNKNOWN, never PASS. User=arm units run as arm, so they are not a root route: they are reported. Timer, socket and path units
+# activate a service, and that service is judged here.
+am_one() { # COMPONENT (no link in its prefix): 0 ok, 1 arm can write (TC_WHY), 3 not evaluable; AM_PW=1 when arm can write in it
+  local c=$1 s u g a t at acl e id perm
+  AM_PW=0
+  if [ ! -e "$c" ]; then
+    [ "$AM_PARENT_W" = 1 ] && { TC_WHY="$c is absent below a directory arm can write"; return 1; }
+    AM_ABSENT=1; return 0
+  fi
+  s=$(stat -c '%u %g %a %F %U:%G' -- "$c" 2>/dev/null) || { TC_WHY="cannot stat $c"; return 3; }
+  read -r u g a t _ <<< "$s"
+  [ -n "$u" ] && [ -n "$g" ] && [[ $a =~ ^[0-7]+$ ]] || { TC_WHY="cannot read owner/mode of $c"; return 3; }
+  [ -n "$ARM_UID" ] && [ "$u" = "$ARM_UID" ] && { TC_WHY="$c is owned by arm (${s##* }:$a)"; return 1; }
+  if (( 8#$a & 8#002 )); then
+    if [ "$t" = directory ] && (( 8#$a & 8#1000 )); then TC_REP="$TC_REP $c(${s##* }:$a)"; AM_PW=1
+    else TC_WHY="$c is world-writable (${s##* }:$a)"; return 1; fi
+  fi
+  if (( 8#$a & 8#020 )); then
+    [[ $ARM_GIDS == *" $g "* ]] && { TC_WHY="$c is group-writable by a group arm is in (${s##* }:$a)"; return 1; }
+    TC_REP="$TC_REP $c(${s##* }:$a)"
+  fi
+  if have /usr/bin/getfacl; then
+    acl=$(getfacl -cpn -- "$c" 2>/dev/null) || { TC_WHY="getfacl failed on $c"; return 3; }
+    while IFS= read -r e; do
+      case $e in user::*|group::*|other::*|mask::*|'') continue;; esac
+      IFS=: read -r at id perm <<< "${e%%#*}"
+      perm=${perm//[[:space:]]/}
+      if [[ $perm == *w* ]] && { { [ "$at" = user ] && [ -n "$ARM_UID" ] && [ "$id" = "$ARM_UID" ]; } || { [ "$at" = group ] && [[ $ARM_GIDS == *" $id "* ]]; }; }; then
+        TC_WHY="$c carries an ACL entry granting write to arm or arm's group ($at:$id:$perm)"; return 1
+      fi
+      TC_REP="$TC_REP $c(${s##* }:$a:acl-$at:$id:$perm)"
+    done <<< "$acl"
+  fi
+  return 0
 }
-ufail=; uarm=; nroot=0; npath=0
+am_walk() { # PATH DEPTH: walk PATH from /, following and walking every link
+  local p=$1 d=$2 cur= rest comp tg u r
+  [ "$d" -gt 40 ] && { TC_WHY="too many symbolic links resolving $p"; return 3; }
+  [[ $p == /* ]] || { TC_WHY="relative path $p"; return 3; }
+  AM_PARENT_W=0; am_one / || return; AM_PARENT_W=$AM_PW
+  rest=${p#/}
+  while [ -n "$rest" ]; do comp=${rest%%/*}; [[ $rest == */* ]] && rest=${rest#*/} || rest=
+    case $comp in ''|.) continue;; esac
+    cur=$cur/$comp
+    if [ -L "$cur" ]; then
+      u=$(stat -c %u -- "$cur" 2>/dev/null) || { TC_WHY="cannot stat link $cur"; return 3; }
+      [ -n "$ARM_UID" ] && [ "$u" = "$ARM_UID" ] && { TC_WHY="$cur is a symbolic link owned by arm"; return 1; }
+      [ "$u" = 0 ] || TC_REP="$TC_REP $cur(link:uid$u)"
+      tg=$(readlink -- "$cur" 2>/dev/null) || { TC_WHY="cannot read link $cur"; return 3; }
+      [[ $tg == /* ]] || tg=${cur%/*}/$tg
+      am_walk "$tg" $((d + 1)); r=$?; [ "$r" = 0 ] || return $r
+      cur=$(realpath -m -- "$cur" 2>/dev/null) || { TC_WHY="cannot resolve $cur"; return 3; }
+      [ "$cur" = / ] && cur=
+      [ "$AM_ABSENT" = 1 ] && return 0
+      continue
+    fi
+    am_one "$cur" || return; AM_PARENT_W=$AM_PW
+    [ "$AM_ABSENT" = 1 ] && return 0
+  done
+  return 0
+}
+arm_mod() { # PATH: 0 = arm cannot modify it; 1 = arm can (TC_WHY); 3 = cannot evaluate (TC_WHY); TC_REP collects reported facts
+  TC_WHY=; TC_REP=; AM_ABSENT=0; AM_PARENT_W=0
+  am_walk "$1" 0
+}
+ufail=; uunk=; urep=; uarm=; nroot=0; npath=0
 judge_path() { # unit what path
-  npath=$((npath + 1)); trust_res "$3" || ufail="$ufail $1:$2:$TC_WHY;"
+  local rc d
+  npath=$((npath + 1))
+  if [[ $3 != /* ]] && [[ $3 != */* ]] && [ -n "$3" ]; then
+    # a bare command name: systemd resolves it through its fixed search path, so every candidate up to and including the first
+    # that exists is judged (an absent slot in a directory arm can write would let arm plant an earlier match)
+    for d in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin; do
+      arm_mod "$d/$3"; rc=$?
+      case $rc in 0) urep="$urep $TC_REP";; 1) ufail="$ufail $1:$2:$TC_WHY;"; return;; *) uunk="$uunk $1:$2:$TC_WHY;"; return;; esac
+      [ -e "$d/$3" ] && return
+    done
+    urep="$urep $3(not-found-in-search-path)"; return # every slot judged absent and not plantable by arm
+  fi
+  arm_mod "$3"; rc=$?
+  case $rc in 0) urep="$urep $TC_REP";; 1) ufail="$ufail $1:$2:$TC_WHY;";; *) uunk="$uunk $1:$2:$TC_WHY;";; esac
 }
 units=$({ systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null | awk '{print $1}'
           systemctl list-units --type=service --all --no-legend --no-pager --plain 2>/dev/null | awk '{print $1}'; } | grep -E '^[A-Za-z0-9@_.:-]+\.service$' | sort -u)
@@ -232,8 +310,12 @@ for u in $units; do
       fi;;
   esac
 done
-[ -z "$ufail" ] && chk C3 PASS "$nroot root-run service unit(s), $npath executed/argument/EnvironmentFile path(s): every link root-owned, every resolved path trusted; User=arm units (run as arm, reported):${uarm:- none}" \
-  || chk C3 FAIL "root-run units execute, source or read an untrusted path:$ufail"
+urep=$(tr ' ' '\n' <<< "$urep" | sed '/^$/d' | sort -u | tr '\n' ' '); urep=${urep% }
+have /usr/bin/getfacl && c3acl="ACLs read with getfacl" || c3acl="getfacl absent, so ACLs not read (mode bits judged only)"
+if [ -n "$ufail" ]; then chk C3 FAIL "root-run units execute, source or read a path arm can modify:$ufail${uunk:+ also not evaluable:$uunk}"
+elif [ -n "$uunk" ]; then chk C3 UNKNOWN "root-run unit path(s) that could not be evaluated:$uunk"
+else chk C3 PASS "$nroot root-run service unit(s), $npath executed/argument/EnvironmentFile path(s): no component arm can modify ($c3acl); reported, not arm-writable:${urep:- none}; User=arm units (run as arm, reported):${uarm:- none}"
+fi
 cfail=
 for f in /etc/crontab /etc/cron.d/* /etc/anacrontab; do
   [ -f "$f" ] || continue

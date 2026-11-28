@@ -1,0 +1,195 @@
+== r7v host up 2026-11-28T04:50:17Z host=streamanator user=arm day=2026-11-28 docker 29.1.3
+image r7v-sysd-tf8a63bb3:1 id sha256:d47e4dc932dfed5c3e254ecf7791998187e79b8a60db8f26684c38af1f629cfe from sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba
+[FIXTURE] r7v-tf8a63bb3-prod: fake Melbourne offset -2:37:00: local 2026-11-28 02:20:00 = real 2026-11-28T04:57:00Z
+== r7v-tf8a63bb3-prod setup-prod
+[REAL-SYSTEMD] systemd 255 (255.4-1ubuntu8.19); PID 1 systemd; hostname afldb-prod; kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS
+[FIXTURE] zone /usr/share/zoneinfo/Australia/Melbourne; now UTC 2026-11-28T04:54:39, Melbourne 2026-11-28 02:17:39 AEDT
+[HARNESS] staging /root/r7v-staging: bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+---- R7/backup/install-backup.sh /opt/r7v-backup-staging (REAL: the backup implementer's owner install, as root)
+   | session check: no ancestor of pid 287 has arm's uid (1 hops to pid 28), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 4 item 9)
+   | bundle /opt/r7v-backup-staging verified: SHA256SUMS e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d (compare with README.md before going on; the install continues only on a match you have checked)
+   | accounts: uid=999(afldb-backup) gid=995(afldb-backup) groups=995(afldb-backup); arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),996(afldb-backup-read) (a session started before this sees the new group only after a new login)
+   | sealed_origin_install: PASS (trusted paths, pinned digests, effective unit)
+   | OWNER STEPS STILL REQUIRED (not done by this script):
+   |  1. PostgreSQL peer authentication for the backup account, then reload (no restart):
+   |       pg_ident.conf, add:   afldbbackup afldb-backup afldb_backup
+   |       pg_hba.conf, add BEFORE any broader 'local' line:
+   |                             local afldb_prod afldb_backup peer map=afldbbackup
+   |       then, in this root session:  runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'
+   |  2. In this root session: bash verify-backup-install.sh, then bash verify-backup-install.sh --as-arm (arm's checks, run as arm
+   |     through setpriv without arm's login); both must end BACKUP INSTALL RESULT PASS. A run in an arm login is INFO only.
+   |  3. streamanator: change the off-host pull source to <prod>:/var/lib/afldb-backup/published/ (offhost-pull.sh is unchanged).
+   |  4. Status probes: AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state for `scheduled-backup.sh status`.
+   |  5. Leave the timer as it is: the next 02:20 run is the first sealed one (seals/<invocation>.seal + published/<dump>).
+   | BACKUP INSTALL RESULT PASS (installed; owner steps above remain)
+[FIXTURE] owner PostgreSQL step for the backup applied as install-backup.sh prints it; role afldb_backup + pg_read_all_data (production: the existing role)
+[REAL-SYSTEMD] afldb-backup.timer started at local 2026-11-28 02:18:06; next elapse Sat 2026-11-28 02:20:00 AEDT
+---- verify/verifier-db.sql and verify/pg-auth-lines.txt applied verbatim (the prospective owner step)
+[REAL] pg_hba local lines: local afldb_prod afldb_verify peer map=afldbverify;local afldb_prod afldb_backup peer map=afldbbackup;local all postgres peer;local all all peer;local replication all peer;
+[FIXTURE] afldb.service (fixture app) active=active MainPID 631 InvocationID acfa286a54d84a66b51922a58acc5f24; current -> releases/17822b29e6de-R7VfixtureBuild
+[FIXTURE] R1 host policy files copied from the repo into /etc; no caddy, no afldb-backup-verify (weekly restore) unit, no production kernels (container)
+---- install-verify.sh --role prod (as root, from the root-owned staging; THE OWNER INSTALL SCRIPT UNDER TEST)
+   | session check: no ancestor of pid 642 has arm's uid (1 hops to pid 28), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 10)
+   | == install-verify 2026-11-28T04:55:10Z host=afldb-prod role=prod staging=/root/r7v-staging
+   | PASS staging bundle: 13 files match SHA256SUMS (58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8)
+   | PASS staging verify-verify-install.sh = packet SHA256SUMS line (packet SHA256SUMS 49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901)
+   | PASS account: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),999(systemd-journal),996(afldb-backup-read); shell /bin/sh; home root:root 755
+   | Created symlink /etc/systemd/system/sockets.target.wants/afldb-verify-rootfacts.socket -> /etc/systemd/system/afldb-verify-rootfacts.socket.
+   | PASS installed: /usr/local/lib/afldb-verify (58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 = the bundle digest the wrapper pins), role prod, sshd drop-in, root facts socket
+   | NEXT (owner, separate step, production only): apply /root/r7v-staging/verifier-db.sql as the database owner and the two lines of /root/r7v-staging/pg-auth-lines.txt
+   | == verify-verify-install 2026-11-28T04:55:13Z host=afldb-prod role=prod as root
+   | PASS bundle: 13 files match SHA256SUMS; bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+   | PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+   | PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+   | PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+   | PASS role file = prod
+   | PASS authorized_keys: 1 key line(s), every one restrict + forced command
+   | PASS account: afldb-verify:x:997:994::/var/lib/afldb-verify:/bin/sh
+   | PASS groups: afldb-backup-read afldb-verify systemd-journal
+   | PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+   | PASS arm is not in group afldb-verify
+   | PASS home /var/lib/afldb-verify root-owned and empty
+   | PASS afldb-verify-rootfacts.socket active and enabled
+   | PASS socket file root:afldb-verify 660 socket
+   | PASS sshd for afldb-verify: forcecommand /usr/local/lib/afldb-verify/afldb-verify-entry
+   | PASS sshd for afldb-verify: permittty no
+   | PASS sshd for afldb-verify: allowtcpforwarding no
+   | PASS sshd for afldb-verify: allowagentforwarding no
+   | PASS sshd for afldb-verify: x11forwarding no
+   | PASS sshd for afldb-verify: permittunnel no
+   | PASS sshd for afldb-verify: permituserenvironment no
+   | PASS sshd for afldb-verify: permituserrc no
+   | PASS sshd for afldb-verify: authorizedkeysfile /etc/ssh/afldb-verify/authorized_keys
+   | PASS sshd for afldb-verify: passwordauthentication no
+   | PASS sshd for arm: not forced into the verifier
+   | VERIFY-INSTALL RESULT PASS
+   | INSTALL-VERIFY RESULT PASS
+---- verify-verify-install.sh as arm (read-only; sshd checks skipped without root)
+   | == verify-verify-install 2026-11-28T04:55:15Z host=afldb-prod role=prod as arm
+   | PASS bundle: 13 files match SHA256SUMS; bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+   | PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+   | PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+   | PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+   | PASS role file = prod
+   | PASS authorized_keys: 1 key line(s), every one restrict + forced command
+   | PASS account: afldb-verify:x:997:994::/var/lib/afldb-verify:/bin/sh
+   | PASS groups: afldb-backup-read afldb-verify systemd-journal
+   | PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+   | PASS arm is not in group afldb-verify
+   | PASS home /var/lib/afldb-verify root-owned and empty
+   | PASS afldb-verify-rootfacts.socket active and enabled
+   | PASS socket file root:afldb-verify 660 socket
+   | SKIPPED sshd -T checks (not root)
+   | VERIFY-INSTALL RESULT PASS
+[REAL-SYSTEMD] afldb-backup.service: Result=success ExecMainStatus=0 InvocationID=ecd21ccff9db4219ad7fa849ea49ff01 
+[REAL-SYSTEMD] afldb-backup.timer LastTriggerUSec t 1795841820670419 (2026-11-28 02:20:01 AEDT)
+   -rw-r--r-- root:root links=1 219 B /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.done
+   -rw-r--r-- root:root links=1 853 B /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal
+   -r--r----- root:afldb-backup-read links=1 3994 B /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump
+   -r--r----- root:afldb-backup-read links=1 98 B /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump.sha256
+   -r--r----- root:afldb-backup-read links=1 199 B /var/lib/afldb-backup/state/last-backup.json
+   seal | afldb-backup-seal/4
+   seal | sealer_sha256=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5
+   seal | unit=afldb-backup.service
+   seal | invocation=ecd21ccff9db4219ad7fa849ea49ff01
+   seal | job=394
+   seal | job_type=start
+   seal | active_state=activating
+   seal | sub_state=start-post
+   seal | exec_main_code=1
+   seal | exec_main_status=0
+   seal | service_user=afldb-backup
+   seal | inactive_enter_mono=0
+   seal | inactive_exit_mono=651341512292
+   seal | exec_main_start_mono=651341512097
+   seal | trigger_unit=afldb-backup.timer
+   seal | trigger_timer_realtime_usec=1795841820670419
+   seal | timer_last_trigger_usec=1795841820670419
+   seal | timer_last_trigger_mono=651341491868
+   seal | timer_active_enter_mono=651227370800
+   seal | timer_active_enter_usec=1795841706549351
+   seal | dispatch_kind=scheduled
+   seal | dump=afldb_prod-20261128-022000.dump
+   seal | dump_sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+   seal | dump_bytes=3994
+   seal | boot_id=c3524e4759ab4e0f8050875471b56b12
+   seal | sealed_realtime_usec=1795841821268416
+[HARNESS] A2ARGS accepted 17822b29e6de-R7VfixtureBuild r3:yes r4:no 10:00 tue:released inv:acfa286a54d84a66b51922a58acc5f24
+[HARNESS] carried to the off-host container (instead of rsync from production): afldb_prod-20261128-022000.dump afldb_prod-20261128-022000.dump.sha256 
+== r7v-tf8a63bb3-offhost setup-offhost (fake Melbourne offset -1:49:01: 03:10:00 local = real 2026-11-28T04:59:01Z)
+[REAL-SYSTEMD] systemd 255 (255.4-1ubuntu8.19); PID 1 systemd; hostname streamanator; kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS
+[FIXTURE] zone /usr/share/zoneinfo/Australia/Melbourne; now UTC 2026-11-28T04:57:06, Melbourne 2026-11-28 03:08:05 AEDT
+[HARNESS] staging /root/r7v-staging: bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+[REAL] cron active; arm crontab installed; the REAL afldb-offhost-pull-daily.sh (2ebac1c09b07e6b3) with the FIXTURE offhost-pull.sh
+[FIXTURE] the 03:10 job is due at local 2026-11-28 03:10:00 = real 2026-11-28T04:59:01Z
+---- install-verify.sh --role offhost (as root, from the root-owned staging; THE OWNER INSTALL SCRIPT UNDER TEST)
+   | session check: no ancestor of pid 321 has arm's uid (1 hops to pid 28), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 10)
+   | == install-verify 2026-11-28T04:57:09Z host=streamanator role=offhost staging=/root/r7v-staging
+   | PASS staging bundle: 13 files match SHA256SUMS (58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8)
+   | PASS staging verify-verify-install.sh = packet SHA256SUMS line (packet SHA256SUMS 49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901)
+   | PASS account: uid=999(afldb-verify) gid=996(afldb-verify) groups=996(afldb-verify),999(systemd-journal); shell /bin/sh; home root:root 755
+   | Created symlink /etc/systemd/system/sockets.target.wants/afldb-verify-rootfacts.socket -> /etc/systemd/system/afldb-verify-rootfacts.socket.
+   | PASS installed: /usr/local/lib/afldb-verify (58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 = the bundle digest the wrapper pins), role offhost, sshd drop-in, root facts socket
+   | == verify-verify-install 2026-11-28T04:57:11Z host=streamanator role=offhost as root
+   | PASS bundle: 13 files match SHA256SUMS; bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+   | PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+   | PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+   | PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+   | PASS role file = offhost
+   | PASS authorized_keys: 1 key line(s), every one restrict + forced command
+   | PASS account: afldb-verify:x:999:996::/var/lib/afldb-verify:/bin/sh
+   | PASS groups: afldb-verify systemd-journal
+   | PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+   | PASS arm is not in group afldb-verify
+   | PASS home /var/lib/afldb-verify root-owned and empty
+   | PASS afldb-verify-rootfacts.socket active and enabled
+   | PASS socket file root:afldb-verify 660 socket
+   | PASS sshd for afldb-verify: forcecommand /usr/local/lib/afldb-verify/afldb-verify-entry
+   | PASS sshd for afldb-verify: permittty no
+   | PASS sshd for afldb-verify: allowtcpforwarding no
+   | PASS sshd for afldb-verify: allowagentforwarding no
+   | PASS sshd for afldb-verify: x11forwarding no
+   | PASS sshd for afldb-verify: permittunnel no
+   | PASS sshd for afldb-verify: permituserenvironment no
+   | PASS sshd for afldb-verify: permituserrc no
+   | PASS sshd for afldb-verify: authorizedkeysfile /etc/ssh/afldb-verify/authorized_keys
+   | PASS sshd for afldb-verify: passwordauthentication no
+   | PASS sshd for arm: not forced into the verifier
+   | VERIFY-INSTALL RESULT PASS
+   | INSTALL-VERIFY RESULT PASS
+---- verify-verify-install.sh as arm (read-only; sshd checks skipped without root)
+   | == verify-verify-install 2026-11-28T04:57:13Z host=streamanator role=offhost as arm
+   | PASS bundle: 13 files match SHA256SUMS; bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+   | PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+   | PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+   | PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+   | PASS role file = offhost
+   | PASS authorized_keys: 1 key line(s), every one restrict + forced command
+   | PASS account: afldb-verify:x:999:996::/var/lib/afldb-verify:/bin/sh
+   | PASS groups: afldb-verify systemd-journal
+   | PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+   | PASS arm is not in group afldb-verify
+   | PASS home /var/lib/afldb-verify root-owned and empty
+   | PASS afldb-verify-rootfacts.socket active and enabled
+   | PASS socket file root:afldb-verify 660 socket
+   | SKIPPED sshd -T checks (not root)
+   | VERIFY-INSTALL RESULT PASS
+[HARNESS] waiting for arm's real 03:10 cron job in r7v-tf8a63bb3-offhost to finish
+   pull-log | 2026-11-28T04:59:02Z BEGIN run=2026-11-28T04:59:02Z-954 cron_pid=951 lineage=954:sh:1795841942,953:sh:1795841942,951:cron:1795841942,315:cron:1795841829
+   pull-log | OUTPUT run=2026-11-28T04:59:02Z-954 pulled afldb_prod-20261128-022000.dump
+   pull-log | 2026-11-28T04:59:02Z VERIFIED run=2026-11-28T04:59:02Z-954 dump=afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+   pull-log | 2026-11-28T04:59:02Z END run=2026-11-28T04:59:02Z-954 rc=0
+R7V CTR prod r7v-tf8a63bb3-prod
+R7V CTR offhost r7v-tf8a63bb3-offhost
+R7V DAY 2026-11-28
+R7V HOSTKEY prod ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINwdlCqBof9S1qrg1IOj1BO4urnBM1U6pl3D5MnSwkn/
+R7V HOSTKEY offhost ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDetZ5LcQjuQfZNj0kq+r3gzpK1Hqv2JGB3/Ba0OPaT1
+R7V READY

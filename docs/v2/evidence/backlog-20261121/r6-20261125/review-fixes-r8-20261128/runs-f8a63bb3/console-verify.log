@@ -1,0 +1,21 @@
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against f8a63bb3f8f5e035829f17cb38fce84f2292186f:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at f8a63bb3f8f5e035829f17cb38fce84f2292186f
+PASS bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+workspace /home/arm/r7v-ws.vpzYY0
+== r7v tf8a63bb3 day 2026-11-28 containers r7v-tf8a63bb3-prod r7v-tf8a63bb3-offhost; transport ProxyCommand docker exec; client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+SCENARIO a PASS g0-success: exit 0, G0 SCOPE line, 3 ARM-PRODUCED label(s); OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=ecd21ccff9db4219ad7fa849ea49ff01 dump=afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 dispatc
+SCENARIO c PASS a2-whole: the verifier's own STOP (exit 1, 13 FAIL / 25 PASS lines), backup-origin=attributed reported separately; A2 SCOPE line; 9 ARM-PRODUCED PASS lines; FAILs: today is not the scheduled Wednesday (2026-11-25); re-p|running 6.8.0-151-generic (expected 6.8.0-137-generic)|installed kernel images are '' (expected exactly 137 an|missing /boot/vmlinuz-6.8.0-149-generic|missing /boot/initrd.img-6.8.0-149-generic|missing /boot/vmlinuz-6.8.0-137-generic|missing /boot/initrd.img-6.8.0-137-generic|a modules directory is missing|caddy inactive|Caddyfile  (r4:no expects 4f6972ec)|restore service lacks a matching timer dispatch, start |last-verify.json and restored dump do not match the sch|afldb_restore_test lacks the scheduled restore digest o|
+SCENARIO g PASS forged-comment: the forged text reached the wrapper only as data (1 line(s) '[relayed, neutralised] ...', 0 ESC, 0 control bytes); genuine verdict and exit unchanged (OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe curren... exit 1)
+SCENARIO h PASS installer-guard: install-verify.sh through arm's sudo over a real arm ssh login REFUSED (plain:refused stripped:refused ), verifier state digest unchanged
+SCENARIO i PASS staging-libsh: refused before sourcing (home-arm, group-writable, tampered: marker absent); CONTRAST r7 ran the hostile lib.sh as root (marker present); state unchanged
+SCENARIO d PASS hostile-arm: owner-path verdicts and exits unchanged (g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2... exit 0; a2 STOP exit 1); CONTRAST old path forged 'G0 PROD RESULT PASS' + OFFHOST-COMPARE (exit 0) and 'R6 PRE RESULT PASS' (exit 0)
+SCENARIO e PASS stale-replay: fresh control accepted, replay/stale/wrong-bundle/exit-lie/two-RESULT refused (fresh:0 replay:1 stale:1 bundle:1 exitlie:1 tworesults:1 )
+SCENARIO f PASS keys: other-key-as-verify:ok arm-key-as-verify:ok verify-key-as-arm:ok verify-key-forced-tty:ok verify-key-no-command:ok verify-key-shell-command:ok verify-key-extra-words:ok verify-key-stdio-forward:ok arm-key-as-arm-control:ok 
+SCENARIO j PASS version-exit: both PASS -> exit 0 (2 PASS lines); off-host STOP -> exit 1; CONTRAST r7 wrapper exited 0 with a STOP line
+SCENARIO b PASS g0-refusal: exit 1, FAIL scheduled origin unproven: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump has 3995 bytes, the seal says 3994; G0b not called, no OFFHOST-COMPARE
+logs: tf8a63bb3-a-g0-success.log tf8a63bb3-b-g0-refusal.log tf8a63bb3-c-a2-whole.log tf8a63bb3-d-hostile-arm.log tf8a63bb3-e-stale-replay.log tf8a63bb3-f-keys.log tf8a63bb3-g-forged-comment.log tf8a63bb3-h-installer-guard.log tf8a63bb3-i-staging-libsh.log tf8a63bb3-inputs.log tf8a63bb3-j-version-exit.log tf8a63bb3-setup.log tf8a63bb3-summary.log 
+R7 VERIFY HARNESS RESULT PASS
+removed 2 container(s); left: containers 0, images 0, workspace removed
+R7V-EXIT 0

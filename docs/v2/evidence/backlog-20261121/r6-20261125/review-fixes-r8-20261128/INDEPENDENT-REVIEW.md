@@ -205,3 +205,120 @@ evidence-tooling items; none opens a false PASS of G0, G0B, `backup-origin=attri
 Working-tree note: at 04:12Z, after my verify run, `R7/verify-harness/r7v-run.sh` and `r7v-container.sh` were modified in the
 worktree (uncommitted, not by me) to pin the contrast blobs to `7e2ef51a`, which is the fix direction of R8-F-5. That change is
 outside the judged revision and I have not re-run the harness against it. `HEAD` was still `89bd271e` when I finished.
+
+---
+
+## Round 2 (f8a63bb3)
+
+**Revision judged:** `f8a63bb3f8f5e035829f17cb38fce84f2292186f`, as `git diff 89bd271e f8a63bb3` (one commit). Line numbers are of
+the blobs at `f8a63bb3`. Round 1 above is unchanged. Basis: the diff read in full for every code and procedure file; pins and
+digests recomputed from git objects (`review-logs/round2/pins-f8a63bb3.log`); the committed development evidence
+(`dev-logs/backup-f7/`, `procedure-harness/logs/dev-a3b-*`) read. I ran **no** harness in this round: the coordinator's three
+final runs at `f8a63bb3` (`runs-f8a63bb3/`) were still in progress when I wrote this and I did not duplicate them. My view below
+is therefore conditional on those three runs ending PASS.
+
+### Verdict
+
+The fixes are correct and I found no bypass, no regression and no new CRIT/HIGH/MED defect. R8-F-7, the only round-1 finding that
+touched a G1 input, is closed: the service unit is now pinned whole. **Q1 NO, Q2 NO**, on the same conditions as round 1 (F1
+closed by the owner on production, and streamanator's root path for G0b). Only operational prerequisites and the pin commit
+remain; the four new items are LOW/INFO.
+
+### 1. R8-F-7: `sealed_origin_install`
+
+* The change is additive and confined to `sealed_origin_install` and the header comment (`R7/backup/sealed-origin.sh:27-41`,
+  `:118`, `:126-165`, `:205-208`). `sealed_origin` (rules 4 to 6) has no changed line. The two copies are byte-identical
+  (`a733e67b…`), and `verify-backup-install.sh:28` pins that digest.
+* With `DropInPaths` required to equal the pinned drop-in (`:144`) and the fragment required to hash to `FRAG_SHA` (`:207-208`,
+  `edf00291…` = `deploy/afldb-backup.service` at this revision, verified), every byte of unit text PID 1 can have loaded from
+  disk is pinned. A drop-in in `/run`, in `system.control` (from `set-property`), in a type-level `service.d` or under a
+  truncated-prefix name all appear in `DropInPaths`, so each is refused by name. The property checks (`:145-150`) and the
+  manager-environment check (`:153-160`) are then defence in depth. I found no bypass by reading.
+* False refusal of a genuine install: none in the committed evidence (`dev-logs/backup-f7/r7b-summary.log`: genuine, genuine-rd,
+  rearm-in attributed; `r7b-extra-dropin.log:281-296`: four extras refused by name, restored state attributed, r7 library
+  attributes with the `Environment=` drop-in in place). On production two things can now refuse a genuine install, both fail
+  closed and both reported at install time by `verify-backup-install.sh`: an installed base unit that is not byte-identical to
+  the repository file, and any other drop-in on the service. Whether either exists on production is unknown to me.
+* **Timer not pinned (DEPENDENCIES C21): accepted.** The timer cannot change what runs, only when. Rule 4 requires the start
+  job to come from the timer with its dispatch inside the window, requires exactly one seal in the window, and recomputes the
+  dispatch kind. A root-edited timer yields another moment in the window or a STOP. Pinning it would also break the harness's
+  `RandomizedDelaySec=0` fixture for no gain.
+
+### 2. Owner checks
+
+* `arm_probe` (`afldb-owner-checks.sh:52-67`): PASS needs exit 0 and the nonce sentinel as the last line. A killed probe gives
+  FAIL. A stopped probe hangs the script (no timeout), which is never a PASS (R8-F-15). Injected output can only add lines, and
+  added lines move E1, C6, D4 and E0 towards FAIL, not PASS. Forging a completed probe needs control of its exit status, which
+  needs ptrace and therefore `ptrace_scope=0`; the script and DEPENDENCIES C19 say so and name the root-side companion of each
+  probe. I accept that.
+* C2 now always prints a line. C3 judges every root-run service. C6 uses sshd's effective `AuthorizedKeysFile` for root and
+  returns UNKNOWN on an `AuthorizedKeysCommand`. D1/D2/D4 use `pg_has_role(…, 'MEMBER')` against every superuser role, which is
+  the right closure in PostgreSQL 16, and a failed query yields FAIL or UNKNOWN, not PASS. F5 requires exactly one bare key
+  line; F6 rejects an `AuthorizedKeysCommand`.
+* Still read-only and secret-free by reading: no write outside stdout, SELECT only, fingerprints and role names only. The one
+  side effect is unchanged from round 1: E0's `sudo -n true` as arm leaves an auth-log entry.
+
+### 3. Procedure and plan
+
+* Steps 1.4 to 1.9 (`OWNER-PROCEDURE.md:114-120`) are now a machine test: one line, `ssh-ed25519` plus 68 base64 characters plus
+  an optional printable comment, only the type and key fields kept and installed, fingerprint compared to the typed paper value.
+  This closes R8-F-8. See R8-F-13 for one false-STOP case.
+* Session variables are set at the start of every admin root session, and 4.5 says so. Closes that part of R8-F-10.
+* Plan strike-throughs are prose only. I recomputed the fenced-block hashes of the plan and the RUNBOOK against `7e2ef51a`:
+  identical (`0bbf23e2…`, `c92bac1c…`).
+
+### 4. Harnesses
+
+* `r7v-run.sh:82-84` pins the contrast blobs to `7e2ef51a`. At that revision `install-verify.sh` is `7ab4ba61…` (the blob the
+  authors' green pre-commit run used) and both files differ from the r8 blobs, so the contrast is meaningful again.
+* New scenarios read: backup `extra-dropin`; procedure `pubkey-optprefix`, `pg-nologin-super`, `admin-key-option`,
+  `admin-extra-key`. Each mutates one thing, expects a refusal that names it, and restores. `dev-a3b` reports 29 scenarios PASS.
+  Not exercised anywhere: a base unit that differs from `FRAG_SHA`, the property checks reached without an extra drop-in, and a
+  killed or injected probe (the procedure says so itself).
+
+### 5. Pins (all verified from git objects)
+
+| Pin | Value at `f8a63bb3` | Result |
+|---|---|---|
+| `R7/backup/SHA256SUMS` | `e3a68821…72e7d` | matches; `sha256sum -c` OK |
+| wrapper `BUNDLE_SHA` = `R7/verify/bundle/SHA256SUMS` | `58fceba6…506c8` | matches; `sha256sum -c` OK |
+| `R7/verify/SHA256SUMS` | `49e0fa7c…13901` | matches; `sha256sum -c` OK |
+| `R8/owner-checks/SHA256SUMS` | `2568c25f…740ae` | matches; `sha256sum -c` OK |
+| `build-sums.sh --check` | | PASS |
+
+Unchanged since `89bd271e`: sealer, run wrapper, drop-in, `install-backup.sh`, `install-verify.sh`, the verify bundle other than
+`sealed-origin.sh`, `deploy/`, `tools/`, `src/`. `<R8-PIN:tested-rev>` is still a placeholder (R8-F-4).
+
+### Status of round-1 findings
+
+| ID | Status | Note |
+|---|---|---|
+| R8-F-1 | closed | fail-closed probe; E2 companion |
+| R8-F-2 | closed | same, C6/F5 |
+| R8-F-3 | closed | C2 prints PASS when no rule mentions arm |
+| R8-F-4 | open, by design | pin commit fills the revision |
+| R8-F-5 | closed by reading | contrast pinned to `7e2ef51a`; confirm with the coordinator's verify run |
+| R8-F-6 | closed | membership closure in D1/D2/D4; rehearsed `fc-pg-nologin-super` |
+| R8-F-7 | closed | service unit pinned whole; timer reasoning accepted |
+| R8-F-8 | closed | machine test, fields-only install, F5 strict |
+| R8-F-9 | closed | C3 widened, C6 uses sshd's path; see R8-F-14 |
+| R8-F-10 | closed | table text matches the script; session variables stated |
+| R8-F-11 | open in part | plan wording struck through; the R8 `README.md` that `verify/README.md` points at is still untracked |
+| R8-F-12 | closed as documented residual | DEPENDENCIES C19 |
+
+### New findings
+
+| ID | Grade | One line | file:line | Basis |
+|---|---|---|---|---|
+| R8-F-13 | LOW | Step 1.5a refuses a public key file with CRLF line ends, and the STOP text blames arm. Windows OpenSSH `ssh-keygen` writes CRLF (reproduced on the workstation: 84 bytes, CR present); Git Bash's writes LF, and the procedure says Git Bash, so this bites only if the key is made elsewhere. Fail-safe. Fix: strip CR in 1.4, or name the cause in the STOP column | `OWNER-PROCEDURE.md:114-116` | reproduced (key generation only) |
+| R8-F-14 | LOW | C3 now fails on any root-run service whose executable, file argument or `EnvironmentFile` has a group-writable or ACL-bearing path component, and there is no acceptance list as E3 has. On Ubuntu `/var/log` is `root:syslog 775`, so a root service with an existing file argument under it would block Phase 2 for an unrelated reason. Fail-safe, but it can stop the procedure on the day. Fix: an `--accept`-style list for C3, or limit the group-writable test to groups arm is in | `afldb-owner-checks.sh` C3 block (`:176-236`, `trust_res` at `:182`) | by reading; not run on a stock production-like host |
+| R8-F-15 | INFO | `arm_probe` has no timeout: an arm process that stops the probe hangs the owner checks. Never a PASS. Fix: `timeout` around `as_arm` | `afldb-owner-checks.sh:52-67` | by reading |
+| R8-F-16 | INFO | The manager-environment check is a denylist, and PID 1's loaded state is checked only for the listed properties, so a unit reloaded from different text and then restored on disk is caught only for those. Both need root. Sturdier: an allowlist of manager variables, and `NeedDaemonReload=no`. Also `sealed-origin.sh:40` cites row C20 for the timer, which is C21; the file is pinned, so leave it until the next change | `R7/backup/sealed-origin.sh:40`, `:153-160` | by reading |
+
+### Merge-readiness for `f8a63bb3`
+
+Ready from the repository side, subject to the coordinator's three final harness runs at `f8a63bb3` ending PASS. No finding
+blocks. Remaining before the procedure can run: the pin commit (fill `<R8-PIN:tested-rev>`, add the R8 `README.md` without
+touching `verify/README.md`), then the owner's Phases 0 to 4. Not verified: any production fact, including whether the installed
+base unit equals `edf00291…` and whether the service has other drop-ins; the fragment-mismatch refusal; a killed or injected
+probe.

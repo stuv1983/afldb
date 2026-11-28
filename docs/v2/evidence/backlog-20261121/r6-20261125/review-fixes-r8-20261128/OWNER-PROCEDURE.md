@@ -66,7 +66,7 @@ file, in a log or in evidence.
 | `<R8-PIN:tested-rev>` | the revision whose bytes are installed | `git rev-parse <R8-PIN:tested-rev>^{commit}` |
 | `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` | `$R7/backup/SHA256SUMS` | `git show <R8-PIN:tested-rev>:$R7/backup/SHA256SUMS \| sha256sum` |
 | `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` | `$R7/verify/SHA256SUMS` | `git show <R8-PIN:tested-rev>:$R7/verify/SHA256SUMS \| sha256sum` |
-| `2568c25ffc8d23be4e95e15ef8d0cc47bcdfbb3b002fa3403d37e390dcc740ae` | `$R8/owner-checks/SHA256SUMS` | `git show <R8-PIN:tested-rev>:$R8/owner-checks/SHA256SUMS \| sha256sum` |
+| `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` | `$R8/owner-checks/SHA256SUMS` | `git show <R8-PIN:tested-rev>:$R8/owner-checks/SHA256SUMS \| sha256sum` |
 | `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` | the wrapper's pinned `BUNDLE_SHA` (verify README §1) | `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` at the tested revision |
 
 Paths used below:
@@ -110,10 +110,10 @@ travel as data, and the console only compares fingerprints.
 |---|---|---|---|---|
 | 1.1 | [WS] | `ssh-keygen -t ed25519 -f ~/.ssh/afldb_admin -C afldb-admin` (set a passphrase) | a new key used for nothing else: not arm's key, not `~/.ssh/afldb_verify` | none |
 | 1.2 | [WS] | `ssh-keygen -lf ~/.ssh/afldb_admin.pub` | the fingerprint `SHA256:…`; write it on paper | none |
-| 1.3 | [WS]→[ARM] | `ssh afldb 'umask 077; cat > ~/afldb_admin.pub' < ~/.ssh/afldb_admin.pub` | arm carries the **public** key as data only, which is safe because it is checked in 1.5 | none |
-| 1.4 | [CON] | `K=/root/afldb-r8-keyin/afldb_admin.pub; install -d -m 0700 /root/afldb-r8-keyin; rm -f $K $K.line` then `setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K` | root takes a copy with arm's rights; it does not follow anything arm could link | none |
-| 1.5a | [CON] | `[ "$(grep -c '' $K)" = 1 ] && LC_ALL=C grep -Eqx 'ssh-ed25519 [A-Za-z0-9+/]{68}( [ -~]*)?' $K && awk '{print $1, $2}' $K > $K.line && echo KEY-SHAPE-OK` | a **machine** test (r8 review R8-F-8), not a judgement by eye: the file is exactly one line, and that line is `ssh-ed25519`, the 68-character key and at most a printable comment, with **nothing before it** (no options prefix). Only the type and key fields are kept, in `$K.line` | no `KEY-SHAPE-OK`: **STOP**. arm altered the carried key (rehearsed: `pubkey-optprefix`). Create nothing |
-| 1.5b | [CON] | `[ "$(ssh-keygen -lf $K.line \| awk '{print $2}')" = "SHA256:<the paper fingerprint, typed>" ] && echo KEY-FP-MATCH` | the kept key is **the workstation's** key | no `KEY-FP-MATCH`: **STOP**. arm substituted a key (rehearsed: `pubkey-swap`). Create nothing |
+| 1.3 | [WS]→[ARM] | `tr -d '\r' < ~/.ssh/afldb_admin.pub \| ssh afldb 'umask 077; cat > ~/afldb_admin.pub'` | arm carries the **public** key as data only, which is safe because it is checked in 1.5. The workstation strips carriage returns first: Windows OpenSSH `ssh-keygen` writes the `.pub` with a CRLF line end (r8 review R8-F-13) | none |
+| 1.4 | [CON] | `K=/root/afldb-r8-keyin/afldb_admin.pub; install -d -m 0700 /root/afldb-r8-keyin; rm -f $K $K.n $K.line` then `setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K` | root takes a copy with arm's rights; it does not follow anything arm could link | none |
+| 1.5a | [CON] | `sed 's/\r$//' $K > $K.n && [ "$(grep -c '' $K.n)" = 1 ] && LC_ALL=C grep -Eqx 'ssh-ed25519 [A-Za-z0-9+/]{68}( [ -~]*)?' $K.n && awk '{print $1, $2}' $K.n > $K.line && echo KEY-SHAPE-OK` | a **machine** test (r8 review R8-F-8), not a judgement by eye. One trailing carriage return is stripped first, in case 1.3's strip was skipped (r8 review R8-F-13; rehearsed: `pubkey-crlf`); otherwise the test is unchanged. The file is then exactly one line, and that line is `ssh-ed25519`, the 68-character key and at most a printable comment, with **nothing before it** (no options prefix). Only the type and key fields are kept, in `$K.line` | no `KEY-SHAPE-OK`: **STOP**. The carried key is malformed or not the workstation key (rehearsed: `pubkey-optprefix`). Create nothing; carry it again from the workstation with 1.3 |
+| 1.5b | [CON] | `[ "$(ssh-keygen -lf $K.line \| awk '{print $2}')" = "SHA256:<the paper fingerprint, typed>" ] && echo KEY-FP-MATCH` | the kept key is **the workstation's** key | no `KEY-FP-MATCH`: **STOP**. The carried key is not the workstation key (rehearsed: `pubkey-swap`). Create nothing |
 | 1.6 | [CON] | `useradd -m -U -s /bin/bash afldb-admin` | an account with its own primary group | `useradd` error: STOP |
 | 1.7 | [CON] | `passwd afldb-admin` | the admin's own sudo password, typed twice at the prompt and nowhere else | none |
 | 1.8 | [CON] | `usermod -a -G sudo afldb-admin; chmod 0750 /home/afldb-admin` | full sudo **with that password**; arm cannot enter the home | none |
@@ -166,7 +166,7 @@ Phase 2. Its authentication uses a key and a password arm never held.
 | 2.1.4 | [WS]→[ADM] | `ADM 'umask 077; set -C; cat > ~/afldb-r8-stage.tar' < ~/afldb-r8-stage.tar` | the bytes travel over the admin path, never through arm | `set -C` refusal (a file already there): remove it in [ADM-ROOT] and resend |
 | 2.1.5 | [ADM-ROOT] | `T=/home/afldb-admin/afldb-r8-stage.tar; stat -c '%U %a %s' $T; sha256sum $T` | owner `afldb-admin 600`, and **the TAR value of 2.1.3** (compared by eye) | different: STOP |
 | 2.1.6 | [ADM-ROOT] | `X=/root/afldb-r8-extract; rm -rf $X; install -d -m 0700 $X; tar -x --no-same-owner --no-same-permissions -f $T -C $X; chown -R root:root $X; chmod -R go-w $X` | root-owned extracted bytes, outside `/home` | tar error: STOP |
-| 2.1.7 | [ADM-ROOT] | `OC=/root/afldb-r8-owner-checks; install -d -m 0755 $OC; install -m 0644 $X/$R8/owner-checks/afldb-owner-checks.sh $X/$R8/owner-checks/SHA256SUMS $OC/; sha256sum $OC/SHA256SUMS; (cd $OC && sha256sum -c --strict SHA256SUMS)` | `2568c25ffc8d23be4e95e15ef8d0cc47bcdfbb3b002fa3403d37e390dcc740ae` and `OK` | different: STOP |
+| 2.1.7 | [ADM-ROOT] | `OC=/root/afldb-r8-owner-checks; install -d -m 0755 $OC; install -m 0644 $X/$R8/owner-checks/afldb-owner-checks.sh $X/$R8/owner-checks/SHA256SUMS $OC/; sha256sum $OC/SHA256SUMS; (cd $OC && sha256sum -c --strict SHA256SUMS)` | `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` and `OK` | different: STOP |
 
 ### 2.2 Run
 
@@ -190,6 +190,8 @@ Every such arm-side probe is **fail-closed** (r8 review R8-F-1, R8-F-2). These a
 * The probe's last action prints a sentinel carrying a random per-call nonce.
 * The script accepts the probe only when it exited 0 **and** its last line is that sentinel. Otherwise the check is
   `FAIL probe did not complete`. No check ever reads PASS from absent output.
+* The probe runs under a root-owned `timeout --kill-after=5 60`, outside `setpriv`, so arm cannot stop the timer (r8 review
+  R8-F-15). A probe that arm stops or that hangs is killed after 60 seconds, and the check is `FAIL probe did not complete`.
 * A concurrently hostile arm process can still kill the probe, which gives FAIL, or (same uid) write into its output. So each probe
   has a root-side companion that does not depend on arm:
   * E1 has E2;
@@ -231,7 +233,7 @@ All checks run from the single command in 2.2. "Blocks" says what stays blocked 
 | C1s | report: the docker/lxd/containerd sockets and their owners and modes | report | nothing |
 | C2 | the only polkit rule mentioning arm is the known settle rule: `50-afldb-settle-afltables.rules`, sha256 `3164e0d9…c50b64` = `deploy/afldb-settle-afltables-trigger.rules` (start of `afldb-settle-afltables.service` only). It prints PASS for that rule, FAIL for any other `.rules` file mentioning arm, and one PASS line when no `.rules` file mentions arm | PASS | G1/G2 |
 | C2b | no `.pkla` (legacy polkit) entry names arm | PASS | G1/G2 |
-| C3 | **every** service unit that root runs is judged. Root-run means `User=` root or unset, or any command with a `+`/`!`/`!!` prefix. The checks run over the unit files and loaded units from `systemctl list-unit-files`/`list-units`, using `systemctl show` `Exec*Ex`/`EnvironmentFiles`/`Environment`; templates are judged from their text. Each executable path, each absolute-path argument that is a file, and each `EnvironmentFile` passes only if every symbolic link on the way is root-owned and the resolved path is trusted (no component arm-owned, group/other-writable, ACL-bearing or a link). `Environment=` must not mention `/home/`, and a `+`/`!` command in a User=arm unit is FAIL. User=arm units run as arm, so they are reported, not failed. Not judged: timer, socket and path units, which activate a service that is itself judged; and an interpreter's own runtime lookups (r8 review R8-F-9) | PASS | G1/G2 |
+| C3 | **every** service unit that root runs is judged. Root-run means `User=` root or unset, or any command with a `+`/`!`/`!!` prefix. The checks run over the unit files and loaded units from `systemctl list-unit-files`/`list-units`, using `systemctl show` `Exec*Ex`/`EnvironmentFiles`/`Environment`; templates are judged from their text. Each executable path, each absolute-path argument that is a file, and each `EnvironmentFile` is walked from `/`, following every symbolic link and walking its target too. A bare command name (`ExecStart=systemctl …`) is resolved as systemd does, through `/usr/local/sbin`, `/usr/local/bin`, `/usr/sbin`, `/usr/bin`, `/sbin`, `/bin`, and every candidate up to and including the first that exists is judged. The path FAILs only when **arm can modify it** (r8 review R8-F-14): a component owned by arm; group-writable with a group arm is in; world-writable (a sticky directory excepted); an ACL entry (`getfacl`) granting write to arm or one of arm's groups; a link owned by arm; or an absent component below a directory arm can write. Other group-writable or ACL-bearing components (for example `/var/log`, root:syslog 0775), sticky world-writable directories and links owned by another non-root user are **reported** as `path(owner:group:mode)` in the PASS line, not failed. A component that cannot be evaluated (stat or getfacl fails) makes C3 **UNKNOWN**, never PASS; without `getfacl` only the mode bits are judged, and the PASS line says so (rehearsed: `fc-c3-gw-other`, `fc-c3-gw-arm`). `Environment=` must not mention `/home/`, and a `+`/`!` command in a User=arm unit is FAIL. User=arm units run as arm, so they are reported, not failed. Not judged: timer, socket and path units, which activate a service that is itself judged; and an interpreter's own runtime lookups (r8 review R8-F-9) | PASS | G1/G2 |
 | C4 | no root cron entry (`/etc/crontab`, `/etc/cron.d`, root's spool, `cron.{hourly,daily,weekly,monthly}`) references an arm-writable path | PASS | G1/G2 |
 | C5 | `/root`, and each of `/root/.bashrc`, `.profile`, `.bash_profile`, `.bash_login`, `.bash_logout`, `.bash_aliases`, `.inputrc`, `.ssh`, `.ssh/rc`, `.ssh/environment`, `.ssh/authorized_keys`, `.ssh/authorized_keys2` that exists, is a trusted path, and none mentions `/home/`. The system-wide `/etc/profile`, `/etc/profile.d`, `/etc/bash.bashrc` and `/etc/environment` are judged under E1/E2, not C5 | PASS | G1/G2 (they run in every [ADM-ROOT] `sudo -i`; this procedure avoids `-i`, but they also run in [CON]) |
 | C6 | report: fingerprints only of root's authorised keys, read from sshd's effective `AuthorizedKeysFile` for root (`sshd -T -C user=root`, `%h`/`%u` expanded; r8 review R8-F-9). FAIL if one equals one of arm's keys. arm's keys come from sshd's `AuthorizedKeysFile` for arm plus `~/.ssh/*.pub`, read **as arm** by a fail-closed probe: FAIL "probe did not complete" if it does not finish. UNKNOWN if sshd takes root's keys from an `AuthorizedKeysCommand`. Suppressing the probe hides only the overlap test: adding arm's key to root's keys means writing a file C5/E2 protect | PASS | G1/G2 |
@@ -245,7 +247,7 @@ All checks run from the single command in 2.2. "Blocks" says what stays blocked 
 | D4 | the role named by each DSN in arm's `.env`, **read as arm**, with only the user part extracted (variable and role names printed; `TEST` DSNs skipped). Each such role is not a superuser, is not a member (direct or inherited) of any superuser role, and is not a member of any of the three server program/file roles; FAIL names the superuser roles it reaches. The file is read by a fail-closed probe: FAIL "probe did not complete" if it does not finish | PASS | G1/G2, install. UNKNOWN if the file is absent or unreadable by arm (then establish arm's role another way) |
 | D5 | `pg_hba` has no `trust` line, and `pg_ident` maps neither arm nor a regex to `postgres`, `all`, `afldb_backup` or `afldb_verify`; include directives are reported as UNKNOWN | PASS | G1 (`afldb_backup`), G2 (`afldb_verify`) |
 | E0 | **(e)** a fresh arm process cannot run `sudo -n true`. Fail-closed probe: PASS only on the probe's completed `SUDO-N-REFUSED` answer | PASS | G1/G2 |
-| E1 | as arm (`setpriv … -c '[ -w … ]'`), no component of any protected path is writable. The protected paths are the staging copies; `/usr/local/lib/afldb-backup`, `/usr/local/lib/afldb-verify` and their contents; `/var/lib/afldb-backup/*`; `/etc/systemd/system/afldb-backup.service.d`; `/etc/ssh/sshd_config.d`; `/etc/ssh/afldb-verify`; `/etc/postgresql/16/main/pg_{hba,ident}.conf`; `/etc/sudoers{,.d}`; polkit; `/etc/passwd`, `/etc/shadow`, pam, profile; `/root`; the bash, sudo and sshd binaries; the admin's home, `.ssh`, `authorized_keys` and startup files. Fail-closed probe (r8 review R8-F-1): PASS only when the probe completed and listed nothing; a killed or cut-short probe is FAIL "probe did not complete" | PASS (absent paths are reported, not failed, so the check works before installation) | G1/G2, install |
+| E1 | as arm (`setpriv … -c '[ -w … ]'`), no component of any protected path is writable. The protected paths are the staging copies; `/usr/local/lib/afldb-backup`, `/usr/local/lib/afldb-verify` and their contents; `/var/lib/afldb-backup/*`; `/etc/systemd/system/afldb-backup.service.d`; `/etc/ssh/sshd_config.d`; `/etc/ssh/afldb-verify`; `/etc/postgresql/16/main/pg_{hba,ident}.conf`; `/etc/sudoers{,.d}`; polkit; `/etc/passwd`, `/etc/shadow`, pam, profile; `/root`; the bash, sudo and sshd binaries; the admin's home, `.ssh`, `authorized_keys` and startup files. Fail-closed probe (r8 review R8-F-1): PASS only when the probe completed and listed nothing; a killed, cut-short or timed-out (60 s, R8-F-15) probe is FAIL "probe did not complete" | PASS (absent paths are reported, not failed, so the check works before installation) | G1/G2, install |
 | E2 | as root, every component of those paths from `/` is not arm-owned, not group/other-writable, has no named ACL entry (`getfacl`) and is no symlink | PASS | G1/G2, install. Rehearsed: `fc-group-writable` |
 | E3 | outside `/home`, `/tmp`, `/var/tmp`, `/proc`, `/sys`, `/dev`, `/run/user`: no arm-owned, arm-group-writable or world-writable file, and no non-sticky world-writable directory, except known entries (arm's cron spool, mail) and `--accept` entries | PASS; otherwise UNKNOWN with the first 25 paths | G1/G2 until each path is reviewed and accepted or fixed |
 | E3a | the `--accept` file itself is a trusted root-owned file | no line when trusted or when `--accept` is not given; FAIL otherwise | G1/G2 |
@@ -360,15 +362,18 @@ the real systemd 255, from the pinned image `sha256:d71c0b28…` (Ubuntu 24.04),
 
 * starts from production's shape today, arm with sudo [FIXTURE], and uses `docker exec` as root as the console stand-in [HARNESS];
 * reaches the container's real sshd from the workstation's real Windows OpenSSH through a ProxyCommand [HARNESS transport];
-* refuses a key arm substituted, and the real key behind an options prefix arm added (Phase 1, machine test 1.5a–1.5b);
+* refuses a key arm substituted, and the real key behind an options prefix arm added, but accepts the real key with a CRLF line
+  end (Phase 1, machine test 1.5a–1.5b);
 * creates the admin account, then checks two admin logins and that arm's key is refused for the admin;
 * verifies the stage tar over the admin path against workstation digests;
 * runs Phase 2 before the change (BLOCKED), and through arm's sudo (BLOCKED on A2);
 * runs the installer through arm's sudo (REFUSED, nothing installed);
 * runs both installs and both install checks (root and `--as-arm`), then the wrapper's `version` call;
 * runs Phase 4, a second admin login, the reverify, and Phase 2 (PASS);
-* runs six fail-closed cases and a control: arm's PostgreSQL role made superuser; a NOLOGIN superuser role granted to arm's
-  role; a group-writable protected directory; a missing admin path; an options prefix on the admin key; and a second admin key line;
+* runs eight fail-closed cases and a control: arm's PostgreSQL role made superuser; a NOLOGIN superuser role granted to arm's
+  role; a group-writable protected directory; a missing admin path; an options prefix on the admin key; a second admin key line;
+  a root-run unit's argument in a root:&lt;group arm is not in&gt; 0775 directory (C3 reports it, PASS); and the same directory with
+  group arm (C3 FAIL);
 * scans every log for the fixture password, the admin and arm passwords, and private key blocks.
 
 Results and residue: `procedure-harness/logs/<RID>-summary.log` (git-ignored by `logs/`; force-add to keep). Development runs at worktree bytes, 28 Nov 2026:
@@ -386,9 +391,22 @@ came from the worktree.
 * `dev-a3` FAILED only `wrapper-version`. The harness ran the worktree wrapper, which carries B's new `BUNDLE_SHA`, against
   `89bd271e` bundles. The harness now runs the wrapper from the same staged tar.
 
+After review round 2 of `f8a63bb3` (R8-F-13/-14/-15), two more development runs were made with `--bundles-rev f8a63bb3`.
+
+* `dev-a4b` is `R8 PROCEDURE HARNESS RESULT PASS`: 32 scenarios PASS. New in this run: `pubkey-crlf` (a CRLF key is accepted
+  after one CR is stripped), `fc-c3-gw-other` (C3 PASS reporting `/opt/r8p-gw(root:r8pgrp:775)`) and `fc-c3-gw-arm` (C3 FAIL:
+  `/opt/r8p-gw is group-writable by a group arm is in (root:arm:775)`). C3 judged 112–113 root-run units and 182–186 paths, with
+  ACLs read through `getfacl`. Residue afterwards: 0 containers, 0 images, 0 workspaces.
+* `dev-a4` FAILED `checks-post-access`, `fc-c3-gw-other` and `control-after-revert`. In all three, C3 was UNKNOWN on units whose
+  `ExecStart` names a bare command (`systemctl`, `rm`, `udevadm`). The new C3 fails closed on a path it cannot place, and the
+  round-1 judge (`trust_res`) had silently resolved such names against its working directory. C3 now resolves a bare name through systemd's search
+  path. The new `pubkey-crlf` and `fc-c3-gw-arm` scenarios already passed in this run. Residue afterwards: 0 containers,
+  0 images, 0 workspaces.
+
 These runs are not evidence for a committed revision either.
 
-Not exercised: an arm process killing or injecting into a probe; the code path exists, but no scenario drives it.
+Not exercised: an arm process killing, stopping or injecting into a probe, and the probe's 60-second timeout. The code paths
+exist, but no scenario drives them.
 
 Re-run with `--verify-rev <R8-PIN:tested-rev>` after the commit.
 
@@ -407,8 +425,8 @@ The rehearsal does **not** exercise:
 | 0.1–0.3 | Recovery Console; `login: root`; `id; cat /proc/self/loginuid; tty` | [CON] | an independent root session | no root login: **STOP, F1 open** |
 | 0.4 | `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` | [CON] | production host key, independently | none |
 | 1.1–1.2 | `ssh-keygen -t ed25519 -f ~/.ssh/afldb_admin -C afldb-admin`; `ssh-keygen -lf ~/.ssh/afldb_admin.pub` | [WS] | a new admin key; its fingerprint on paper | none |
-| 1.3 | `ssh afldb 'umask 077; cat > ~/afldb_admin.pub' < ~/.ssh/afldb_admin.pub` | [WS]→[ARM] | data only | none |
-| 1.4–1.5b | `K=…; setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K`; the 1.5a shape test (`KEY-SHAPE-OK`) and the 1.5b fingerprint test (`KEY-FP-MATCH`) | [CON] | the carried key is one bare ed25519 line and is the workstation's | no `KEY-SHAPE-OK` or no `KEY-FP-MATCH`: **STOP** |
+| 1.3 | `tr -d '\r' < ~/.ssh/afldb_admin.pub \| ssh afldb 'umask 077; cat > ~/afldb_admin.pub'` | [WS]→[ARM] | data only (CR stripped: Windows `ssh-keygen` writes CRLF) | none |
+| 1.4–1.5b | `K=…; setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K`; the 1.5a shape test (one trailing CR stripped, then `KEY-SHAPE-OK`) and the 1.5b fingerprint test (`KEY-FP-MATCH`) | [CON] | the carried key is one bare ed25519 line and is the workstation's | no `KEY-SHAPE-OK` or no `KEY-FP-MATCH`: **STOP**, the carried key is malformed or not the workstation key |
 | 1.6–1.10 | `useradd -m -U -s /bin/bash afldb-admin`; `passwd afldb-admin`; `usermod -a -G sudo afldb-admin`; `chmod 0750 /home/afldb-admin`; `install … $K.line …/authorized_keys` (the type and key fields only); checks | [CON] | the admin account with its own key and password | any unexpected value |
 | 1.11–1.13 | `ADM`; `id; sudo -k; sudo -v; sudo -l`; twice, in new connections | [WS], [ADM] | the admin path reaches root, twice | host key mismatch or failure |
 | 2.1.1–2.1.3 | `git rev-parse <R8-PIN:tested-rev>^{commit}`; `git archive … -o ~/afldb-r8-stage.tar`; `sha256sum` | [WS] | workstation bytes and expected digests | a pin differs |

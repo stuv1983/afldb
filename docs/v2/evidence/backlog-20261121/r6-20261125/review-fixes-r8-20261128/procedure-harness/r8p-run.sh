@@ -140,7 +140,8 @@ L() { local f=$LOGS/$RID-$1.log; shift; { echo "== $RID $(date -u +%FT%TZ) $*"; 
 
 # ------------------------------------------------------------------------------------------ Phase 0 and 1 at the console stand-in
 pace
-O=$(S arm r8p-arm 'umask 077; cat > ~/afldb_admin.pub; echo "carried by arm: $(wc -c < ~/afldb_admin.pub) bytes"; id' < "$KD/admin.pub.lf" 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L arm-carries-pub "arm carries the admin .pub as data (arm's own login, arm's key)"
+# step 1.3 as written (R8-F-13): the workstation strips CR (Windows ssh-keygen writes CRLF) before arm carries the key
+O=$(tr -d '\r' < "$KD/admin.pub" | S arm r8p-arm 'umask 077; cat > ~/afldb_admin.pub; echo "carried by arm: $(wc -c < ~/afldb_admin.pub) bytes"; id' 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L arm-carries-pub "arm carries the admin .pub as data (arm's own login, arm's key; CR stripped on the workstation, $(grep -c $'\r' "$KD/admin.pub") CR line(s) in the workstation file)"
 pace
 O=$(HX exec console "$AFP" < "$KD/apw" 2>&1); printf '%s\n' "$O" | L console "Phase 0 facts, pubkey swap, Phase 1 at the console stand-in"
 grep -q 'R8P PHASE0 root-console=yes' <<< "$O" && res console-phase0 PASS "expect=root-console-session got=$(grep -m1 'loginuid' <<< "$O" | tr -s ' ') (docker exec stands in for the provider console; production's is UNKNOWN)" \
@@ -149,6 +150,9 @@ grep -q 'R8P PHASE1 REFUSED (swap)' <<< "$O" && grep -q 'R8P PUBKEY-SWAP exit 1'
   && res pubkey-swap PASS "expect=refused got=refused (a key arm substituted for the carried .pub was not installed; nothing created)" || res pubkey-swap FAIL "expect=refused got=$(grep 'R8P PHASE1\|PUBKEY' <<< "$O" | tr '\n' ' ')"
 grep -q 'R8P PHASE1 REFUSED (optprefix)' <<< "$O" && grep -q 'R8P PUBKEY-OPTPREFIX exit 1' <<< "$O" && ! grep -q 'UNEXPECTED' <<< "$O" \
   && res pubkey-optprefix PASS "expect=refused got=refused (the real key behind an options prefix, same fingerprint, was not installed)" || res pubkey-optprefix FAIL "expect=refused got=$(grep 'R8P PHASE1\|OPTPREFIX' <<< "$O" | tr '\n' ' ')"
+grep -q 'R8P PHASE1 CRLF-ACCEPTED (crlf)' <<< "$O" && grep -q 'R8P PUBKEY-CRLF exit 0' <<< "$O" && grep -q '1 line(s), 1 with a CR before the strip' <<< "$O" && ! grep -q 'UNEXPECTED' <<< "$O" \
+  && res pubkey-crlf PASS "expect=accepted got=accepted (the key with a CRLF line end passes the machine test after one CR is stripped; nothing created)" || res pubkey-crlf FAIL "expect=accepted got=$(grep 'R8P PHASE1\|CRLF\|carried key' <<< "$O" | tr '\n' ' ')"
+grep -q 'malformed or not the workstation key' <<< "$O" || res refusal-wording FAIL "expect=REFUSED text 'malformed or not the workstation key' got=$(grep -m1 'REFUSED' <<< "$O")"
 grep -q 'R8P PHASE1 DONE (real)' <<< "$O" && grep -q "authorized_keys afldb-admin:afldb-admin 600 $AFP (1 line)" <<< "$O" \
   && res admin-bootstrap PASS "expect=afldb-admin-with-workstation-key got=$(grep -m1 '   afldb-admin:' <<< "$O" | cut -c1-200)" || res admin-bootstrap FAIL "expect=afldb-admin-with-workstation-key got=$(grep 'R8P PHASE1' <<< "$O" | tr '\n' ' ')"
 
@@ -241,6 +245,12 @@ grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK F5 FAIL.*not 
 B=$(blk admin-extra-key)
 grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK F5 FAIL.*2 authorised key lines' <<< "$B" \
   && res fc-admin-extra-key PASS "expect=BLOCKED(F5 two key lines) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-admin-extra-key FAIL "expect=BLOCKED(F5) got=$(grep -E '^CHECK F5 |^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
+B=$(blk c3-gw-other)
+grep -qx 'OWNER CHECKS RESULT PASS' <<< "$B" && grep -q '^CHECK C3 PASS.*/opt/r8p-gw(root:r8pgrp:775)' <<< "$B" \
+  && res fc-c3-gw-other PASS "expect=PASS(C3 reports /opt/r8p-gw root:r8pgrp:775, arm not in the group) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-c3-gw-other FAIL "expect=PASS(C3 reports) got=$(grep -E '^CHECK C3 |^CHECK [A-Z0-9]+ (FAIL|UNKNOWN)|^OWNER CHECKS' <<< "$B" | cut -c1-400 | tr '\n' '|')"
+B=$(blk c3-gw-arm)
+grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK C3 FAIL.*/opt/r8p-gw is group-writable by a group arm is in' <<< "$B" \
+  && res fc-c3-gw-arm PASS "expect=BLOCKED(C3 /opt/r8p-gw group-writable by arm's group) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-c3-gw-arm FAIL "expect=BLOCKED(C3) got=$(grep -E '^CHECK C3 |^OWNER CHECKS' <<< "$B" | cut -c1-300 | tr '\n' '|')"
 B=$(blk control)
 grep -qx 'OWNER CHECKS RESULT PASS' <<< "$B" && res control-after-revert PASS "expect=PASS got=OWNER CHECKS RESULT PASS (console session; every mutation reverted)" || res control-after-revert FAIL "expect=PASS got=$(grep -E '^CHECK [A-Z0-9]+ (FAIL|UNKNOWN)|^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
 

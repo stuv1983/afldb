@@ -1,0 +1,25 @@
+== dev-a4b 2026-11-28T05:10:48Z Phase 0 facts, pubkey swap, Phase 1 at the console stand-in
+[HARNESS] console stand-in: docker exec as root; production's provider console root login is UNKNOWN (OWNER-PROCEDURE.md Phase 0)
+   id: uid=0(root) gid=0(root) groups=0(root)
+   loginuid: 4294967295
+   passwd -S root: L
+   ancestors: 318:bash:uid=0 
+R8P PHASE0 root-console=yes
+[FIXTURE-ATTACK] arm replaced the carried ~/afldb_admin.pub with another key (fingerprint SHA256:I5RB5OJPA2ZfSgSmTSHOyMnVgn9ozh1w/C1zOxoyW78)
+   carried key: 1 line(s), 0 with a CR before the strip; shape bare-ed25519; fingerprint of the kept fields SHA256:I5RB5OJPA2ZfSgSmTSHOyMnVgn9ozh1w/C1zOxoyW78; workstation SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4
+R8P PHASE1 REFUSED (swap): the carried key is malformed or not the workstation key; nothing created
+R8P PUBKEY-SWAP exit 1
+[FIXTURE-ATTACK] arm prefixed the carried key with an options field (command=...); its fingerprint is still the workstation's
+   carried key: 1 line(s), 0 with a CR before the strip; shape NOT-bare; fingerprint of the kept fields none; workstation SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4
+R8P PHASE1 REFUSED (optprefix): the carried key is malformed or not the workstation key; nothing created
+R8P PUBKEY-OPTPREFIX exit 1
+[FIXTURE] the carried key given a CRLF line end (an un-normalised Windows carry): CR count 1
+   carried key: 1 line(s), 1 with a CR before the strip; shape bare-ed25519; fingerprint of the kept fields SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4; workstation SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4
+R8P PHASE1 CRLF-ACCEPTED (crlf): one trailing CR stripped; the kept fields carry the workstation's fingerprint; this rehearsal mode creates nothing
+R8P PUBKEY-CRLF exit 0
+   carried key: 1 line(s), 0 with a CR before the strip; shape bare-ed25519; fingerprint of the kept fields SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4; workstation SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4
+   afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); password P; home afldb-admin:afldb-admin 750; authorized_keys afldb-admin:afldb-admin 600 SHA256:iAnR0Wvusz7RDNxQLLCRKEiDdNoptCXF1vmFZXgUft4 (1 line)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+   sudo -l -U afldb-admin:  (ALL : ALL) ALL;
+R8P PHASE1 DONE (real)
+R8P PHASE1 exit 0
