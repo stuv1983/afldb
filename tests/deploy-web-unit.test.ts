@@ -573,8 +573,11 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(rcv(seed.stdout)).toEqual(genuine);
     expect(rcv(daily.stdout)).toEqual(['afldb_prod-20261104-022000.dump']);
     expect(rcv(released.stdout)).toEqual([]); // nothing new crossed the wire
+    // As in production, the source keeps fewer dumps than the off-host: drop from the fixture source each dump the destination's
+    // retention pruned, so a later pull does not fetch it again (a genuine re-transfer that would be, and is, a receipt).
+    const trimSrc = () => { const h = new Set(held()); for (const f of readdirSync(src)) if (f.endsWith('.dump') && !h.has(f)) { rmSync(join(src, f)); rmSync(join(src, `${f}.sha256`), { force: true }); } };
     // Pre-placed: the right dump and sidecar are already in the destination; --ignore-existing moves nothing; verified, not received.
-    put('afldb_prod-20261105-022000.dump');
+    trimSrc(); put('afldb_prod-20261105-022000.dump');
     for (const f of ['afldb_prod-20261105-022000.dump', 'afldb_prod-20261105-022000.dump.sha256']) writeFileSync(join(dest, f), readFileSync(join(src, f)));
     const preplaced = pull();
     expect(preplaced.status, `${preplaced.stdout}${preplaced.stderr}`).toBe(0);
@@ -582,7 +585,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(rcv(preplaced.stdout)).toEqual([]);
     // Partial failure: a later source file is unreadable, rsync fails part-way: no receipt for any file of that run; the retry
     // receives the file it moves.
-    put('afldb_prod-20261106-022000.dump');
+    trimSrc(); put('afldb_prod-20261106-022000.dump');
     chmodSync(join(src, 'afldb_prod-20261106-022000.dump'), 0o000);
     const partial = pull();
     expect(partial.status).toBe(1);
@@ -594,7 +597,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(rcv(retry.stdout)).toEqual(['afldb_prod-20261106-022000.dump']);
     // r10 round 2 (independent review F5): a partial left under .rsync-partial before the run is not a receipt, even when this run
     // completes the file and verifies it.
-    put('afldb_prod-20261107-022000.dump');
+    trimSrc(); put('afldb_prod-20261107-022000.dump');
     mkdirSync(join(dest, '.rsync-partial'), { recursive: true });
     writeFileSync(join(dest, '.rsync-partial', 'afldb_prod-20261107-022000.dump'), 'dump');
     const resumed = pull();
@@ -602,7 +605,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(resumed.stdout).toMatch(/not a receipt: afldb_prod-20261107-022000\.dump/);
     expect(rcv(resumed.stdout)).toEqual([]);
     // r10 round 2 (F6): the machine-readable receipt is written to fd 3, which rsync and ssh never get; callers parse fd 3 only.
-    put('afldb_prod-20261108-022000.dump');
+    trimSrc(); put('afldb_prod-20261108-022000.dump');
     const fd3 = spawnSync('bash', ['-c', 'bash tools/maintenance/offhost-pull.sh "$1" "$2" --keep 3 3>&1 1>/dev/null 2>/dev/null', '_', src, dest], { encoding: 'utf8', env });
     expect(fd3.status).toBe(0);
     expect(fd3.stdout.trim().split('\n')).toEqual([expect.stringMatching(/^RECEIVED afldb_prod-20261108-022000\.dump sha256=[0-9a-f]{64} bytes=\d+ size=\d+$/)]);
