@@ -1,0 +1,10 @@
+== rvw8p 2026-11-28T03:58:41Z admin root session: Phase 4, arm removed from sudo
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step phase4 2026-11-28T03:58:41Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+---- Phase 4 (owner approval): remove arm from sudo; the console stays open
+Removing user arm from group sudo
+   gpasswd exit 0
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   sudo -l -U arm: User arm is not allowed to run sudo on afldb-prod.
+R8P PHASE4 done

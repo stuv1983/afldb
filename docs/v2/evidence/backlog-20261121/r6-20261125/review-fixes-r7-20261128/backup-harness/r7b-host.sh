@@ -18,7 +18,7 @@ RUN=${1:?run directory}; RID=${2:?run id}; shift 2
 [[ $RID =~ ^[A-Za-z0-9-]+$ ]] && [ -d "$RUN/fix" ] && [ -O "$RUN" ] || { echo "STOP not this run's private directory: $RUN ($RID)"; exit 2; }
 KEEPIMG=0; IMG=
 while [ $# -gt 0 ]; do case $1 in --keep-image) KEEPIMG=1; shift;; --image) IMG=${2:?tag}; KEEPIMG=1; shift 2;; *) break;; esac; done
-ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted genuine-rd rearm-in-rd post-pub-fail arm-sudo)
+ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted genuine-rd rearm-in-rd post-pub-fail arm-sudo extra-dropin)
 SCEN=("$@"); [ ${#SCEN[@]} -gt 0 ] || SCEN=("${ALL[@]}")
 for sc in "${SCEN[@]}"; do [[ " ${ALL[*]} " == *" $sc "* ]] || { echo "STOP unknown scenario $sc"; exit 2; }; done
 PIN=sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba   # grafana/alloy:latest on streamanator, Ubuntu 24.04.4

@@ -396,8 +396,11 @@ Added in r8 (the dependency review, R8 `DEPENDENCIES.md`, which classifies every
 22. **arm's checks of the backup install (r8).** "verify-backup-install.sh as arm in a new login" let arm's login choose the process
     that judged arm's permissions. Acceptance is now root's `verify-backup-install.sh --as-arm` (setpriv to arm without arm's login,
     stdin `/dev/null`, a new session, output sanitised and prefixed `[as arm] `, verdict by the arm process's exit status and the
-    dropped `id`); a run in an arm session ends `BACKUP INSTALL RESULT INFO-ONLY ...`. Another arm process can still write text into
-    that child's output pipe (same uid); such text is shown only as `[as arm]` data and cannot change the exit status.
+    dropped `id`); a run in an arm session ends `BACKUP INSTALL RESULT INFO-ONLY ...`. This removes arm's files and startup code from
+    the probe, not a concurrently hostile arm process (R8-F-12): another arm process can write text into the child's output pipe
+    (shown only as `[as arm]` data), signal it (a forced failure or hang, never a PASS) and, only where `kernel.yama.ptrace_scope=0`,
+    ptrace it and forge the arm-side PASS. Root's own checks (ownership, modes, trusted paths, digests, `sealed_origin_install`) and
+    every gate do not depend on the arm probe (backup README section 9).
 
 ## 5. Installation prerequisites and order (owner; nothing here was installed)
 
@@ -424,7 +427,7 @@ and the R6 plan's r7 note.
 
 1. **Production, R7/backup** (backup README §5).
    * Preconditions: the base units are root-owned copies, not links; no r6 attest drop-in; the zone file is a root-owned regular file.
-   * Check `SHA256SUMS` `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682` (r7: `d0023d10…`), then run `install-backup.sh` in the admin root session. It
+   * Check `SHA256SUMS` `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (r7: `d0023d10…`), then run `install-backup.sh` in the admin root session. It
      refuses (`REFUSED: root session descends from arm`) a root session that descends from arm (r8).
    * In the same session, add the `pg_ident`/`pg_hba` lines before any broader `local` line, then reload.
    * `verify-backup-install.sh` must print `BACKUP INSTALL RESULT PASS` twice, both run from the admin root session: once as root,
@@ -447,7 +450,7 @@ and the R6 plan's r7 note.
    * Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
 4. **Workstation.**
    * Stage `verify/` from `<R8-PIN:tested-rev>` in the owner's own clone and run `sha256sum -c SHA256SUMS`
-     (`3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd`; wrapper `BUNDLE_SHA` `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`; r7: `7d693020`, `221b254a…`, `df3457cc…`).
+     (`49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`; wrapper `BUNDLE_SHA` `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`; r7: `7d693020`, `221b254a…`, `df3457cc…`).
    * Run `afldb-verify-call.sh version`. It must print `OWNER VERDICT VERSION PASS` for both hosts.
 
 Until then, and until a sealed timer run exists for the gate date, G0 and A-2 STOP, by design. Rollback: backup README §6.
@@ -481,6 +484,11 @@ date gate):
   PASS. The wrapper also prints `A2 SCOPE:` / `G0 SCOPE:` lines (§4 item 19) before the verdict; the `OWNER VERDICT` line format is
   unchanged.
 * **R8-5 labels**: A-2 and G0b PASS lines that rest on arm's data carry `[ARM-PRODUCED ...]`; no check changed.
+* **R8-6 the service unit pinned whole (independent review R8-F-7)**: `sealed_origin_install` now requires `DropInPaths` to be exactly
+  the pinned drop-in, an empty environment and no bind/mount settings, no shell- or loader-affecting variable in the service manager's
+  environment, and the base unit byte-identical to `deploy/afldb-backup.service` (a production copy that differs is a fail-closed STOP
+  at install). The timer stays unpinned by design (it only moves the dispatch, which the window check judges). `sealed-origin.sh`
+  changes (`1153df78…` -> `a733e67b…`), so does the verifier bundle; backup README section 4 item 13, R8 `DEPENDENCIES.md` C20, C21.
 
 ## 7. What remains unproven
 

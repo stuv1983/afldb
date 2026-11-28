@@ -292,8 +292,8 @@ The qualifying backup is the 02:20 run of the gate date. Complete these before i
   `sudo -u postgres` steps, every root step of this runbook and of the plan) must use the same path. Until then MED-2 and MED-3
   stay OPEN;
 * from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
-  **r8:** the revision becomes `<R8-PIN:tested-rev>`, and the digests below become `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682`,
-  `3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd` and `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`.
+  **r8:** the revision becomes `<R8-PIN:tested-rev>`, and the digests below become `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`,
+  `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.
   * The archive is made in the owner's **workstation** clone and hashed there, carried over the admin path, and re-verified in the
     admin root session against the workstation value.
   * Never copy bytes from arm's checkout, never run git as root in it, and never read an expected digest from a file on production.
@@ -331,7 +331,7 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * The off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged).
 4. **Workstation.** `V7` is a fresh `git archive` export of
    `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at `7d69302007568d3141a567c8eba89e4ee473c9a6`.
-   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…` (r8: `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e` at
+   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…` (r8: `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` at
      `<R8-PIN:tested-rev>`, in the owner's own clone).
    * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
      `streamanator` (role offhost).

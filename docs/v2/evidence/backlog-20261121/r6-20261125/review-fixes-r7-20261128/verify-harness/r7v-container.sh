@@ -248,7 +248,7 @@ r8snap() {
 # r8 scenario i (FIXTURE-ATTACK): staging copies of verify/ whose bundle/lib.sh carries an appended hostile line. If install-verify.sh
 # ever sources it (as root), it creates /root/r8-libsh-ran-<case> and redefines trusted_path to pass everything. r8's install-verify.sh
 # checks the staging and lib.sh's digest BEFORE sourcing it, so no marker may appear; r7's (sent as r8-contrast/install-verify-r7.sh,
-# the HEAD blob) sourced lib.sh first: the CONTRAST case shows the marker appearing. Each case: "R8 LIBSH <case> exit=<rc>
+# the blob at the pinned r7 revision 7e2ef51a) sourced lib.sh first: the CONTRAST case shows the marker appearing. Each case: "R8 LIBSH <case> exit=<rc>
 # marker=<absent|present> <first STOP line>"; then the state digest before and after.
 r8_libsh() {
   local s0 c d rc o
@@ -268,7 +268,7 @@ r8_libsh() {
     esac
     if [ "$c" = contrast-r7-home-arm ]; then
       cp "$FIX/r8-contrast/install-verify-r7.sh" "$d/install-verify.sh"; chown arm:arm "$d/install-verify.sh"
-      L HARNESS "CONTRAST: the r7 install-verify.sh (HEAD blob $(sha256sum < "$d/install-verify.sh" | cut -c1-16)...) in $d"
+      L HARNESS "CONTRAST: the r7 install-verify.sh (r7 7e2ef51a blob $(sha256sum < "$d/install-verify.sh" | cut -c1-16)...) in $d"
     fi
     rm -f "/root/r8-libsh-ran-$c"
     o=$(cd / && bash "$d/install-verify.sh" --role prod --key "$d/afldb_verify.pub" < /dev/null 2>&1); rc=$?

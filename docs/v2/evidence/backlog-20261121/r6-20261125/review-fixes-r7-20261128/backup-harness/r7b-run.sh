@@ -39,12 +39,18 @@ STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
     echo "   (no --verify-rev: worktree bytes, not a committed revision)"
   fi
 } > "$STAGE/presend.txt"
+# r8 (R8-F-7): CONTRAST blob for scenario extra-dropin, the r7 gate library exactly as committed at 7e2ef51a (sha256 1153df78...).
+CREV=7e2ef51a; CBLOB=$R7/backup/sealed-origin.sh
+mkdir -p "$STAGE/r8-contrast"
+git -C "$WT" show "$CREV:$CBLOB" > "$STAGE/r8-contrast/sealed-origin-r7.sh" || { echo "STOP cannot read $CREV:$CBLOB"; exit 2; }
+echo "   CONTRAST $(sha256sum < "$STAGE/r8-contrast/sealed-origin-r7.sh" | cut -c1-64)  r8-contrast/sealed-origin-r7.sh (= $CREV:$CBLOB)" >> "$STAGE/presend.txt"
 cat "$STAGE/presend.txt"
 [ -z "$VREV" ] || grep -q '^   result: every sent file' "$STAGE/presend.txt" || { echo "STOP the worktree does not equal $VREV"; exit 2; }
 for f in "${SENT[@]}"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done
 WS=$("${SSH[@]}" 'mktemp -d -p "$HOME" r7b-ws.XXXXXX') || exit 1
 echo "workspace $WS"
-tar -C "$WT" -cf - "${SENT[@]}" | "${SSH[@]}" "mkdir -m 700 '$WS/fix' && tar -C '$WS/fix' -xf - && find '$WS/fix' -type f | wc -l"
+{ tar -C "$WT" -cf - "${SENT[@]}"; } > "$STAGE/send.tar" && tar -C "$STAGE" -rf "$STAGE/send.tar" r8-contrast/sealed-origin-r7.sh || { echo "STOP cannot build the transport tar"; exit 2; }
+"${SSH[@]}" "mkdir -m 700 '$WS/fix' && tar -C '$WS/fix' -xf - && find '$WS/fix' -type f | wc -l" < "$STAGE/send.tar"
 "${SSH[@]}" "cat > '$WS/presend.txt'" < "$STAGE/presend.txt"
 "${SSH[@]}" "bash '$WS/fix/$R7/backup-harness/r7b-host.sh' '$WS' '$RID' ${HOSTOPT[*]} $*"; RC=$?
 case $LOGDIR in "") LD=$WT/$R7/backup-harness/logs;; /*) LD=$LOGDIR;; *) LD=$WT/$LOGDIR;; esac

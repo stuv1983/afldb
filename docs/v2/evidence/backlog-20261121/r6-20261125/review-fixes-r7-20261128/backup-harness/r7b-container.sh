@@ -27,6 +27,12 @@
 #                         arm's sudo (su arm, then sudo; with SUDO_* removed; with arm's shell replaced by exec sudo) is REFUSED
 #                         ("REFUSED: root session descends from arm: <test>") and changes nothing; then the owner install (root, not
 #                         through arm) and verify-backup-install.sh --as-arm; the scenario ends there (no timer run)
+#                         extra-dropin (r8, independent review R8-F-7): a genuine run, attributed; then [FIXTURE: a root act]
+#                         root adds one extra afldb-backup.service drop-in at a time (Environment=BASH_ENV=..., BindReadOnlyPaths=...,
+#                         and a BindPaths= drop-in sorting BEFORE 70-) and, separately, a manager BASH_ENV (systemctl
+#                         set-environment): sealed_origin must refuse each, naming the drop-in (or BASH_ENV); with all removed it
+#                         attributes the same run again; CONTRAST: the r7 library (1153df78, from 7e2ef51a) attributes the run with
+#                         the Environment= drop-in in place
 # r8, every scenario: arm's checks are verify-backup-install.sh --as-arm, run by root (setpriv to arm, no login): acceptance
 # evidence; the old run in an arm session (env -i) is kept as INFO only.
 # The last line printed is "SCENARIO <name> PASS|FAIL ...".
@@ -65,6 +71,7 @@ dump_waiting() { # seconds count: at least <count> pg_dump backends wait on the 
 EXPECT=refused; KIND=scheduled; TIMER=early; LOCK=0; HOLD=0; RET=0; REFUSAL=; ARMSUITE=0; RD=0; ARMSUDO=0
 case $SC in
   arm-sudo)         EXPECT=none; ARMSUDO=1;;
+  extra-dropin)     EXPECT=attributed;;
   genuine-rd)       EXPECT=attributed; RD=1;;
   rearm-in-rd)      EXPECT=attributed; KIND=catch-up; TIMER=at-td; RD=1;;
   post-pub-fail)    REFUSAL='has no valid completion record';;
@@ -398,7 +405,7 @@ echo "staging (root): $(ls -la $STGD | tail -n +2 | awk '{ print $1, $3":"$4, $9
 # ------------------------------------------------------------------------------------------------------------------ the gate rule
 hdr "sealed_origin $DAY, run by r7reader (not arm, not root; groups $(id -Gn r7reader | tr ' ' ',')) from the INSTALLED library [REAL]"
 cat > $PROBE.so.sh <<'EOF'
-. /usr/local/lib/afldb-backup/sealed-origin.sh
+. "${2:-/usr/local/lib/afldb-backup/sealed-origin.sh}"
 sealed_origin "$1" > /tmp/r7b-so.out; rc=$?
 while IFS= read -r l; do printf 'SODIAG %s\n' "$l"; done < /tmp/r7b-so.out
 printf 'SO rc=%s\n' "$rc"
@@ -483,7 +490,42 @@ else
         || hfail "seal-interrupted: Result=$RES published=$(ls -A $PUB | tr '\n' ' ')";;
   esac
 fi
+if [ "$SC" = extra-dropin ]; then
+  hdr "r8 (R8-F-7): an extra afldb-backup.service drop-in or manager environment, added by root after the genuine run [FIXTURE: root's act]"
+  S_OK=$(sov SO_SHA); I_OK=$(sov SO_INVOCATION); XN=0
+  so_again() { # label [library]: the same probe, as r7reader
+    (cd / && as_reader /usr/bin/bash --noprofile --norc $PROBE.so.sh "$DAY" ${2:-}) > $OUT/so-$1.out 2>&1
+    XRC=$(sed -n 's/^SO rc=//p' $OUT/so-$1.out); XR=$(sed -n 's/^SO SO_REASON=//p' $OUT/so-$1.out | head -1); XS=$(sed -n 's/^SO SO_SHA=//p' $OUT/so-$1.out | head -1)
+    L REAL "sealed_origin [$1]: rc=$XRC $( [ "$XRC" = 0 ] && echo "attributed sha256=$XS" || echo "reason=${XR:0:400}")"; }
+  x_case() { # label file property content
+    printf '%s\n' "$4" > $DID/$2; chmod 644 $DID/$2; systemctl daemon-reload
+    L FIXTURE "root wrote $DID/$2 ($(tr '\n' ' ' < $DID/$2)) and ran daemon-reload; PID 1 now: DropInPaths=$(svc DropInPaths) $3=$(svc $3)"
+    so_again "$1"
+    [ "$XRC" != 0 ] && [[ $XR == *"$DID/$2"* ]] && { hok "$1: refused, the reason names $DID/$2"; XN=$((XN + 1)); } || hfail "$1: rc=$XRC, reason '${XR:0:200}' does not name $DID/$2"
+    if [ "$1" = env ] && [ -f /in/fix/r8-contrast/sealed-origin-r7.sh ]; then
+      install -o root -g root -m 0644 /in/fix/r8-contrast/sealed-origin-r7.sh /opt/r7b-contrast-so.sh
+      L HARNESS "CONTRAST library /opt/r7b-contrast-so.sh sha256 $(sha /opt/r7b-contrast-so.sh) (the r7 sealed-origin.sh at 7e2ef51a)"
+      so_again contrast-r7-env /opt/r7b-contrast-so.sh
+      [ "$XRC" = 0 ] && [ "$XS" = "$S_OK" ] && { hok "CONTRAST: the r7 library ATTRIBUTES the run with $DID/$2 in place (the gap R8-F-7 names)"; CX=attributed; } || { hfail "CONTRAST: the r7 library did not attribute (rc=$XRC ${XR:0:160})"; CX=?; }
+    fi
+    rm -f $DID/$2; systemctl daemon-reload
+  }
+  x_case env 80-r8-env.conf Environment $'[Service]\nEnvironment=BASH_ENV=/var/lib/afldb-backup/staging/r8-bash-env'
+  x_case bind 80-r8-bind.conf BindReadOnlyPaths $'[Service]\nBindReadOnlyPaths=/usr/share/zoneinfo:/var/lib/afldb-backup/staging/r8-bind'
+  x_case early-bind 10-r8-early.conf BindPaths $'[Service]\nBindPaths=/tmp:/var/lib/afldb-backup/staging/r8-bind2'
+  systemctl set-environment BASH_ENV=/var/lib/afldb-backup/staging/r8-bash-env
+  L FIXTURE "root ran systemctl set-environment BASH_ENV=/var/lib/afldb-backup/staging/r8-bash-env: show-environment has $(systemctl show-environment | grep -c '^BASH_ENV=') BASH_ENV line"
+  so_again manager-env
+  [ "$XRC" != 0 ] && [[ $XR == *"sets BASH_ENV"* ]] && { hok "manager-env: refused, the reason names BASH_ENV"; XN=$((XN + 1)); } || hfail "manager-env: rc=$XRC, reason '${XR:0:200}'"
+  systemctl unset-environment BASH_ENV
+  L FIXTURE "root ran systemctl unset-environment BASH_ENV; DropInPaths=$(svc DropInPaths); show-environment: $(systemctl show-environment | cut -d= -f1 | tr '\n' ' ')"
+  so_again restored
+  [ "$XRC" = 0 ] && [ "$XS" = "$S_OK" ] && [ "$(sed -n 's/^SO SO_INVOCATION=//p' $OUT/so-restored.out)" = "$I_OK" ] \
+    && hok "restored: every extra removed, attributed again (invocation $I_OK, sha256 $S_OK)" || hfail "restored: rc=$XRC ${XR:0:200}"
+  XLINE="extra afldb-backup.service drop-ins and a manager BASH_ENV refused by name ($XN/4: Environment=, BindReadOnlyPaths=, BindPaths= sorting before 70-, set-environment BASH_ENV); removed: attributed again; CONTRAST r7 library with the Environment= drop-in: ${CX:-not run}"
+fi
 if [ ${#FAILS[@]} = 0 ]; then
+  [ "$SC" = extra-dropin ] && { echo "SCENARIO $SC PASS $XLINE; inv=$I_OK sha256=$S_OK"; exit 0; }
   echo "SCENARIO $SC PASS expect=$EXPECT so_rc=$SORC $( [ "$SORC" = 0 ] && echo "inv=$(sov SO_INVOCATION) dump=$(sov SO_DUMP) sha256=$(sov SO_SHA) dispatch=$(sov SO_DISPATCH_KIND) delay=$(sov SO_DISPATCH_DELAY_S)s" || echo "reason=${SOR:0:240}")"
   exit 0
 fi

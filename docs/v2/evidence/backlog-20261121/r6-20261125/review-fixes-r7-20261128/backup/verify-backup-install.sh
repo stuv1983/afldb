@@ -25,7 +25,7 @@ if [ "$MODE" = as-arm ]; then
 fi
 cd / || exit 90
 LIB=/usr/local/lib/afldb-backup/sealed-origin.sh
-LIB_SHA=1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4
+LIB_SHA=a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e
 CODE=/usr/local/lib/afldb-backup; DR=/var/lib/afldb-backup; DID=/etc/systemd/system/afldb-backup.service.d
 DSN='postgresql://afldb_backup@/afldb_prod?host=/var/run/postgresql'
 F=0
@@ -74,8 +74,10 @@ if [ "$h" != "$LIB_SHA" ]; then
 fi
 # shellcheck source=/dev/null
 . $LIB
-if sealed_origin_install; then ok "sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit"
-else bad "sealed_origin_install: $SO_REASON"; fi
+if sealed_origin_install; then ok "sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in, base unit = deploy/afldb-backup.service), effective unit (exactly the drop-in, no environment or bind settings)"
+else bad "sealed_origin_install: $SO_REASON"
+  [[ $SO_REASON == *"FragmentPath"* ]] && info "the installed base unit differs from the repository's deploy/afldb-backup.service: every gate STOPs (fail closed) until it is replaced with that file and systemctl daemon-reload is run (README.md section 4 item 13)"
+fi
 (cd $CODE && sha256sum --strict --quiet -c SHA256SUMS > /dev/null 2>&1) && ok "$CODE/SHA256SUMS matches the installed files" || bad "$CODE/SHA256SUMS does not match"
 [ ! -e $DID/60-afldb-backup-attest.conf ] && ok "the r6 attest drop-in is absent" || bad "the r6 attest drop-in $DID/60-afldb-backup-attest.conf is present"
 

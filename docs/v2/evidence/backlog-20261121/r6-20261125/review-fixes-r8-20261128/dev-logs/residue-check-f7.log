@@ -1,0 +1,6 @@
+[HARNESS] r8 agent B residue check after backup-f7 2026-11-28T04:45:02Z on DEV 10.0.40.100 (read-only docker/ls as arm)
+identity: arm uid=1000
+containers labelled r7b.run/r7v.run: 0/0
+images labelled r7b.run/r7v.run: 0/0
+images named r7b-/r7v-: 0
+workspaces ~/r7*-ws.*: 0

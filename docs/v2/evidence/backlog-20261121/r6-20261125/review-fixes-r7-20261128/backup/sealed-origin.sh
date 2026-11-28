@@ -24,12 +24,21 @@
 #     /var/lib/afldb-backup and seals/ (root:root 0755), published/ and state/ (root:afldb-backup-read 0750), staging/
 #     (afldb-backup:afldb-backup 0700 under a trusted parent), the seal (root:root 0644, one link), the published dump and its
 #     sidecar (root:afldb-backup-read 0440, one link).
-#  2. Pinned digests (constants below): afldb-backup-run, afldb-backup-seal, the installed backup.sh, the drop-in.
+#  2. Pinned digests (constants below): afldb-backup-run, afldb-backup-seal, the installed backup.sh, the drop-in; r8: the
+#     service's FragmentPath (= deploy/afldb-backup.service).
 #  3. Effective unit (PID 1's view): User=afldb-backup, Group=afldb-backup, no SupplementaryGroups, no EnvironmentFiles, exactly one
 #     ExecStart = the run's argv with no flags, exactly one ExecStartPost = the sealer's argv with flags exactly "privileged" (no
 #     ignore-failure), NO ExecCondition, ExecStartPre, ExecStop, ExecStopPost or ExecReload command (review round 1, INFO),
 #     ProtectHome=yes, ReadWritePaths exactly the staging directory, NoNewPrivileges=yes, DropInPaths has the drop-in; and no .env in
 #     the code directory (backup.sh would source /usr/local/lib/afldb-backup/.env; review round 1, INFO).
+#     r8 (R8-F-7): DropInPaths is EXACTLY the drop-in (any other drop-in is refused by name); Environment, PassEnvironment,
+#     UnsetEnvironment and every bind/mount/path setting systemctl show exposes (BindPaths, BindReadOnlyPaths, TemporaryFileSystem,
+#     ReadOnlyPaths, InaccessiblePaths, ExecPaths, NoExecPaths, RootDirectory, RootImage, MountImages, ExtensionImages,
+#     ExtensionDirectories) are empty; ProtectSystem=strict, PrivateTmp=yes, WorkingDirectory=/; the service manager's environment
+#     block sets no shell- or loader-affecting variable (BASH_ENV, ENV, SHELLOPTS, BASHOPTS, PS4, BASH_FUNC_*, LD_*, ...); and
+#     (rule 2) the FragmentPath file is byte-identical to the repository's deploy/afldb-backup.service. The TIMER is deliberately
+#     not pinned: its fragment and drop-ins are trusted paths (rule 1) but only move the dispatch, which rule 4 checks against the
+#     window and from which it recomputes the dispatch kind (R8 DEPENDENCIES.md row C20).
 #  4. The seal: among every seal, exactly ONE whose start job was created by afldb-backup.timer with its dispatch in the gate date's
 #     02:20:00-02:31:00 Australia/Melbourne window (as the gates compute it: TZ=Australia/Melbourne date -d "<date> 02:20" +%s, and
 #     02:31, whole seconds inclusive); no other seal names the same dispatch; no other seal was written from the window start to the
@@ -106,6 +115,7 @@ sealed_origin_install() {
   local BKSH=/usr/local/lib/afldb-backup/tools/maintenance/backup.sh DI=/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf
   local RUN_SHA=2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085 SEAL_SHA=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5
   local BKSH_SHA=df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be DI_SHA=f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb
+  local FRAG_SHA=edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8   # r8: deploy/afldb-backup.service
   local XS='/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run'
   local XP='/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-seal'
   local DR=/var/lib/afldb-backup out l p h re k v frag= drop= tfrag= tdrop= ef=0 nx=0 np=0 ex= ep= hit; local -a ps tps fs; local -A U
@@ -113,7 +123,10 @@ sealed_origin_install() {
   # rule 3: the unit as PID 1 has it loaded
   out=$(LC_ALL=C /usr/bin/systemctl show afldb-backup.service -p FragmentPath -p DropInPaths -p EnvironmentFiles -p ExecStartEx -p ExecStartPostEx \
     -p User -p Group -p SupplementaryGroups -p ProtectHome -p ReadWritePaths -p NoNewPrivileges -p ExecConditionEx -p ExecStartPreEx \
-    -p ExecStopEx -p ExecStopPostEx -p ExecReloadEx 2>/dev/null) \
+    -p ExecStopEx -p ExecStopPostEx -p ExecReloadEx \
+    -p Environment -p PassEnvironment -p UnsetEnvironment -p BindPaths -p BindReadOnlyPaths -p TemporaryFileSystem -p ReadOnlyPaths \
+    -p InaccessiblePaths -p ExecPaths -p NoExecPaths -p RootDirectory -p RootImage -p MountImages -p ExtensionImages \
+    -p ExtensionDirectories -p ProtectSystem -p PrivateTmp -p WorkingDirectory 2>/dev/null) \
     || { SO_REASON="systemctl show afldb-backup.service failed"; return 1; }
   while IFS= read -r l; do
     k=${l%%=*}; v=${l#*=}
@@ -123,12 +136,33 @@ sealed_origin_install() {
       ExecStartPostEx) [ -z "$v" ] || { np=$((np + 1)); ep=$v; };;
       ExecConditionEx|ExecStartPreEx|ExecStopEx|ExecStopPostEx|ExecReloadEx)
         [ -z "$v" ] || { SO_REASON="afldb-backup.service has a $k command (only ExecStart and the sealer's ExecStartPost are allowed)"; return 1; };;
-      FragmentPath|DropInPaths|User|Group|SupplementaryGroups|ProtectHome|ReadWritePaths|NoNewPrivileges)
+      FragmentPath|DropInPaths|User|Group|SupplementaryGroups|ProtectHome|ReadWritePaths|NoNewPrivileges|Environment|PassEnvironment|UnsetEnvironment|BindPaths|BindReadOnlyPaths|TemporaryFileSystem|ReadOnlyPaths|InaccessiblePaths|ExecPaths|NoExecPaths|RootDirectory|RootImage|MountImages|ExtensionImages|ExtensionDirectories|ProtectSystem|PrivateTmp|WorkingDirectory)
         [ -z "${U[$k]+x}" ] || { SO_REASON="systemctl show afldb-backup.service printed $k twice"; return 1; }; U[$k]=$v;;
       *) SO_REASON="unexpected line from systemctl show afldb-backup.service"; return 1;;
     esac
   done <<< "$out"
   frag=${U[FragmentPath]:-}; drop=${U[DropInPaths]:-}
+  # r8 (R8-F-7): the unit is exactly the pinned base fragment plus the pinned drop-in. A further drop-in anywhere systemd reads one
+  # (/etc, /run, /run/systemd/system.control from set-property, /usr/lib, a unit-type directory such as service.d) is refused by
+  # name, before anything else it might set is read. Then, as defence in depth, what PID 1 reports for the environment and the
+  # mount namespace must be exactly what the drop-in sets (systemd 255 omits some empty list properties: absent counts as empty).
+  [ "$drop" = "$DI" ] || { SO_REASON="afldb-backup.service DropInPaths is '${drop//[^A-Za-z0-9\/._@+ -]/?}', not exactly $DI: an extra drop-in changes the unit outside the pinned files"; SO_REASON=${SO_REASON:0:400}; return 1; }
+  for k in Environment PassEnvironment UnsetEnvironment BindPaths BindReadOnlyPaths TemporaryFileSystem ReadOnlyPaths InaccessiblePaths \
+      ExecPaths NoExecPaths RootDirectory RootImage MountImages ExtensionImages ExtensionDirectories; do
+    v=${U[$k]:-}; [ -z "$v" ] || { SO_REASON="afldb-backup.service has $k=${v//[^A-Za-z0-9\/._@:=+ -]/?} (the drop-in leaves it empty)"; SO_REASON=${SO_REASON:0:300}; return 1; }
+  done
+  [ "${U[ProtectSystem]:-}|${U[PrivateTmp]:-}|${U[WorkingDirectory]:-}" = "strict|yes|/" ] \
+    || { SO_REASON="afldb-backup.service has ProtectSystem=${U[ProtectSystem]:-} PrivateTmp=${U[PrivateTmp]:-} WorkingDirectory=${U[WorkingDirectory]:-}, not strict, yes and / (the drop-in's)"; return 1; }
+  # r8: the service manager's own environment block (systemctl set-environment, DefaultEnvironment=) reaches every unit's ExecStart,
+  # whose bash (not env -i) would honour a variable that runs code or changes the shell before afldb-backup-run's first line.
+  out=$(LC_ALL=C /usr/bin/systemctl show-environment 2>/dev/null) || { SO_REASON="systemctl show-environment failed"; return 1; }
+  while IFS= read -r l; do
+    k=${l%%=*}
+    case $k in
+      BASH_ENV|ENV|SHELLOPTS|BASHOPTS|PS4|BASH_XTRACEFD|GLOBIGNORE|CDPATH|IFS|POSIXLY_CORRECT|TMPDIR|GCONV_PATH|LOCPATH|NLSPATH|HOSTALIASES|BASH_FUNC_*|LD_*)
+        SO_REASON="the service manager's environment sets ${k//[^A-Za-z0-9_%]/?} (systemctl set-environment or DefaultEnvironment=): every unit's ExecStart inherits it"; return 1;;
+    esac
+  done <<< "$out"
   [ "$ef" = 0 ] || { SO_REASON="afldb-backup.service has $ef EnvironmentFile= entries"; return 1; }
   [ "${U[User]:-}/${U[Group]:-}" = afldb-backup/afldb-backup ] || { SO_REASON="afldb-backup.service runs as User=${U[User]:-} Group=${U[Group]:-}, not afldb-backup/afldb-backup (is the drop-in installed?)"; return 1; }
   [ -z "${U[SupplementaryGroups]:-}" ] || { SO_REASON="afldb-backup.service has SupplementaryGroups=${U[SupplementaryGroups]}"; return 1; }
@@ -168,6 +202,10 @@ sealed_origin_install() {
     h=$(/usr/bin/sha256sum < "${p%%:*}" 2>/dev/null); [ "${h%% *}" = "${p##*:}" ] \
       || { SO_REASON="${p%%:*} has sha256 ${h:0:16}..., not the pinned ${p##*:}"; SO_REASON=${SO_REASON:0:220}...; return 1; }
   done
+  # r8 (R8-F-7): the base unit PID 1 loaded (FragmentPath, a trusted path by rule 1) is byte-identical to the repository's
+  # deploy/afldb-backup.service. A production copy that differs is a fail-closed STOP (verify-backup-install.sh reports it at install).
+  h=$(/usr/bin/sha256sum < "$frag" 2>/dev/null); [ "${h%% *}" = "$FRAG_SHA" ] \
+    || { SO_REASON="$frag (afldb-backup.service's FragmentPath) has sha256 ${h:0:16}..., not the pinned $FRAG_SHA of the repository's deploy/afldb-backup.service"; return 1; }
   return 0
 }
 

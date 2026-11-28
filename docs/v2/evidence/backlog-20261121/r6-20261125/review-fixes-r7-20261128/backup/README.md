@@ -26,13 +26,13 @@ descends from arm (section 4 item 10), and arm's checks of the install run throu
 | `afldb-backup-run` | `/usr/local/lib/afldb-backup/afldb-backup-run` 0755 (ExecStart, as afldb-backup) | `2c62ff91…` |
 | `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `793e94be…` |
 | `70-afldb-backup-sealed.conf` | `/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf` 0644 | `f8a18580…` |
-| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `1153df78…` |
+| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `a733e67b…` (r7: `1153df78…`) |
 | `install-backup.sh` | not installed (owner runs it from the staging directory; r8: refuses a root session descending from arm) | `21c33fa4…` (r7: `f433b81a…`) |
-| `verify-backup-install.sh` | not installed (read-only check, run as root, then as root with `--as-arm`) | `f1dcc7db…` (r7: `f286ea7b…`) |
+| `verify-backup-install.sh` | not installed (read-only check, run as root, then as root with `--as-arm`) | `66b5be10…` (r7: `f286ea7b…`) |
 | repository `tools/maintenance/backup.sh` (staged as `backup.sh`) | `/usr/local/lib/afldb-backup/tools/maintenance/backup.sh` 0755, byte-identical | `df609046…` |
-| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `d1c11c25…` (r7: `d0023d10…`) |
+| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `e3a68821…` (r7: `d0023d10…`) |
 
-Full digests: `SHA256SUMS`. `sealed-origin.sh` pins the run, the sealer, `backup.sh` and the drop-in; `verify-backup-install.sh` pins
+Full digests: `SHA256SUMS`. `sealed-origin.sh` pins the run, the sealer, `backup.sh`, the drop-in and (r8) the base unit `deploy/afldb-backup.service` (`edf00291…`); `verify-backup-install.sh` pins
 `sealed-origin.sh`. If any of those bytes change, re-pin in that order (library, then verify script, then `SHA256SUMS`).
 
 ## 3. `sealed_origin` interface (as built; DESIGN 3.5)
@@ -72,7 +72,7 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
 6. **Failure marker.** No new root marker: a failure is PID 1's `Result=` of the unit (root fact) plus the unchanged `OnFailure=`
    unit's `FAILED-unit` marker in arm's `.state` (arm-writable, informational, as before). `state/last-backup.json` is written only on success.
 7. **`sealed-origin.sh` is also installed** in `/usr/local/lib/afldb-backup` (the install's self-check and `verify-backup-install.sh`
-   source it); the verifier may source its own copy, which must be byte-identical (`1153df78…`).
+   source it); the verifier may source its own copy, which must be byte-identical (`a733e67b…`; r7 `1153df78…`).
 8. **`scheduled-backup.sh`:** one explicit opt-in, `AFLDB_BACKUP_SEALED_STATE_DIR=<absolute path>` (status mode only, no default): the
    "backup" check and the off-host-failed check read `<dir>/last-backup.json`; verification, markers and every other mode are unchanged.
    This changes the checkout bytes (`234fca6a…` -> `7e2b470a…`); a probe that needs the nightly's freshness from arm's checkout needs a
@@ -93,6 +93,21 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
     file's sha256 and the bytes' sha256 are both printed. A run in an arm session ends `BACKUP INSTALL RESULT INFO-ONLY ...` (arm's
     login chooses that process). r8 also fixed r7's `seals: bad array subscript` message when no seal exists yet (INFO line only).
 12. **Harness image (r8)** adds `sudo`, used only inside the `arm-sudo` scenario's container.
+13. **r8 after the independent review (R8-F-7): the service unit is pinned whole.** r7's `sealed_origin_install` trusted the base
+    `afldb-backup.service` and any further drop-in by root ownership only, and did not read `Environment=`, the bind/mount settings or
+    the exact `DropInPaths` set; the ExecStart bash (not `env -i`) would honour, for example, `BASH_ENV` from a later drop-in before
+    `afldb-backup-run`'s first line. Now (rule 3) `DropInPaths` must be **exactly** `70-afldb-backup-sealed.conf` (any other drop-in,
+    in `/etc`, `/run`, `/run/systemd/system.control` from `set-property`, or a sorting-earlier name, is refused by name);
+    `Environment`, `PassEnvironment`, `UnsetEnvironment` and every bind/mount/path setting `systemctl show` exposes must be empty;
+    `ProtectSystem=strict`, `PrivateTmp=yes`, `WorkingDirectory=/`; the service manager's environment block (`systemctl
+    set-environment`, `DefaultEnvironment=`) must set no shell- or loader-affecting variable (`BASH_ENV`, `ENV`, `SHELLOPTS`,
+    `BASHOPTS`, `PS4`, `BASH_FUNC_*`, `LD_*`, ...); and (rule 2) the FragmentPath file must be byte-identical to the repository's
+    `deploy/afldb-backup.service` (`edf00291…`). **A production copy of the base unit that differs from that blob is a fail-closed
+    STOP**: `verify-backup-install.sh` (and the installer's own self-check) reports it at install, and every gate STOPs until the file is
+    replaced with the repository's and `systemctl daemon-reload` is run. The **timer** is deliberately not pinned and its drop-ins are
+    not required to be an exact set (the harness's `RandomizedDelaySec=0` fixture drop-in; r7's reasoning stands): its settings only
+    move the dispatch, which rule 4 checks against the 02:20-02:31 window and from which it recomputes the dispatch kind (R8
+    `DEPENDENCIES.md` rows C20, C21). Harness scenario `extra-dropin` exercises this.
 
 ## 5. Installation (owner; can be done BEFORE the qualifying backup; the production checkout is never written)
 
@@ -118,7 +133,7 @@ proof.
      3.1–3.2).
    * Never copy from arm's checkout `/home/arm/projects/afldb`, never run git as root there, and never read the expected digest from
      a file on production.
-   * The pin becomes `d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682`, since r8 changes `install-backup.sh` and `verify-backup-install.sh`.
+   * The pin becomes `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`, since r8 changes `install-backup.sh` and `verify-backup-install.sh`.
 2. `bash /root/afldb-r7-backup/install-backup.sh /root/afldb-r7-backup` as root in the admin root session. It refuses a session that
    descends from arm (r8, above), staging under `/home`, group/other-writable
    staging, any mismatch with `SHA256SUMS`, a library/bundle pin mismatch, a missing helper, an unloaded or untrusted base unit, the r6
@@ -205,6 +220,15 @@ and role grant; owner pg edit applied by the harness; the two HOLDS (a root psql
   (a start by hand after the timer's run) STOP as ambiguous.
 * Disk: the published copy and the staging copy coexist during sealing (2x one dump).
 * r8: the installer guard (section 4 item 10) is a tripwire, not a proof of an independent root path; the `loginuid` test is not
-  exercised by the harness (a container cannot set loginuid without `CAP_AUDIT_CONTROL`). Under `--as-arm`, another arm process can
-  write text into the arm child's output pipe (same uid); it appears only as `[as arm]` data and cannot change the exit status that
-  decides the result.
+  exercised by the harness (a container cannot set loginuid without `CAP_AUDIT_CONTROL`).
+* r8 (corrected after the independent review, R8-F-12): `--as-arm` removes arm's **files and startup code** (login, profile, rc
+  files, a chosen shell) from the arm probe, not a **concurrently hostile arm process**. The probe runs as uid arm, so any other arm
+  process can (a) write text into its output pipe (shown only as `[as arm]` data), (b) signal it (`SIGSTOP`, `SIGKILL`): that forces a
+  failure or a hang, never a PASS, and (c) only where `kernel.yama.ptrace_scope=0` (Ubuntu's default is 1, which confines ptrace to
+  descendants, and the probe is not arm's descendant), ptrace it and change what its checks see or its exit status, i.e. forge the
+  arm-side PASS. What still holds independently of the arm probe: root's own run of `verify-backup-install.sh` (ownership, modes, link
+  counts and trusted paths of the code, the unit files, `seals/`, `published/`, `state/` and staging; the pinned digests;
+  `sealed_origin_install`; arm's group list from root's `id arm`), which decides arm's access by DAC from root's view, and every gate,
+  because `sealed_origin` never reads the arm probe. The arm probe adds evidence for effective access (an ACL, a capability, a group
+  membership root's mode check would miss); a forged arm PASS removes that addition, not the root checks. The owner should read
+  `kernel.yama.ptrace_scope` before relying on the arm half.

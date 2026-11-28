@@ -9,11 +9,13 @@
 # Usage: bash r8p-run.sh [--verify-rev <rev>] <RID>
 #   --verify-rev REV  the stage tar is `git archive REV` of the bundle paths (plus the workstation's verify public key), and every
 #                     harness file sent equals its blob at REV; otherwise the worktree bytes are used (development evidence only).
+#   --bundles-rev REV (development only, without --verify-rev) the R7 backup/verify bundles and tools/maintenance/backup.sh come
+#                     from `git archive REV` and the owner checks from the worktree; for a run while another agent edits R7.
 # Scenarios print `SCENARIO <name> PASS|FAIL|PENDING expect=... got=...`; the run ends `R8 PROCEDURE HARNESS RESULT PASS|FAIL`.
 # A PENDING scenario (an interface agent B owns that is not in the bytes under test) makes the result FAIL, never PASS.
 set -uo pipefail; export LC_ALL=C
-VREV=
-while :; do case ${1:-} in --verify-rev) VREV=${2:?rev}; shift 2;; *) break;; esac; done
+VREV=; BREV=
+while :; do case ${1:-} in --verify-rev) VREV=${2:?rev}; shift 2;; --bundles-rev) BREV=${2:?rev}; shift 2;; *) break;; esac; done
 RID=${1:?rid}; [[ $RID =~ ^[A-Za-z0-9-]{1,24}$ ]] || { echo "STOP bad RID"; exit 2; }
 WT=/d/dev/afldb-closeout-20261127
 R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128
@@ -53,9 +55,17 @@ if [ -n "$VREV" ]; then
   BYTES="git archive $REV"
 else
   for f in "${SENT[@]}"; do log "   WORKTREE $(sha256sum < "$WT/$f" | cut -c1-64)  $f"; done
-  tar -C "$WT" -cf "$KD/stage.tar" "${STAGE_PATHS[@]}" || { echo "STOP tar"; exit 2; }
-  log "[TRANSPORT] no --verify-rev: the stage tar holds WORKTREE bytes of ${STAGE_PATHS[*]} (development evidence, not a committed revision)"
-  BYTES="worktree"
+  if [ -n "$BREV" ]; then
+    BR=$(git -C "$WT" rev-parse --verify "$BREV^{commit}") || { echo "STOP unknown revision $BREV"; exit 2; }
+    git -C "$WT" archive --format=tar --output="$KDM/stage.tar" "$BR" "$R7/backup" "$R7/verify" tools/maintenance/backup.sh || { echo "STOP git archive"; exit 2; }
+    tar -C "$WT" -rf "$KD/stage.tar" "$R8/owner-checks" || { echo "STOP tar"; exit 2; }
+    log "[TRANSPORT] --bundles-rev: the R7 bundles and backup.sh are git archive $BR; the owner checks are WORKTREE bytes (development evidence, not a committed revision)"
+    BYTES="bundles $BR + worktree owner checks"
+  else
+    tar -C "$WT" -cf "$KD/stage.tar" "${STAGE_PATHS[@]}" || { echo "STOP tar"; exit 2; }
+    log "[TRANSPORT] no --verify-rev: the stage tar holds WORKTREE bytes of ${STAGE_PATHS[*]} (development evidence, not a committed revision)"
+    BYTES="worktree"
+  fi
 fi
 # the bundle digests as the WORKSTATION computes them from the bytes it sends (the procedure's <R8-PIN:...> values)
 BSUMS=$(tar -xOf "$KD/stage.tar" "$R7/backup/SHA256SUMS" | sha256sum | cut -c1-64)
@@ -75,6 +85,8 @@ AFP=$(fpw admin); VFP=$(fpw verify)
 mkdir -p "$KD/stagekeys/keys"; cp "$KD/verify.pub.lf" "$KD/stagekeys/keys/afldb_verify.pub"
 tar -C "$KD/stagekeys" -rf "$KD/stage.tar" keys/afldb_verify.pub || { echo "STOP append key"; exit 2; }
 TAR_SHA=$(sha256sum < "$KD/stage.tar" | cut -c1-64)
+# the workstation wrapper is the one in the bytes under test (the same tar), never a separately edited worktree copy
+tar -xOf "$KD/stage.tar" "$R7/verify/afldb-verify-call.sh" > "$KD/afldb-verify-call.sh" || { echo "STOP wrapper"; exit 2; }
 mkdir -p "$KD/fix/keys" "$KD/fix/deploy"
 cp "$WT/$R8/procedure-harness/r8p-host.sh" "$WT/$R8/procedure-harness/r8p-container.sh" "$KD/fix/"
 for u in afldb-backup.service afldb-backup.timer afldb-backup-failed.service; do cp "$WT/deploy/$u" "$KD/fix/deploy/"; done
@@ -135,7 +147,9 @@ grep -q 'R8P PHASE0 root-console=yes' <<< "$O" && res console-phase0 PASS "expec
   || res console-phase0 FAIL "expect=root-console-session got=none"
 grep -q 'R8P PHASE1 REFUSED (swap)' <<< "$O" && grep -q 'R8P PUBKEY-SWAP exit 1' <<< "$O" && ! grep -q 'UNEXPECTED' <<< "$O" \
   && res pubkey-swap PASS "expect=refused got=refused (a key arm substituted for the carried .pub was not installed; nothing created)" || res pubkey-swap FAIL "expect=refused got=$(grep 'R8P PHASE1\|PUBKEY' <<< "$O" | tr '\n' ' ')"
-grep -q 'R8P PHASE1 DONE (real)' <<< "$O" && grep -q "authorized_keys afldb-admin:afldb-admin 600 $AFP" <<< "$O" \
+grep -q 'R8P PHASE1 REFUSED (optprefix)' <<< "$O" && grep -q 'R8P PUBKEY-OPTPREFIX exit 1' <<< "$O" && ! grep -q 'UNEXPECTED' <<< "$O" \
+  && res pubkey-optprefix PASS "expect=refused got=refused (the real key behind an options prefix, same fingerprint, was not installed)" || res pubkey-optprefix FAIL "expect=refused got=$(grep 'R8P PHASE1\|OPTPREFIX' <<< "$O" | tr '\n' ' ')"
+grep -q 'R8P PHASE1 DONE (real)' <<< "$O" && grep -q "authorized_keys afldb-admin:afldb-admin 600 $AFP (1 line)" <<< "$O" \
   && res admin-bootstrap PASS "expect=afldb-admin-with-workstation-key got=$(grep -m1 '   afldb-admin:' <<< "$O" | cut -c1-200)" || res admin-bootstrap FAIL "expect=afldb-admin-with-workstation-key got=$(grep 'R8P PHASE1' <<< "$O" | tr '\n' ' ')"
 
 # ------------------------------------------------------------------------------------------ Phase 1 verification from the workstation
@@ -189,7 +203,7 @@ V=$(grep '^OWNER CHECKS RESULT' <<< "$O" | tail -1)
 [[ $V == "OWNER CHECKS RESULT BLOCKED"* ]] && grep -q '^CHECK B2 FAIL' <<< "$O" && res checks-post-install PASS "expect=BLOCKED(installs-alone-do-not-close-F1) got=$V" || res checks-post-install FAIL "expect=BLOCKED got=$V"
 
 pace
-O=$(bash "$WT/$R7/verify/afldb-verify-call.sh" --rehearsal "$KDM/cfg" --key "$KDM/verify" version 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L wrapper-version "workstation: afldb-verify-call.sh version (verify key; one host in this harness)"
+O=$(bash "$KD/afldb-verify-call.sh" --rehearsal "$KDM/cfg" --key "$KDM/verify" version 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L wrapper-version "workstation: afldb-verify-call.sh version (verify key; one host in this harness)"
 grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod' <<< "$O" \
   && res wrapper-version PASS "expect=VERSION-PASS(afldb-prod) got=$(grep -m1 '^OWNER VERDICT VERSION PASS' <<< "$O" | cut -c1-120); offhost: STOP (no off-host container in this harness, expected)" \
   || res wrapper-version FAIL "expect=VERSION-PASS(afldb-prod) got=$(grep '^OWNER VERDICT' <<< "$O" | tr '\n' ' ' | cut -c1-240)"
@@ -218,6 +232,15 @@ grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK E2 FAIL.*/usr
 B=$(blk no-admin)
 grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK F5 FAIL.*no authorised key' <<< "$B" && grep -q '^CHECK F1 FAIL.*does not exist' <<< "$B" && grep -q 'R8P FC no-admin-nosuch checks-exit 1' <<< "$O" \
   && res fc-no-admin PASS "expect=BLOCKED(F5 no key; F1 no account) got=both BLOCKED" || res fc-no-admin FAIL "expect=BLOCKED(F1,F5) got=$(grep -E '^CHECK F[15] |^OWNER CHECKS' <<< "$B" | cut -c1-120 | tr '\n' '|')"
+B=$(blk pg-nologin-super)
+grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK D1 FAIL.*afldb_owner=>r8p_super' <<< "$B" && grep -q '^CHECK D4 FAIL.*afldb_owner(super.*roles: true|.*r8p_super' <<< "$B" \
+  && res fc-pg-nologin-super PASS "expect=BLOCKED(D1,D4 name afldb_owner via r8p_super) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-pg-nologin-super FAIL "expect=BLOCKED(D1,D4 via r8p_super) got=$(grep -E '^CHECK D[14] |^OWNER CHECKS' <<< "$B" | cut -c1-200 | tr '\n' '|')"
+B=$(blk admin-key-option)
+grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK F5 FAIL.*not a bare key line' <<< "$B" \
+  && res fc-admin-key-option PASS "expect=BLOCKED(F5 options prefix) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-admin-key-option FAIL "expect=BLOCKED(F5) got=$(grep -E '^CHECK F5 |^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
+B=$(blk admin-extra-key)
+grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK F5 FAIL.*2 authorised key lines' <<< "$B" \
+  && res fc-admin-extra-key PASS "expect=BLOCKED(F5 two key lines) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-admin-extra-key FAIL "expect=BLOCKED(F5) got=$(grep -E '^CHECK F5 |^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
 B=$(blk control)
 grep -qx 'OWNER CHECKS RESULT PASS' <<< "$B" && res control-after-revert PASS "expect=PASS got=OWNER CHECKS RESULT PASS (console session; every mutation reverted)" || res control-after-revert FAIL "expect=PASS got=$(grep -E '^CHECK [A-Z0-9]+ (FAIL|UNKNOWN)|^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
 

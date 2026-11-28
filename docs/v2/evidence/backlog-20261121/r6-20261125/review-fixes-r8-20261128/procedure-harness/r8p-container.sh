@@ -5,13 +5,15 @@
 # Nothing in it installs either bundle: the bundles reach the container only through the admin SSH path (r8p-admin.sh).
 #   setup              (stdin: arm's password) production today's shape: arm with sudo, arm's key and .env, PostgreSQL 16
 #                      afldb_prod with an owner role, the base afldb-backup units, real sshd; prints the host key       [FIXTURE]
-#   console <fp>       (stdin: the admin password) Phase 0 facts of the console session [HARNESS]; then pubkey-swap: arm replaces
-#                      the carried .pub with another key and Phase 1 must refuse and create nothing [FIXTURE-ATTACK]; then Phase 1
-#                      at the console: the .pub arm carried is accepted only if its fingerprint equals the workstation's, and
-#                      afldb-admin is created with its own password and that key
+#   console <fp>       (stdin: the admin password) Phase 0 facts of the console session [HARNESS]; then pubkey-swap (arm replaces
+#                      the carried .pub with another key) and pubkey-optprefix (arm prefixes the real key with an options field,
+#                      same fingerprint): Phase 1 must refuse both and create nothing [FIXTURE-ATTACK]; then Phase 1 at the
+#                      console: the carried .pub is accepted only as exactly one bare ed25519 line whose fingerprint equals the
+#                      workstation's, only its type and key fields are installed, and afldb-admin gets its own password
 #   nothing-installed  asserts no bundle was installed (after arm's refused attempt)
 #   fc <fp>            fail-closed cases run through the admin-staged owner checks from this console: pg-superuser,
-#                      group-writable, no-admin, then control; each mutation is reverted afterwards                    [FIXTURE]
+#                      pg-nologin-super (a NOLOGIN superuser role granted to arm's DSN role), group-writable, no-admin,
+#                      admin-key-option, admin-extra-key, then control; each mutation is reverted afterwards          [FIXTURE]
 #   final              (stdin: every log of the run) `id` of every identity, then the count of fixture-password occurrences
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -64,43 +66,58 @@ phase0() {
   echo "R8P PHASE0 root-console=yes"
 }
 
-phase1() { # mode(real|swap) fp ; the console commands of OWNER-PROCEDURE.md Phase 1 (typed by the owner at the console as root)
-  local MODE=$1 FP=$2 GOT
-  if [ "$MODE" = swap ]; then
+phase1() { # mode(real|swap|optprefix) fp ; the console commands of OWNER-PROCEDURE.md Phase 1 steps 1.4-1.5 and 1.6-1.10
+  local MODE=$1 FP=$2 K=/root/afldb-r8-keyin/afldb_admin.pub OK
+  if [ "$MODE" = swap ] || [ "$MODE" = optprefix ]; then
     as_arm /usr/bin/bash --noprofile --norc -c 'cp ~/afldb_admin.pub ~/.r8p-saved.pub'
-    setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c 'cat > ~/afldb_admin.pub' < $IN/keys/swap.pub
-    L FIXTURE-ATTACK "arm replaced the carried ~/afldb_admin.pub with another key (fingerprint $(ssh-keygen -lf $IN/keys/swap.pub | awk '{print $2}'))"
+    if [ "$MODE" = swap ]; then
+      setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c 'cat > ~/afldb_admin.pub' < $IN/keys/swap.pub
+      L FIXTURE-ATTACK "arm replaced the carried ~/afldb_admin.pub with another key (fingerprint $(ssh-keygen -lf $IN/keys/swap.pub | awk '{print $2}'))"
+    else
+      as_arm /usr/bin/bash --noprofile --norc -c '{ printf "command=\"/home/arm/x\" "; cat ~/.r8p-saved.pub; } > ~/afldb_admin.pub'
+      L FIXTURE-ATTACK "arm prefixed the carried key with an options field (command=...); its fingerprint is still the workstation's"
+    fi
   fi
-  install -d -m 0700 /root/afldb-r8-keyin && rm -f /root/afldb-r8-keyin/afldb_admin.pub
-  as_arm /usr/bin/cat /home/arm/afldb_admin.pub > /root/afldb-r8-keyin/afldb_admin.pub     # read with arm's rights, into root's copy
-  GOT=$(ssh-keygen -lf /root/afldb-r8-keyin/afldb_admin.pub 2>/dev/null)
-  echo "   carried key, root's copy: $(awk '{print $1, $2, $NF}' <<< "$GOT") ($(grep -c . /root/afldb-r8-keyin/afldb_admin.pub) line(s)); workstation fingerprint $FP"
-  if [ "$(grep -c . <<< "$GOT")" != 1 ] || [ "$(awk '{print $2}' <<< "$GOT")" != "$FP" ] || [[ $GOT != *"(ED25519)" ]] \
-     || [ "$(awk 'NF {print $1}' /root/afldb-r8-keyin/afldb_admin.pub)" != ssh-ed25519 ]; then   # one bare key line: no options prefix
-    echo "R8P PHASE1 REFUSED ($MODE): the carried key's fingerprint is not the workstation's; nothing created"
+  # 1.4: root's copy, read with arm's rights
+  install -d -m 0700 /root/afldb-r8-keyin && rm -f "$K" "$K.line"
+  as_arm /usr/bin/cat /home/arm/afldb_admin.pub > "$K"
+  # 1.5: machine test, exactly as written in the procedure: ONE line, `ssh-ed25519 <68 base64 chars>` plus an optional printable
+  # comment, nothing before it; only the type and key fields are kept; their fingerprint must equal the workstation's
+  OK=0
+  [ "$(grep -c '' "$K")" = 1 ] && LC_ALL=C grep -Eqx 'ssh-ed25519 [A-Za-z0-9+/]{68}( [ -~]*)?' "$K" && awk '{print $1, $2}' "$K" > "$K.line" \
+    && [ "$(ssh-keygen -lf "$K.line" | awk '{print $2}')" = "$FP" ] && OK=1
+  echo "   carried key: $(grep -c '' "$K") line(s); shape $(LC_ALL=C grep -Eqx 'ssh-ed25519 [A-Za-z0-9+/]{68}( [ -~]*)?' "$K" && echo bare-ed25519 || echo NOT-bare); fingerprint of the kept fields $( [ -s "$K.line" ] && ssh-keygen -lf "$K.line" | awk '{print $2}' || echo none); workstation $FP"
+  if [ "$OK" != 1 ]; then
+    echo "R8P PHASE1 REFUSED ($MODE): the carried key is not exactly one bare ed25519 line with the workstation's fingerprint; nothing created"
     getent passwd afldb-admin > /dev/null && echo "R8P PHASE1 UNEXPECTED: afldb-admin exists"
-    [ "$MODE" = swap ] && as_arm /usr/bin/bash --noprofile --norc -c 'mv ~/.r8p-saved.pub ~/afldb_admin.pub'
+    [ "$MODE" != real ] && as_arm /usr/bin/bash --noprofile --norc -c 'mv ~/.r8p-saved.pub ~/afldb_admin.pub'
     return 1
   fi
-  [ "$MODE" = swap ] && { echo "R8P PHASE1 UNEXPECTED ($MODE): the swapped key was accepted"; return 3; }
+  [ "$MODE" != real ] && { echo "R8P PHASE1 UNEXPECTED ($MODE): the altered key was accepted"; return 3; }
   read -r APW || { echo "STOP no admin password on stdin"; return 1; }
   useradd -m -U -s /bin/bash afldb-admin || return 1
   printf 'afldb-admin:%s\n' "$APW" | chpasswd || return 1; unset APW
   usermod -a -G sudo afldb-admin || return 1
   chmod 0750 /home/afldb-admin
   install -d -o afldb-admin -g afldb-admin -m 0700 /home/afldb-admin/.ssh
-  install -o afldb-admin -g afldb-admin -m 0600 /root/afldb-r8-keyin/afldb_admin.pub /home/afldb-admin/.ssh/authorized_keys
-  echo "   afldb-admin: $(id afldb-admin); password $(passwd -S afldb-admin | awk '{print $2}'); home $(stat -c '%U:%G %a' /home/afldb-admin); authorized_keys $(stat -c '%U:%G %a' /home/afldb-admin/.ssh/authorized_keys) $(ssh-keygen -lf /home/afldb-admin/.ssh/authorized_keys | awk '{print $2}')"
+  install -o afldb-admin -g afldb-admin -m 0600 "$K.line" /home/afldb-admin/.ssh/authorized_keys
+  echo "   afldb-admin: $(id afldb-admin); password $(passwd -S afldb-admin | awk '{print $2}'); home $(stat -c '%U:%G %a' /home/afldb-admin); authorized_keys $(stat -c '%U:%G %a' /home/afldb-admin/.ssh/authorized_keys) $(ssh-keygen -lf /home/afldb-admin/.ssh/authorized_keys | awk '{print $2}') ($(grep -c '' /home/afldb-admin/.ssh/authorized_keys) line)"
   echo "   sudo -l -U afldb-admin: $(sudo -l -U afldb-admin | sed -n '/may run/,$p' | sed 1d | tr -s ' ' | tr '\n' ';')"
   echo "R8P PHASE1 DONE ($MODE)"
 }
 
 fc_case() { # case fp
-  local CASE=$1 FP=$2 rc
+  local CASE=$1 FP=$2 rc AK=/home/afldb-admin/.ssh/authorized_keys
   case $CASE in
     pg-superuser)   pgq -c 'ALTER ROLE afldb_owner SUPERUSER' > /dev/null; L FIXTURE "ALTER ROLE afldb_owner SUPERUSER (arm's owner DSN role)";;
+    pg-nologin-super) pgq -c 'CREATE ROLE r8p_super NOLOGIN SUPERUSER' -c 'GRANT r8p_super TO afldb_owner' > /dev/null
+                    L FIXTURE "CREATE ROLE r8p_super NOLOGIN SUPERUSER; GRANT r8p_super TO afldb_owner (arm's owner DSN role stays NOSUPERUSER itself: $(pgq -c "SELECT rolsuper FROM pg_roles WHERE rolname='afldb_owner'"))";;
     group-writable) chmod g+w /usr/local/lib/afldb-verify; L FIXTURE "chmod g+w /usr/local/lib/afldb-verify: $(stat -c '%U:%G %a' /usr/local/lib/afldb-verify)";;
-    no-admin)       mv /home/afldb-admin/.ssh/authorized_keys /root/afldb-r8-keyin/held-authorized_keys; L FIXTURE "the admin's authorized_keys moved away (no admin SSH path)";;
+    no-admin)       mv "$AK" /root/afldb-r8-keyin/held-authorized_keys; L FIXTURE "the admin's authorized_keys moved away (no admin SSH path)";;
+    admin-key-option) cp -p "$AK" /root/afldb-r8-keyin/held-authorized_keys; { printf 'no-pty '; cat /root/afldb-r8-keyin/held-authorized_keys; } > "$AK"
+                    L FIXTURE "the admin's single key line given an options prefix (no-pty); same fingerprint";;
+    admin-extra-key) cp -p "$AK" /root/afldb-r8-keyin/held-authorized_keys; cat $IN/keys/swap.pub >> "$AK"
+                    L FIXTURE "a second key line appended to the admin's authorized_keys";;
     control)        L HARNESS "no mutation (control)";;
   esac
   echo "---- owner checks from the console stand-in (case $CASE)"
@@ -108,8 +125,9 @@ fc_case() { # case fp
   if [ "$CASE" = no-admin ]; then echo "---- and with an admin account that does not exist"; run_checks --admin afldb-nosuch | grep -E '^CHECK F|^OWNER CHECKS'; echo "R8P FC no-admin-nosuch checks-exit ${PIPESTATUS[0]}"; fi
   case $CASE in
     pg-superuser)   pgq -c 'ALTER ROLE afldb_owner NOSUPERUSER' > /dev/null;;
+    pg-nologin-super) pgq -c 'DROP ROLE r8p_super' > /dev/null;;
     group-writable) chmod g-w /usr/local/lib/afldb-verify;;
-    no-admin)       mv /root/afldb-r8-keyin/held-authorized_keys /home/afldb-admin/.ssh/authorized_keys;;
+    no-admin|admin-key-option|admin-extra-key) mv /root/afldb-r8-keyin/held-authorized_keys "$AK";;
   esac
   echo "R8P FC $CASE checks-exit $rc (reverted)"
 }
@@ -120,6 +138,7 @@ console)
   FP=${2:?workstation fingerprint}
   phase0
   phase1 swap "$FP"; echo "R8P PUBKEY-SWAP exit $?"
+  phase1 optprefix "$FP"; echo "R8P PUBKEY-OPTPREFIX exit $?"
   phase1 real "$FP"; echo "R8P PHASE1 exit $?";;
 nothing-installed)
   r=; id afldb-backup > /dev/null 2>&1 && r="$r user-afldb-backup"; id afldb-verify > /dev/null 2>&1 && r="$r user-afldb-verify"
@@ -129,7 +148,7 @@ nothing-installed)
 fc)
   FP=${2:?fp}
   [ -f "$CHECKS" ] || { echo "STOP the owner checks were not staged by the admin session"; exit 1; }
-  for c in pg-superuser group-writable no-admin control; do fc_case "$c" "$FP"; done;;
+  for c in pg-superuser pg-nologin-super group-writable no-admin admin-key-option admin-extra-key control; do fc_case "$c" "$FP"; done;;
 final)
   for u in root arm afldb-admin afldb-backup afldb-verify postgres; do echo "   id $u: $(id "$u" 2>&1)"; done
   n=$(grep -c -F -f /root/r8p-fixture-pw); echo "R8P SECRET-SCAN fixture-password-occurrences ${n:-0}";;

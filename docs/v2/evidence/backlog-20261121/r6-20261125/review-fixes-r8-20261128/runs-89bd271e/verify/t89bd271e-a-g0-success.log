@@ -1,0 +1,95 @@
+== r7v-run t89bd271e 2026-11-28T04:04:05Z workstation Office user stuar; worktree HEAD 89bd271e0741bc0b390137547db4077d6075e070
+[HARNESS] inputs sent (sha256, worktree):
+   c6961904a480ea9cdd5ca4ba733c79643576074bd8247e167bb7db3cd583e853  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-container.sh
+   1aa3a625a327f8e9e9968644e020dfc0162cfaef2585b145c45827728f511c5a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh
+   94b38320185525a75ff74887e93b0338c4f3e4c88ece4b7c1b6e043c3054a9e9  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-run.sh
+   4cb164fffcf67c186db992897342845bfc1c23801b51f8f465feb1b44985f321  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md
+   3de9911cd8a71efb88e06ea3fbf2d471aee16cf9fa275106740efe24677ab6cd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+   e98444ffe1caeacd2f2f801c7fe88b2356a92bd7eddb94d75463e61b49610139  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/afldb-verify-call.sh
+   ca739de772b31b466bdbb9c6295c8c4646f7b1746c71d7b618d92b606aee9bfb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/authorized_keys.template
+   15fdd32cb7bb960d569358eb0306cf7b5aec03a9289c5167929156b2b3c9215a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/build-sums.sh
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/60-afldb-verify.conf
+   28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-settle-failure-status.sh
+   cb2b936d12d43db0cc041fb0da56ee9412cf76aadc2895dad769400bc1c3c082  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts@.service
+   d26c74b5334eae450fe8be6129ed2159a4ac658d3c92bdd5240f4e711c55344f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0-core.sh
+   dc4ae9f5bb8027e98ef6ea4fb7d30f1ba041dbd5c7044dfbf3042ea819e24de0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/lib.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/sealed-origin.sh
+   f8c95fb103e7c394adcd837de6c7a55060361a38b45f9b829097dd79ce862417  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/install-verify.sh
+   062f2dd3ed1791f92059cc38438942406ba80c98dc46b069375d3ac0c07bdd3f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/pg-auth-lines.txt
+   d7e71ed7bf8756d0b3d4d1bea38be7354f4c5cc22c79f6daa6fca0b9d7b99cd7  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verifier-db.sql
+   4b3d5ed11cf9cb833f5ad6cb20acd885e2d640a4cd18e1663f0c441fd29ce9ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verify-verify-install.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   fb565313645140e1379cdb11f5793fc7cd880f294e9a591f0dcb05930cd55ef8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md
+   d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   7dee0dc7514a6ccd1eb05172b49b686739b09fa612fbad978755702e5d9bc07a  deploy/release.mjs
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  deploy/afldb-settle-failure-status.sh
+   183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e  deploy/host-policy/needrestart-afldb-hold.conf
+   4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810  deploy/host-policy/apt-52-afldb-unattended.conf
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against 89bd271e0741bc0b390137547db4077d6075e070:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 89bd271e0741bc0b390137547db4077d6075e070
+PASS bundle digest 28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+[HARNESS] r8 contrast blobs (HEAD 89bd271e): install-verify-r7.sh f8c95fb103e7c394... call-r7.sh e98444ffe1caeacd...
+[HARNESS] fresh keys: verify AAAAC3NzaC1lZDI1NTE5AAAA... other AAAAC3NzaC1lZDI1NTE5AAAA... arm AAAAC3NzaC1lZDI1NTE5AAAA...
+workspace /home/arm/r7v-ws.zppW6b
+49
+
+== scenario a (2026-11-28T04:09:06Z)
+$ bash afldb-verify-call.sh --rehearsal <cfg> --key <fresh verify key> g0 2026-11-28
+== afldb-verify-call 2026-11-28T04:09:06Z mode=g0 transport=rehearsal pinned-bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e key=C:/Users/stuar/AppData/Local/Temp/tmp.qDMB0mdOke/verify
+-- G0a: production, g0 2026-11-28
+== afldb-verify G0 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T04:09:11Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0 (verifier) 2026-11-28T04:09:11Z local Sat 2026-11-28 02:22:11 AEDT day 2026-11-28
+  sealed-origin: seal /var/lib/afldb-backup/seals/5669ebd1d9674712aad45997c8bb73a2.seal: invocation 5669ebd1d9674712aad45997c8bb73a2, job 394 created by afldb-backup.timer at 1795838820670430 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 80.8 s after timer activation, dump afldb_prod-20261128-022000.dump 3994 bytes sha256 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6
+PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795838820670430 us), invocation 5669ebd1d9674712aad45997c8bb73a2, root seal /var/lib/afldb-backup/seals/5669ebd1d9674712aad45997c8bb73a2.seal; published dump afldb_prod-20261128-022000.dump 3994 B, full re-hash = seal = root sidecar
+DISPATCH scheduled 80.8 s after timer activation
+BACKUP-EVIDENCE r7 5669ebd1d9674712aad45997c8bb73a2 1795838820670430 afldb_prod-20261128-022000.dump 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 scheduled /var/lib/afldb-backup/seals/5669ebd1d9674712aad45997c8bb73a2.seal
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6
+PASS afldb-backup.service Result=success (PID 1: the last run did not fail)
+PASS no FAILED marker in /home/arm/backups/afldb-scheduled/.state (arm-produced evidence)
+INFO afldb-backup-verify.service last: success  0 (record; not a G0 criterion)
+G0 PROD RESULT PASS: the wrapper now runs g0b on streamanator with the dump and sha256 of this RESULT line
+AFLDB-VERIFY RESULT G0 PASS nonce=54c0021e7a0f50431e513ae53d2f68fc host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e at=2026-11-28T04:09:15Z exit=0 date=2026-11-28 invocation=5669ebd1d9674712aad45997c8bb73a2 dump=afldb_prod-20261128-022000.dump sha256=8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 dispatch=scheduled
+-- G0b: streamanator, g0b 2026-11-28 afldb_prod-20261128-022000.dump 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 (values from the authenticated G0a RESULT line only)
+== afldb-verify G0B host=streamanator role=offhost boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e identity: uid=999(afldb-verify) gid=996(afldb-verify) groups=996(afldb-verify),999(systemd-journal) at 2026-11-28T04:09:21Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0B (verifier) 2026-11-28T04:09:21Z host=streamanator day 2026-11-28 dump afldb_prod-20261128-022000.dump sha256 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6
+COPY VERIFIED afldb_prod-20261128-022000.dump sha256=8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 (bytes re-hashed by the root facts reader, named sidecar, verified marker, no hold) [the bytes: root re-hash; sidecar, marker and hold: ARM-PRODUCED]
+SCHEDULE crontab pair present: 10 3 * * * [ARM-PRODUCED: read from the root-only spool, but arm edits its crontab]
+DISPATCH journal: pid=949 at 2026-11-28 03:10:01 AEDT (a root syslog entry: _UID=0, SYSLOG_PID=_PID)
+INVOCATION linked to dispatch: run=2026-11-28T04:09:02Z-950 (lineage contains pid 949, started within 5 s of the journal record) [ARM-PRODUCED: the pull log is arm's; the dispatch is root cron's journald record]
+PASS scheduled pull date=2026-11-28 dispatch_pid=949 run=2026-11-28T04:09:02Z-950 completion=2026-11-28T04:09:02Z rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6
+RESULT SCHEDULED-COPY-VERIFIED
+R6 OFFHOST RESULT PASS
+AFLDB-VERIFY RESULT G0B PASS nonce=1b03d8fab7666e92987bc3b3b7002cb1 host=streamanator boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e at=2026-11-28T04:09:21Z exit=0 date=2026-11-28 dump=afldb_prod-20261128-022000.dump sha256=8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6
+G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced afldb_prod-20261128-022000.dump with sha256 8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 on production and that streamanator holds a root-re-hashed copy with those bytes after a root cron dispatch; the pull-log lines linking dispatch and copy are ARM-PRODUCED
+OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=5669ebd1d9674712aad45997c8bb73a2 dump=afldb_prod-20261128-022000.dump sha256=8a3292cb609a0ca15d746c9de8b5e959e35abf5bf6527aa01c2df08d356761c6 dispatch=scheduled g0a-nonce=54c0021e7a0f50431e513ae53d2f68fc g0a-at=2026-11-28T04:09:15Z g0a-boot=c3524e4759ab4e0f8050875471b56b12 g0b-nonce=1b03d8fab7666e92987bc3b3b7002cb1 g0b-at=2026-11-28T04:09:21Z
+[HARNESS] wrapper exit 0
+[HARNESS] r8: SCOPE line: G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced afldb_prod-20261128-022000.dump with ...
+[HARNESS] r8: lines labelled ARM-PRODUCED (3):
+   SCHEDULE crontab pair present: 10 3 * * * [ARM-PRODUCED: read from the root-only spool, but arm edits its crontab]
+   INVOCATION linked to dispatch: run=2026-11-28T04:09:02Z-950 (lineage contains pid 949, started within 5 s of the journal record) [ARM-PRODUCED: the pull log is arm's; the dispatch is root cron's journ
+   PASS scheduled pull date=2026-11-28 dispatch_pid=949 run=2026-11-28T04:09:02Z-950 completion=2026-11-28T04:09:02Z rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]

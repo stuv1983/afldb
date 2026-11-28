@@ -27,9 +27,9 @@
 #                      sudo install-verify.sh (plain, and with SUDO_* removed): REFUSED "root session descends from arm", and the
 #                      verifier's state digest is unchanged
 #   i  staging-libsh   [FIXTURE-ATTACK] a hostile bundle/lib.sh in an arm-owned, a group-writable and a tampered staging copy: r8's
-#                      install-verify.sh refuses each before sourcing it (no marker); CONTRAST: r7's (the HEAD blob) ran it as root
+#                      install-verify.sh refuses each before sourcing it (no marker); CONTRAST: r7's (the blob at the pinned r7 revision 7e2ef51a) ran it as root
 #   j  version-exit    wrapper 'version': both hosts PASS -> exit 0 (control); the off-host answer replaced by an authenticated-
-#                      looking VERSION STOP (HARNESS fake transport) -> exit 1; CONTRAST: r7's wrapper (HEAD blob) exited 0
+#                      looking VERSION STOP (HARNESS fake transport) -> exit 1; CONTRAST: r7's wrapper (blob at the pinned r7 revision 7e2ef51a) exited 0
 # Logs: verify-harness/logs/<RID>-*.log (workstation), or --log-dir. Containers, image, workspace and test keys are removed at the end.
 # Development only (never in a recorded run): R7V_IMAGE=<kept image> reuses an image; --keep-image keeps it; R7V_KEEP_CTRS=1 keeps
 # the containers and workspace for inspection (the summary prints the `down` command).
@@ -77,10 +77,12 @@ bash "$WT/$R7/verify/build-sums.sh" --check | tee -a "$HDR" || { echo "STOP veri
 KD=$(mktemp -d); KDM=$(cygpath -m "$KD"); trap 'rm -rf "$KD"' EXIT
 for k in verify other arm; do "$WKEYGEN" -q -t ed25519 -N '' -C "r7v-$RID-$k" -f "$KDM/$k" > /dev/null || { echo "STOP ssh-keygen"; exit 2; }; done
 mkdir -p "$KD/stage/r7v-keys"; tr -d '\r' < "$KD/verify.pub" > "$KD/stage/r7v-keys/afldb_verify.pub"; tr -d '\r' < "$KD/arm.pub" > "$KD/stage/r7v-keys/arm_key.pub"
-# r8 CONTRAST inputs (HARNESS): the r7 install-verify.sh and wrapper as committed at HEAD (scenarios i and j)
-mkdir -p "$KD/stage/r8-contrast"; git -C "$WT" show "HEAD:$R7/verify/install-verify.sh" > "$KD/stage/r8-contrast/install-verify-r7.sh" \
-  && git -C "$WT" show "HEAD:$R7/verify/afldb-verify-call.sh" > "$KD/call-r7.sh" || { echo "STOP cannot read the r7 contrast blobs at HEAD"; exit 2; }
-echo "[HARNESS] r8 contrast blobs (HEAD $(git -C "$WT" rev-parse --short HEAD)): install-verify-r7.sh $(sha256sum < "$KD/stage/r8-contrast/install-verify-r7.sh" | cut -c1-16)... call-r7.sh $(sha256sum < "$KD/call-r7.sh" | cut -c1-16)..." >> "$HDR"
+# r8 CONTRAST inputs (HARNESS): the r7 install-verify.sh and wrapper as committed at the r7 revision R7CONTRAST (scenarios i and j).
+# Pinned, not HEAD: once r8 is committed HEAD holds the r8 blobs and the contrast would compare r8 with itself.
+R7CONTRAST=7e2ef51aa1682f6fded60158242b58ac07e2047b
+mkdir -p "$KD/stage/r8-contrast"; git -C "$WT" show "$R7CONTRAST:$R7/verify/install-verify.sh" > "$KD/stage/r8-contrast/install-verify-r7.sh" \
+  && git -C "$WT" show "$R7CONTRAST:$R7/verify/afldb-verify-call.sh" > "$KD/call-r7.sh" || { echo "STOP cannot read the r7 contrast blobs at $R7CONTRAST"; exit 2; }
+echo "[HARNESS] r8 contrast blobs (r7 revision ${R7CONTRAST:0:8}): install-verify-r7.sh $(sha256sum < "$KD/stage/r8-contrast/install-verify-r7.sh" | cut -c1-16)... call-r7.sh $(sha256sum < "$KD/call-r7.sh" | cut -c1-16)..." >> "$HDR"
 echo "[HARNESS] fresh keys: verify $(cut -d' ' -f2 "$KD/verify.pub" | cut -c1-24)... other $(cut -d' ' -f2 "$KD/other.pub" | cut -c1-24)... arm $(cut -d' ' -f2 "$KD/arm.pub" | cut -c1-24)..." >> "$HDR"
 
 # ---- streamanator workspace, containers
@@ -310,7 +312,7 @@ out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$CALL" --rehearsal "$CFG" --key "$KV"
 [ "$J2" = 1 ] && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator' <<< "$out" || JOK=0
 sleep 2
 out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$KD/call-r7.sh" --rehearsal "$CFG" --key "$KV" version 2>&1); J3=$?
-{ echo "-- CONTRAST: r7 wrapper (HEAD blob), same fake transport: exit $J3"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
+{ echo "-- CONTRAST: r7 wrapper (r7 revision blob), same fake transport: exit $J3"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
 [ "$J3" = 0 ] && grep -q '^OWNER VERDICT VERSION STOP' <<< "$out" || JOK=0
 [ "$JOK" = 1 ] && res j "PASS version-exit: both PASS -> exit 0 ($J1P PASS lines); off-host STOP -> exit $J2; CONTRAST r7 wrapper exited $J3 with a STOP line" \
   || res j "FAIL version-exit: control $J1 ($J1P PASS), off-host STOP $J2, r7 contrast $J3"

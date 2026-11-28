@@ -194,7 +194,7 @@ host-account change that needs owner approval; production `sudoers` has not been
 The block below runs in that session:
 * The "root-owned staging copy" is a `git archive` of the r8 tested revision, made in the owner's workstation clone, carried over the
   admin path, and re-verified in the admin root session against the workstation's `sha256sum` of the tar and of `SHA256SUMS`
-  (wrapper `BUNDLE_SHA` `28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e`). This file is itself listed in the packet
+  (wrapper `BUNDLE_SHA` `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`). This file is itself listed in the packet
   `SHA256SUMS`, so the tested revision and the packet digest cannot be written here: they are in the r8 record's pin table
   (`../../review-fixes-r8-20261128/README.md`), which the owner reads in the workstation clone. No byte and no expected digest comes
   from arm's checkout or from any file on production.
@@ -242,7 +242,7 @@ read-only check, and **never writes arm's checkout**.
    r6 form (checked: r6-post-verify.sh does not parse it).
 8. **The sealed run's FAILED marker** is PID 1's `Result=` of afldb-backup.service (R7/backup README item 6: the sealed install writes
    no root marker file). G0 and A-2 require `Result=success`; arm's `.state` markers are still reported (arm-produced).
-9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `1153df78…`). Any later
+9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `a733e67b…`; r7 and the r8 commit 89bd271e: `1153df78…`; r8 after the independent review pins the whole service unit, R8-F-7, backup README section 4 item 13). Any later
    change there must be copied here and followed by `build-sums.sh` (the wrapper's pinned bundle digest changes with it).
 10. Harness image adds `python3`, `cron` and `tzdata` to r6's package list (the verifier needs python3.12; G0B needs a real cron).
 11. **r8, `install-verify.sh` trust order.** r7 sourced the staging `bundle/lib.sh` before checking that the staging was trusted, so

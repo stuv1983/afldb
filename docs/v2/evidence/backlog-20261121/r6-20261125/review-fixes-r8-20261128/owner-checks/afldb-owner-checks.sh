@@ -18,6 +18,10 @@
 # password or hash, no key material (fingerprints only), no .env value (variable names and role names only).
 # Checks: A session independence; B arm's sudo; C other arm->root routes; D PostgreSQL roles and peer maps; E arm's ability to
 # modify protected components; F the admin path. If A fails, nothing else is independent and the result is BLOCKED.
+# r8 review fixes: every arm-side probe (C6 key listing, D4 environment file, E0, E1) is fail-closed (arm_probe: completion sentinel
+# and exit 0, else FAIL "probe did not complete"); C2 prints a PASS line; C3 judges every path a root-run service executes or reads;
+# C6 uses sshd's AuthorizedKeysFile for root; D1/D2/D4 use membership closure (pg_has_role MEMBER of any superuser role and of the
+# three server program/file roles); F5 requires exactly one bare key line; F6 also rejects an AuthorizedKeysCommand.
 set -u -o pipefail
 export LC_ALL=C PATH=/usr/sbin:/usr/bin
 umask 077
@@ -46,6 +50,22 @@ have() { [ -x "$1" ]; }
 # as_arm CMD...: run as arm, never through arm's startup files: no PAM session, environment reset, bash without profile or rc,
 # stdin /dev/null. setpriv --init-groups gives arm its groups from the group database.
 as_arm() { setpriv --reuid=arm --regid=arm --init-groups --reset-env "$@" < /dev/null; }
+# arm_probe BODY [ARGS...]: run BODY (bash) as arm through as_arm, FAIL-CLOSED (r8 review R8-F-1/-2). The probe's LAST action prints a
+# sentinel carrying a per-call random nonce; PROBE_OK=1 only when the probe exited 0 AND its last line is exactly that sentinel, and
+# PROBE_OUT is then the output before it. A probe killed, stopped or cut short by another arm process (same uid) leaves PROBE_OK=0,
+# and every caller turns that into FAIL "probe did not complete"; no caller ever reads PASS from absent output. Residual: a hostile
+# concurrent arm process can also write into the probe's stdout (/proc/<pid>/fd/1, same uid) and so could forge a completed probe;
+# each probe therefore has a root-side companion (E1: E2; C6/F5: the root-side key and trust checks; D4: D1/D2; E0: B1/B2).
+PROBE_OK=0; PROBE_OUT=
+arm_probe() {
+  local body=$1 nonce o rc last; shift
+  nonce=$(od -An -N12 -tx1 /dev/urandom | tr -d ' \n'); PROBE_OK=0; PROBE_OUT=
+  o=$(as_arm /usr/bin/env "R8_PROBE_NONCE=$nonce" /usr/bin/bash --noprofile --norc -c "$body"'
+printf "\nR8-PROBE-DONE %s\n" "$R8_PROBE_NONCE"' _ "$@" 2>/dev/null); rc=$?
+  last=$(tail -n 1 <<< "$o")
+  if [ "$rc" = 0 ] && [ "$last" = "R8-PROBE-DONE $nonce" ]; then PROBE_OK=1; PROBE_OUT=$(sed '$d' <<< "$o"); fi
+  PROBE_RC=$rc
+}
 # trust_comp PATH: owner, group and mode of every component of PATH from /; sets TC_WHY and returns 1 when a component is owned by
 # arm, is group- or other-writable, carries an ACL entry, or is a symbolic link. A missing leaf is reported, not failed (TC_ABSENT=1).
 ARM_UID=$(id -u arm 2>/dev/null) || ARM_UID=
@@ -78,7 +98,8 @@ printf '   script sha256 %s\n' "$(sha256sum < "$0" 2>/dev/null | cut -c1-64)"
 # ------------------------------------------------------------------------------------------------ A: is this session independent?
 if [ "$(id -u)" != 0 ]; then chk A1 FAIL "not root (uid $(id -u)): run in the admin root session or the console as root"
 else chk A1 PASS "running as root"; fi
-if [ -z "$ARM_UID" ]; then chk A0 UNKNOWN "no account arm on this host: the checks are written for production's arm"; fi
+if [ -z "$ARM_UID" ]; then chk A0 UNKNOWN "no account arm on this host: the checks are written for production's arm"
+else chk A0 PASS "account arm exists (uid $ARM_UID)"; fi
 DESC=0; CHAIN=; p=$$; n=0
 while [ -n "$p" ] && [ "$p" -gt 0 ] 2>/dev/null && [ $n -lt 64 ]; do
   st=/proc/$p/status; [ -r "$st" ] || break
@@ -111,16 +132,20 @@ bad=; for g in sudo admin wheel; do [[ " $ag " == *" $g "* ]] && bad="$bad $g"; 
 [ -z "$bad" ] && chk B2 PASS "arm's groups ($ag) include none of sudo, admin, wheel" || chk B2 FAIL "arm is in:$bad (arm's groups: $ag)"
 files=(); [ -e /etc/sudoers ] && files+=(/etc/sudoers); for f in /etc/sudoers.d/*; do [ -f "$f" ] && files+=("$f"); done
 hit=; inc=
+# names: arm itself, and %<g> for every group arm is in (B2 judges sudo/admin/wheel membership; B3 judges what the rules name)
+nre=arm; for g in $ag; do [[ $g =~ ^[A-Za-z0-9_.-]+$ ]] && nre="$nre|%${g//./\\.}"; done
 for f in "${files[@]}"; do
-  grep -Ev '^[[:space:]]*#([^i]|$)|^[[:space:]]*$' "$f" 2>/dev/null | grep -qE '(^|[^A-Za-z0-9_.-])%?arm([^A-Za-z0-9_.-]|$)' && hit="$hit $f"
+  grep -Ev '^[[:space:]]*#([^i]|$)|^[[:space:]]*$' "$f" 2>/dev/null | grep -qE "(^|[^A-Za-z0-9_.%-])($nre)([^A-Za-z0-9_.-]|\$)" && hit="$hit $f"
   inc="$inc$(grep -E '^[[:space:]]*[#@]include(dir)?[[:space:]]' "$f" 2>/dev/null | awk '{print $2}' | tr '\n' ' ')"
 done
-[ -z "$hit" ] && chk B3 PASS "no sudoers file names arm or %arm (${#files[@]} file(s) read); include directives: ${inc:-none}" || chk B3 FAIL "sudoers rules naming arm or %arm in:$hit"
+[ -z "$hit" ] && chk B3 PASS "no non-comment line of /etc/sudoers or /etc/sudoers.d/* names arm or a group of arm (%$(tr ' ' ',' <<< "$ag")); ${#files[@]} file(s) read; include directives: ${inc:-none}" \
+  || chk B3 FAIL "sudoers lines naming arm or a group of arm (%$(tr ' ' ',' <<< "$ag")) in:$hit"
+b5=
 for t in $inc; do
-  trust_comp "$t" && [ "$TC_ABSENT" = 0 ] && continue
-  [ "$TC_ABSENT" = 1 ] && continue
-  chk B5 FAIL "sudoers include target $t: $TC_WHY"
+  trust_comp "$t" && continue
+  b5="$b5 $t: $TC_WHY;"
 done
+[ -z "$b5" ] && chk B5 PASS "sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): ${inc:-none}" || chk B5 FAIL "sudoers include targets:$b5"
 for u in root arm ${ADMIN:+"$ADMIN"}; do
   s=$(passwd -S "$u" 2>/dev/null | awk '{print $2}')
   case $s in NP) chk B6 FAIL "$u has NO password (passwd -S: NP)";; L|P) chk B6 PASS "report: passwd -S $u: $s (L locked, P usable)";; *) chk B6 UNKNOWN "passwd -S $u: '${s:-none}'";; esac
@@ -136,47 +161,79 @@ for s in /run/docker.sock /var/run/docker.sock /var/snap/lxd/common/lxd/unix.soc
   [ -S "$s" ] && chk C1s PASS "report: $s present: $(stat -c '%U:%G %a' -- "$s")"
 done
 KNOWN_RULE=3164e0d9d8f37603effcd5ef91ce2f5ba17fc340370f525251d21991b6c50b64   # deploy/afldb-settle-afltables-trigger.rules (start one unit)
-pk=0
+pk=0; pka=0
 for d in /etc/polkit-1/rules.d /usr/share/polkit-1/rules.d; do
   for f in "$d"/*.rules; do
     [ -f "$f" ] || continue; pk=$((pk + 1))
-    if grep -qE "[\"']arm[\"']|unix-(user|group):arm" "$f"; then
+    if grep -qE "[\"']arm[\"']|unix-(user|group):arm" "$f"; then pka=$((pka + 1))
       [ "$(sha256sum < "$f" | cut -c1-64)" = "$KNOWN_RULE" ] && chk C2 PASS "polkit $f is the known settle-trigger rule (start afldb-settle-afltables.service only)" \
         || chk C2 FAIL "polkit $f grants something to arm and is not the known settle-trigger rule"
     fi
   done
 done
+[ "$pka" = 0 ] && chk C2 PASS "no polkit .rules file mentions arm ($pk file(s) read in /etc/polkit-1/rules.d and /usr/share/polkit-1/rules.d)"
 pkla=$(grep -rlE '(unix-user|unix-group):arm' /etc/polkit-1/localauthority /var/lib/polkit-1/localauthority 2>/dev/null | tr '\n' ' ')
 [ -z "$pkla" ] && chk C2b PASS "no polkit .pkla grants to arm; $pk .rules file(s) read" || chk C2b FAIL "polkit .pkla files name arm: $pkla"
-# root-run units that execute, source or read an arm path
-ufail=; uconsidered=0
-for f in /etc/systemd/system/*.service /etc/systemd/system/*.service.d/*.conf /usr/lib/systemd/system/*.service /lib/systemd/system/*.service \
-         /etc/systemd/system/*.socket /etc/systemd/system/*.timer; do
-  [ -f "$f" ] && grep -q '/home/' "$f" || continue
-  uconsidered=$((uconsidered + 1))
-  case $f in *.service.d/*.conf) u=${f%/*}; u=${u##*/}; u=${u%.d};; *) u=${f##*/};; esac
+# root-run units (r8 review R8-F-9): EVERY path a root-run service executes, every absolute-path argument that is a file, every
+# EnvironmentFile and the Environment are judged, not only paths containing /home/. Root-run = User unset/root, or any command with
+# the + / ! / !! prefix (privileged, no-setuid, ambient). A path passes when every symbolic link on the way is root-owned and the
+# resolved path passes trust_comp (no component arm-owned, group/other-writable, ACL-bearing or a link). User=arm units run as arm,
+# so they are not a root route: they are reported. Timer, socket and path units activate a service, and that service is judged here.
+trust_res() {
+  local p=$1 cur= rest comp
+  rest=${p#/}
+  while [ -n "$rest" ]; do comp=${rest%%/*}; cur=$cur/$comp
+    if [ -L "$cur" ] && [ "$(stat -c %u -- "$cur")" != 0 ]; then TC_WHY="$cur is a symbolic link not owned by root"; return 1; fi
+    [[ $rest == */* ]] && rest=${rest#*/} || rest=; done
+  trust_comp "$(realpath -m -- "$p")"
+}
+ufail=; uarm=; nroot=0; npath=0
+judge_path() { # unit what path
+  npath=$((npath + 1)); trust_res "$3" || ufail="$ufail $1:$2:$TC_WHY;"
+}
+units=$({ systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null | awk '{print $1}'
+          systemctl list-units --type=service --all --no-legend --no-pager --plain 2>/dev/null | awk '{print $1}'; } | grep -E '^[A-Za-z0-9@_.:-]+\.service$' | sort -u)
+for u in $units; do
   case $u in
-    *@.service)   # a template: judge the text of the unit and its drop-ins
-      txt=$(cat "/etc/systemd/system/$u" "/usr/lib/systemd/system/$u" /etc/systemd/system/"$u".d/*.conf 2>/dev/null)
+    *@.service)   # a template: judge its text and drop-ins (instances that are loaded are judged below through systemctl show)
+      txt=$(cat "/etc/systemd/system/$u" "/usr/lib/systemd/system/$u" "/lib/systemd/system/$u" /etc/systemd/system/"$u".d/*.conf /usr/lib/systemd/system/"$u".d/*.conf 2>/dev/null)
       usr=$(grep -E '^[[:space:]]*User=' <<< "$txt" | tail -1 | sed 's/.*=//')
-      if [ "$usr" != arm ]; then grep -qE '^[[:space:]]*(Exec[A-Za-z]*|EnvironmentFile)=.*/home/' <<< "$txt" && ufail="$ufail $u(User=${usr:-root})"
-      else grep -qE '^[[:space:]]*Exec[A-Za-z]*=[-@:]*[+!].*/home/' <<< "$txt" && ufail="$ufail $u(privileged-exec)"; fi;;
-    *.service)
-      usr=$(systemctl show "$u" -p User --value 2>/dev/null)
-      for prop in ExecConditionEx ExecStartPreEx ExecStartEx ExecStartPostEx ExecReloadEx ExecStopEx ExecStopPostEx; do
-        v=$(systemctl show "$u" -p "$prop" --value 2>/dev/null)
-        while IFS= read -r e; do
-          [ -n "$e" ] || continue; [[ $e == *"/home/"* ]] || continue
-          if [ -z "$usr" ] || [ "$usr" = root ] || [ "$usr" = 0 ] || [[ $e == *privileged* ]] || [[ $e == *no-setuid* ]]; then ufail="$ufail $u:$prop"; fi
-        done <<< "$(sed 's/ } { /}\n{/g' <<< "$v")"
-      done
-      if [ -z "$usr" ] || [ "$usr" = root ]; then
-        ef=$(systemctl show "$u" -p EnvironmentFiles --value 2>/dev/null); [[ $ef == *"/home/"* ]] && ufail="$ufail $u:EnvironmentFile"
+      while IFS= read -r l; do
+        cmd=${l#*=}; pre=$(sed -E 's/^([-@:+!]*).*/\1/' <<< "$cmd"); cmd=${cmd#"$pre"}; p=${cmd%% *}
+        if [ -z "$usr" ] || [ "$usr" = root ] || [[ $pre == *[+!]* ]]; then
+          [ "$usr" = arm ] && [[ $pre == *[+!]* ]] && ufail="$ufail $u(privileged-exec as arm);"
+          case $p in /*) judge_path "$u" exec "$p";; esac
+        fi
+      done < <(grep -E '^[[:space:]]*Exec[A-Za-z]*=' <<< "$txt")
+      [ "$usr" = arm ] && uarm="$uarm $u";;
+    *)
+      info=$(systemctl show "$u" -p LoadState -p User -p ExecConditionEx -p ExecStartPreEx -p ExecStartEx -p ExecStartPostEx -p ExecReloadEx \
+               -p ExecStopEx -p ExecStopPostEx -p EnvironmentFiles -p Environment 2>/dev/null)
+      [ "$(sed -n 's/^LoadState=//p' <<< "$info")" = loaded ] || continue
+      usr=$(sed -n 's/^User=//p' <<< "$info"); rootunit=0
+      { [ -z "$usr" ] || [ "$usr" = root ] || [ "$usr" = 0 ]; } && rootunit=1
+      [ "$usr" = arm ] && uarm="$uarm $u"
+      while IFS= read -r e; do
+        [ -n "$e" ] || continue
+        priv=0; [[ $e == *flags=*privileged* || $e == *flags=*no-setuid* || $e == *flags=*ambient* ]] && priv=1
+        [ "$rootunit" = 1 ] || [ "$priv" = 1 ] || continue
+        [ "$usr" = arm ] && [ "$priv" = 1 ] && ufail="$ufail $u(privileged-exec as arm);"
+        p=$(grep -o 'path=[^ ;]*' <<< "$e" | head -1); p=${p#path=}
+        [ -n "$p" ] && judge_path "$u" exec "$p"
+        av=$(sed -n 's/.*argv\[\]=\([^;]*\).*/\1/p' <<< "$e")
+        set -f; for a in $av; do case $a in /*) [ -f "$a" ] && [ "$a" != "$p" ] && judge_path "$u" arg "$a"; [[ $a == /home/* ]] && [ ! -e "$a" ] && ufail="$ufail $u:arg:$a;";; esac; done; set +f
+      done < <(sed -n 's/^Exec[A-Za-z]*Ex=//p' <<< "$info" | sed 's/ } { /}\n{/g')
+      if [ "$rootunit" = 1 ]; then
+        nroot=$((nroot + 1))
+        set -f; for ef in $(sed -n 's/^EnvironmentFiles=//p' <<< "$info" | grep -o '^[^ ]*\|  */[^ ]*' | tr -d ' '); do
+          case $ef in /*) judge_path "$u" EnvironmentFile "$ef";; esac
+        done; set +f
+        sed -n 's/^Environment=//p' <<< "$info" | grep -q '/home/' && ufail="$ufail $u:Environment mentions /home/;"
       fi;;
   esac
 done
-[ -z "$ufail" ] && chk C3 PASS "no root-run unit command or EnvironmentFile under /home ($uconsidered unit file(s) mention /home; each runs as arm)" \
-  || chk C3 FAIL "root runs arm paths in:$ufail"
+[ -z "$ufail" ] && chk C3 PASS "$nroot root-run service unit(s), $npath executed/argument/EnvironmentFile path(s): every link root-owned, every resolved path trusted; User=arm units (run as arm, reported):${uarm:- none}" \
+  || chk C3 FAIL "root-run units execute, source or read an untrusted path:$ufail"
 cfail=
 for f in /etc/crontab /etc/cron.d/* /etc/anacrontab; do
   [ -f "$f" ] || continue
@@ -199,15 +256,28 @@ for f in .bashrc .profile .bash_profile .bash_login .bash_logout .bash_aliases .
   [ -f "/root/$f" ] && grep -v '^[[:space:]]*#' "/root/$f" 2>/dev/null | grep -q '/home/' && rfail="$rfail /root/$f mentions /home/;"
 done
 [ -z "$rfail" ] && chk C5 PASS "root's home and startup files are root-owned, not group/other-writable, carry no ACL and do not mention /home/" || chk C5 FAIL "root's startup files:$rfail"
+# akf_paths USER HOME: the AuthorizedKeysFile paths sshd uses for USER (sshd -T; default .ssh/authorized_keys .ssh/authorized_keys2)
+akf_paths() {
+  local a k; a=$(sshd -T -C "user=$1,host=check.invalid,addr=127.0.0.1" 2>/dev/null | sed -n 's/^authorizedkeysfile //p')
+  [ -n "$a" ] || a=".ssh/authorized_keys .ssh/authorized_keys2"
+  set -f; for k in $a; do k=${k//%h/$2}; k=${k//%u/$1}; k=${k//%%/%}; case $k in /*) ;; *) k=$2/$k;; esac; printf '%s\n' "$k"; done; set +f
+}
+akc_of() { sshd -T -C "user=$1,host=check.invalid,addr=127.0.0.1" 2>/dev/null | sed -n 's/^authorizedkeyscommand //p'; }
 rfp=; afp=
-for f in /root/.ssh/authorized_keys /root/.ssh/authorized_keys2; do [ -f "$f" ] && rfp="$rfp$(fp_list "$f")"$'\n'; done
+RAKF=$(akf_paths root /root)
+while IFS= read -r f; do [ -f "$f" ] && rfp="$rfp$(fp_list "$f")"$'\n'; done <<< "$RAKF"
 rfp=$(grep . <<< "$rfp" | sort -u)
-# arm's keys are read AS ARM (arm's own rights), so arm cannot point root at a file arm may not read
-afp=$(as_arm /usr/bin/bash --noprofile --norc -c 'for f in "$HOME/.ssh/authorized_keys" "$HOME/.ssh/authorized_keys2" "$HOME"/.ssh/*.pub; do [ -f "$f" ] && ssh-keygen -lf "$f" 2>/dev/null; done' 2>/dev/null \
-  | awk '{print $2}' | grep -E '^SHA256:[A-Za-z0-9+/]{43}$' | sort -u)
+# arm's keys are read AS ARM (arm's own rights), so arm cannot point root at a file arm may not read; fail-closed probe (R8-F-2)
+AAKF=$(akf_paths arm "$(getent passwd arm | cut -d: -f6)")
+arm_probe 'for f in "$@" "$HOME"/.ssh/*.pub; do [ -f "$f" ] && ssh-keygen -lf "$f" 2>/dev/null; done; true' $AAKF
+AFP_OK=$PROBE_OK
+afp=$(awk '{print $2}' <<< "$PROBE_OUT" | grep -E '^SHA256:[A-Za-z0-9+/]{43}$' | sort -u)
 both=$(comm -12 <(printf '%s\n' "$rfp") <(printf '%s\n' "$afp") | grep .)
-[ -z "$both" ] && chk C6 PASS "root's authorized keys: $(grep -c . <<< "$rfp") ($(tr '\n' ' ' <<< "$rfp")); none is one of arm's $(grep -c . <<< "$afp") key fingerprint(s)" \
-  || chk C6 FAIL "a key authorised for root is also arm's: $(tr '\n' ' ' <<< "$both")"
+rakc=$(akc_of root)
+if [ "$AFP_OK" != 1 ]; then chk C6 FAIL "probe did not complete: arm's key listing (read as arm) exited $PROBE_RC without its sentinel, so the overlap with root's keys is not established"
+elif [ -n "$both" ]; then chk C6 FAIL "a key authorised for root is also arm's: $(tr '\n' ' ' <<< "$both")"
+elif [ -n "$rakc" ] && [ "$rakc" != none ]; then chk C6 UNKNOWN "sshd takes root's keys from an AuthorizedKeysCommand ($rakc): not judged"
+else chk C6 PASS "root's authorized keys (sshd AuthorizedKeysFile for root: $(tr '\n' ' ' <<< "$RAKF")): $(grep -c . <<< "$rfp") ($(tr '\n' ' ' <<< "$rfp")); none is one of arm's $(grep -c . <<< "$afp") key fingerprint(s)"; fi
 ps=$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null) && chk C7 PASS "report: kernel.yama.ptrace_scope=$ps (0: arm may ptrace any of its own processes; never run an owner command in an arm session)" \
   || chk C7 UNKNOWN "kernel.yama.ptrace_scope unreadable"
 if have /usr/sbin/sshd; then
@@ -224,22 +294,30 @@ if ! have /usr/bin/psql || ! id postgres > /dev/null 2>&1 || [ "$(pgq 'SELECT 1'
   PGOK=0
 else chk D0 PASS "PostgreSQL reachable as postgres by peer: $(pgq 'SHOW server_version')"; PGOK=1; fi
 if [ "$PGOK" = 1 ]; then
+  # D1 (r8 review R8-F-6): membership closure. A login role that is a MEMBER (direct or inherited, whatever the INHERIT/SET options:
+  # pg_has_role 'MEMBER') of ANY superuser role, login or not, can become superuser and run programs as OS user postgres.
   rows=$(pgq "SELECT rolname, rolsuper, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolcanlogin ORDER BY 1")
-  sup=$(awk -F'|' '$2 == "t" && $1 != "postgres" {printf "%s ", $1}' <<< "$rows")
+  supall=$(pgq "SELECT string_agg(rolname || CASE WHEN rolcanlogin THEN '(login)' ELSE '(nologin)' END, ' ' ORDER BY rolname) FROM pg_roles WHERE rolsuper")
+  sup=$(pgq "SELECT r.rolname || '=>' || s.rolname FROM pg_roles r, pg_roles s WHERE r.rolcanlogin AND r.rolname <> 'postgres' AND s.rolsuper
+             AND (r.oid = s.oid OR pg_has_role(r.oid, s.oid, 'MEMBER')) ORDER BY 1" | tr '\n' ' ')
   flags=$(awk -F'|' '$2 == "t" || $3 == "t" || $4 == "t" || $5 == "t" {printf "%s(super=%s createrole=%s replication=%s bypassrls=%s) ", $1, $2, $3, $4, $5}' <<< "$rows")
-  [ -z "$sup" ] && chk D1 PASS "login roles: $(cut -d'|' -f1 <<< "$rows" | tr '\n' ' '); with any of super/createrole/replication/bypassrls: ${flags:-none}" \
-    || chk D1 FAIL "login role(s) other than postgres are SUPERUSER: $sup(all flagged: $flags)"
+  if [ "$(pgq 'SELECT 1')" != 1 ]; then chk D1 UNKNOWN "PostgreSQL stopped answering"
+  elif [ -z "$sup" ]; then chk D1 PASS "no login role other than postgres is, or is a member (direct or inherited) of, a superuser role; superuser roles: ${supall:-none}; login roles: $(cut -d'|' -f1 <<< "$rows" | tr '\n' ' '); with any of super/createrole/replication/bypassrls: ${flags:-none}"
+  else chk D1 FAIL "login role(s) other than postgres can become SUPERUSER (role=>superuser role): $sup(superuser roles: $supall)"; fi
+  # D2: direct or inherited membership of the three server program/file roles, for every non-superuser login role other than postgres
   mem=$(pgq "SELECT r.rolname || ':' || g.rolname FROM pg_roles r, pg_roles g WHERE r.rolcanlogin AND r.rolname <> 'postgres' AND NOT r.rolsuper
              AND g.rolname IN ('pg_execute_server_program','pg_write_server_files','pg_read_server_files') AND pg_has_role(r.oid, g.oid, 'MEMBER') ORDER BY 1")
-  wm=$(grep -E ':(pg_execute_server_program|pg_write_server_files)$' <<< "$mem" | tr '\n' ' ')
-  [ -z "$wm" ] && chk D2 PASS "no login role is a member of pg_execute_server_program or pg_write_server_files; pg_read_server_files members: $(grep ':pg_read_server_files$' <<< "$mem" | cut -d: -f1 | tr '\n' ' ')" \
-    || chk D2 FAIL "login roles that can act as OS user postgres (server programs/files): $wm"
+  wm=$(grep . <<< "$mem" | tr '\n' ' ')
+  [ -z "$wm" ] && chk D2 PASS "no login role other than postgres is a member (direct or inherited) of pg_execute_server_program, pg_write_server_files or pg_read_server_files" \
+    || chk D2 FAIL "login roles with server program/file access (role:server role): $wm"
   own=$(pgq "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'afldb_prod'")
   [ -n "$own" ] && chk D3 PASS "report: owner of database afldb_prod: $own" || chk D3 UNKNOWN "database afldb_prod not found"
 fi
-# arm's DSN role names: the file is read AS ARM; values stay in this shell; only variable names and role names are printed
-envtxt=$(as_arm /usr/bin/bash --noprofile --norc -c 'f=$1; [ -f "$f" ] && [ ! -L "$f" ] && head -c 262144 -- "$f"' _ "$ARM_ENV" 2>/dev/null)
-if [ -z "$envtxt" ]; then chk D4 UNKNOWN "arm's environment file $ARM_ENV is absent, a link, or unreadable by arm: arm's DSN role is not established"
+# arm's DSN role names: the file is read AS ARM (fail-closed probe); values stay in this shell; only variable and role names print
+arm_probe 'f=$1; if [ -f "$f" ] && [ ! -L "$f" ]; then head -c 262144 -- "$f"; fi; true' "$ARM_ENV"
+envtxt=$PROBE_OUT
+if [ "$PROBE_OK" != 1 ]; then unset envtxt; chk D4 FAIL "probe did not complete: reading arm's environment file as arm exited $PROBE_RC without its sentinel, so arm's DSN roles are not established"
+elif [ -z "$envtxt" ]; then chk D4 UNKNOWN "arm's environment file $ARM_ENV is absent, a link, or unreadable by arm: arm's DSN role is not established"
 else
   roles=(); facts=
   while IFS= read -r l; do
@@ -259,11 +337,16 @@ else
   else
     rb=
     for r in $(printf '%s\n' "${roles[@]}" | sort -u); do
-      a=$(pgq "SELECT rolsuper::text || '|' || pg_has_role(oid, 'pg_execute_server_program', 'MEMBER')::text || '|' || pg_has_role(oid, 'pg_write_server_files', 'MEMBER')::text || '|' || rolcreaterole::text FROM pg_roles WHERE rolname = '$r'")
+      # membership closure (R8-F-6): superuser itself or a MEMBER of any superuser role; MEMBER of any of the three server roles
+      a=$(pgq "SELECT (r.rolsuper OR EXISTS (SELECT 1 FROM pg_roles s WHERE s.rolsuper AND pg_has_role(r.oid, s.oid, 'MEMBER')))::text
+                || '|' || pg_has_role(r.oid, 'pg_execute_server_program', 'MEMBER')::text || '|' || pg_has_role(r.oid, 'pg_write_server_files', 'MEMBER')::text
+                || '|' || pg_has_role(r.oid, 'pg_read_server_files', 'MEMBER')::text || '|' || r.rolcreaterole::text
+                || '|' || coalesce((SELECT string_agg(s.rolname, ',' ORDER BY s.rolname) FROM pg_roles s WHERE s.rolsuper AND s.oid <> r.oid AND pg_has_role(r.oid, s.oid, 'MEMBER')), '')
+                FROM pg_roles r WHERE r.rolname = '$r'")
       case $a in
         '') facts="$facts [$r: no such role]";;
-        'false|false|false|'*) facts="$facts [$r: not superuser, no server program/file role, createrole=${a##*|}]";;
-        *) rb="$rb $r($a)";;
+        'false|false|false|false|'*) a=${a%|*}; facts="$facts [$r: not superuser or a member of one, no server program/file role, createrole=${a##*|}]";;
+        *) rb="$rb $r(super|execute|write|read|createrole|via superuser roles: $a)";;
       esac
     done
     [ -z "$rb" ] && chk D4 PASS "arm's DSN roles (names only):$facts" || chk D4 FAIL "arm's DSN role can act as OS user postgres (super|execute|write|createrole):$rb; all:$facts"
@@ -293,13 +376,17 @@ for d in /usr/local/lib/afldb-backup /usr/local/lib/afldb-verify /etc/systemd/sy
   [ -d "$d" ] && while IFS= read -r f; do PROT+=("$f"); done < <(find "$d" -mindepth 1 2>/dev/null)
 done
 if have /usr/bin/sudo; then
-  as_arm /usr/bin/bash --noprofile --norc -c 'sudo -n true' > /dev/null 2>&1 && chk E0 FAIL "arm runs 'sudo -n true' successfully: arm can become root without a password right now" \
-    || chk E0 PASS "arm cannot run 'sudo -n true' (no passwordless sudo, no cached ticket reachable from a fresh arm process)"
+  arm_probe 'if sudo -n true > /dev/null 2>&1; then echo SUDO-N-OK; else echo SUDO-N-REFUSED; fi'
+  if [ "$PROBE_OK" != 1 ]; then chk E0 FAIL "probe did not complete: the arm-side 'sudo -n true' probe exited $PROBE_RC without its sentinel"
+  elif [ "$(grep . <<< "$PROBE_OUT")" = SUDO-N-REFUSED ]; then chk E0 PASS "arm cannot run 'sudo -n true' (no passwordless sudo, no cached ticket reachable from a fresh arm process)"
+  else chk E0 FAIL "arm runs 'sudo -n true' successfully: arm can become root without a password right now"; fi
 fi
-w=$(as_arm /usr/bin/bash --noprofile --norc -c 'for p in "$@"; do c=; r=${p#/}; while :; do c=$c/${r%%/*}; [ -e "$c" ] && [ -w "$c" ] && echo "$c"; [[ $r == */* ]] || break; r=${r#*/}; done; done' _ "${PROT[@]}" 2>/dev/null | sort -u)
-idarm=$(as_arm /usr/bin/id 2>/dev/null)
-[ -z "$w" ] && chk E1 PASS "as arm ($idarm; no startup file, no PAM session) nothing in the protected set or its parents is writable (access(2), ACLs included; ${#PROT[@]} paths)" \
-  || chk E1 FAIL "arm can write: $(tr '\n' ' ' <<< "$w")"
+# E1, fail-closed (R8-F-1): the probe lists writable components and then its sentinel; a killed or cut-short probe is FAIL, never PASS
+arm_probe 'echo "ID $(id)"; for p in "$@"; do c=; r=${p#/}; while :; do c=$c/${r%%/*}; [ -e "$c" ] && [ -w "$c" ] && echo "W $c"; [[ $r == */* ]] || break; r=${r#*/}; done; done; true' "${PROT[@]}"
+w=$(sed -n 's/^W //p' <<< "$PROBE_OUT" | sort -u); idarm=$(sed -n 's/^ID //p' <<< "$PROBE_OUT" | head -1)
+if [ "$PROBE_OK" != 1 ]; then chk E1 FAIL "probe did not complete: the arm-side write probe exited $PROBE_RC without its sentinel (E2 is the root-side companion)"
+elif [ -z "$w" ]; then chk E1 PASS "as arm ($idarm; no startup file, no PAM session) nothing in the protected set or its parents is writable (access(2), ACLs included; ${#PROT[@]} paths; probe completed)"
+else chk E1 FAIL "arm can write: $(tr '\n' ' ' <<< "$w")"; fi
 efail=; absent=0
 for p in "${PROT[@]}"; do
   if trust_comp "$p"; then [ "$TC_ABSENT" = 1 ] && absent=$((absent + 1)); else efail="$efail $TC_WHY;"; fi
@@ -337,14 +424,27 @@ else
   else chk F3 FAIL "$ADMIN has no full sudo rule: $(sed -n '/may run/,$p' <<< "$o" | tr '\n' ';' | cut -c1-200)"; fi
   s=$(passwd -S "$ADMIN" 2>/dev/null | awk '{print $2}'); [ "$s" = P ] && chk F4 PASS "$ADMIN has a usable password (for sudo; it is typed only in the admin session)" || chk F4 FAIL "$ADMIN password status '$s' (need P)"
   T=$(sshd -T -C "user=$ADMIN,host=check.invalid,addr=127.0.0.1" 2>/dev/null)
-  akf=$(sed -n 's/^authorizedkeysfile //p' <<< "$T"); fc=$(sed -n 's/^forcecommand //p' <<< "$T")
-  [ "$fc" = none ] && fc=    # sshd -T prints "forcecommand none" when no forced command applies
-  [ -n "$akf" ] || akf=.ssh/authorized_keys
-  ff=; fails=; for k in $akf; do k=${k//%h/$ahome}; k=${k//%u/$ADMIN}; k=${k//%%/%}; case $k in /*) ;; *) k=$ahome/$k;; esac
-    [ -e "$k" ] || continue
+  fc=$(sed -n 's/^forcecommand //p' <<< "$T"); [ "$fc" = none ] && fc=    # sshd -T prints "forcecommand none" when none applies
+  akc=$(akc_of "$ADMIN"); [ "$akc" = none ] && akc=
+  AKF=$(akf_paths "$ADMIN" "$ahome")
+  # F5 (r8 review R8-F-8): exactly ONE authorised key line in all of sshd's AuthorizedKeysFile paths for the admin, and it is a bare
+  # key line (type, base64, optional comment): the procedure writes no options prefix, so any options prefix, any second key line or
+  # any line that is not a key line is FAIL; with --admin-fp its fingerprint must equal the workstation's.
+  ff=; fails=; nkeys=0; shape=
+  KRE='^(ssh-ed25519|sk-ssh-ed25519@openssh\.com|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+={0,3}( [ -~]*)?$'
+  while IFS= read -r k; do
+    [ -n "$k" ] && { [ -e "$k" ] || [ -L "$k" ]; } || continue
     trust_comp "$k" || { fails="$fails $TC_WHY;"; continue; }
     o=$(stat -c %U -- "$k"); [ "$o" = "$ADMIN" ] || [ "$o" = root ] || fails="$fails $k owned by $o;"
-    ff="$ff$(fp_list "$k")"$'\n'; done
+    n=0
+    while IFS= read -r l || [ -n "$l" ]; do
+      n=$((n + 1)); l=${l%$'\r'}
+      [[ $l =~ ^[[:space:]]*(#|$) ]] && continue
+      nkeys=$((nkeys + 1))
+      LC_ALL=C grep -Eq "$KRE" <<< "$l" || shape="$shape $k:$n is not a bare key line (an options prefix or other text);"
+    done < "$k"
+    ff="$ff$(fp_list "$k")"$'\n'
+  done <<< "$AKF"
   for f in .bashrc .profile .bash_profile .bash_login .bash_logout .ssh/rc .ssh/environment; do
     [ -e "$ahome/$f" ] || [ -L "$ahome/$f" ] || continue
     trust_comp "$ahome/$f" || fails="$fails $TC_WHY;"
@@ -353,14 +453,17 @@ else
   ff=$(grep . <<< "$ff" | sort -u)
   both=$(comm -12 <(printf '%s\n' "$ff") <(printf '%s\n' "$afp") | grep .)
   if [ -n "$fails" ]; then chk F5 FAIL "$ADMIN's home, startup or key files:$fails"
-  elif [ -z "$ff" ]; then chk F5 FAIL "$ADMIN has no authorised key ($akf): no independent SSH admin path"
+  elif [ "$nkeys" = 0 ]; then chk F5 FAIL "$ADMIN has no authorised key ($(tr '\n' ' ' <<< "$AKF")): no independent SSH admin path"
+  elif [ -n "$shape" ]; then chk F5 FAIL "$ADMIN's authorised keys:$shape"
+  elif [ "$nkeys" != 1 ]; then chk F5 FAIL "$ADMIN has $nkeys authorised key lines; the procedure installs exactly one"
+  elif [ "$AFP_OK" != 1 ]; then chk F5 FAIL "probe did not complete: arm's key listing (C6) is not established, so the overlap with the admin key is not judged"
   elif [ -n "$both" ]; then chk F5 FAIL "a key authorised for $ADMIN is also one of arm's: $(tr '\n' ' ' <<< "$both")"
   elif [ -n "$ADMIN_FP" ] && [ "$ff" != "$ADMIN_FP" ]; then chk F5 FAIL "$ADMIN authorises $(tr '\n' ' ' <<< "$ff"), not exactly the workstation fingerprint $ADMIN_FP"
-  else chk F5 PASS "$ADMIN authorises $(grep -c . <<< "$ff") key(s) ($(tr '\n' ' ' <<< "$ff")${ADMIN_FP:+= the workstation fingerprint}); none is arm's; home and startup files trusted"; fi
-  [ -z "$fc" ] && grep -qx 'pubkeyauthentication yes' <<< "$T" && chk F6 PASS "sshd for $ADMIN: pubkey authentication, no forced command; $(grep -E '^(passwordauthentication|permituserrc|allowusers|allowgroups|denyusers|denygroups) ' <<< "$T" | tr '\n' ';')" \
-    || chk F6 FAIL "sshd for $ADMIN: forcecommand '${fc:-none}', $(grep '^pubkeyauthentication' <<< "$T")"
+  else chk F5 PASS "$ADMIN authorises exactly one bare key line ($ff${ADMIN_FP:+ = the workstation fingerprint}); not arm's; home and startup files trusted"; fi
+  if [ -z "$fc" ] && [ -z "$akc" ] && grep -qx 'pubkeyauthentication yes' <<< "$T"; then
+    chk F6 PASS "sshd for $ADMIN: pubkey authentication, no forced command, no AuthorizedKeysCommand; $(grep -E '^(passwordauthentication|permituserrc|allowusers|allowgroups|denyusers|denygroups) ' <<< "$T" | tr '\n' ';')"
+  else chk F6 FAIL "sshd for $ADMIN: forcecommand '${fc:-none}', authorizedkeyscommand '${akc:-none}', $(grep '^pubkeyauthentication' <<< "$T")"; fi
 fi
-
 # ------------------------------------------------------------------------------------------------ result
 if [ ${#FAILS[@]} = 0 ] && [ ${#UNKS[@]} = 0 ]; then echo "OWNER CHECKS RESULT PASS"; exit 0; fi
 note=; [[ " ${FAILS[*]} " == *" A2 "* || " ${FAILS[*]} " == *" A1 "* ]] && note=" (session not independent: no result above counts)"

@@ -26,7 +26,7 @@
 #   root on both hosts is independent of arm (F1, an owner action); authentic is not the same as "every input is true".
 # Exit: 0 PASS, 1 STOP, 2 usage. version: 0 only when BOTH hosts answer PASS (r8; r7 exited 0 even when a host answered STOP).
 set -uo pipefail; export LC_ALL=C
-BUNDLE_SHA=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
+BUNDLE_SHA=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
 PROD_NAME=afldb-prod; OFF_NAME=streamanator; OFF_ADDR=10.0.40.100; PROD_ALIAS=afldb
 SSHBIN=${AFLDB_VERIFY_SSH:-C:/Windows/System32/OpenSSH/ssh.exe}
 KEY=$HOME/.ssh/afldb_verify; TRANSPORT=production; CFG=
