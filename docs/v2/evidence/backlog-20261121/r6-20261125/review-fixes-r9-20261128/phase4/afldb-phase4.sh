@@ -13,15 +13,22 @@
 #            that names arm, or %<g> for a group g arm is in;
 #   (strict) on logical lines (a trailing backslash joins the next line; `#<digits>` and `#include` are NOT comments): a uid form
 #            #<n> that is arm's uid or resolves to arm; %#<gid> for a gid arm is in; any non-Unix group %:<g>; any netgroup +<n>
-#            (it cannot be resolved offline); a user spec or User_Alias member that is ALL or !-negated; a user list it cannot parse;
+#            (it cannot be resolved offline); a user spec or User_Alias member that is ALL or !-negated; a user list, or a User_Alias
+#            member, holding a backslash or a quote (sudoers collapses escapes: `ar\m` is arm), which it does not try to parse;
 #   (source) sudo rules outside the files it reads: an /etc/nsswitch.conf `sudoers:` line naming anything but `files`; an LDAP
 #            (SUDOERS_BASE, /etc/sudo-ldap.conf) or sssd sudo configuration; any active Plugin line in /etc/sudo.conf.
 # entry classifies each match:
-#   group-only  the B3 token %sudo, the only group-only class: `gpasswd -d arm sudo` removes it, `gpasswd -a arm sudo` restores it;
-#   disposed    its file is named by --dispose: the owner edits that file with `visudo -f`, the back-out restores the saved copy;
+#   group-only  the B3 token %sudo, the only group-only class, decided FIRST, in a disposed file too: `gpasswd -d arm sudo` removes
+#               it, `gpasswd -a arm sudo` restores it, and its line is NEVER edited (it is also afldb-admin's route to root, 1.8);
+#   disposed    any other match in a file named by --dispose: the owner edits ONLY those lines with `visudo -f` (4.0 names them and
+#               the %sudo lines to keep), the back-out restores the saved copy;
 #   unrelated   anything else: REFUSED, naming file:line and token; it needs its own disposition before Phase 4.
 # entry also REFUSES: arm not in sudo; arm in admin or wheel; an include directive other than includedir /etc/sudoers.d; a link,
-# non-regular file or unusual name in /etc/sudoers.d; a --dispose file outside /etc/sudoers{,.d} or without a match.
+# non-regular file or unusual name in /etc/sudoers.d; a --dispose file outside /etc/sudoers{,.d}, without a match, or whose only
+# match is %sudo; a %sudo line that shares a (continued) line with a disposed match, since no edit could keep one and not the other.
+# verify (r9, R9-F-2) also requires: in each disposed file every line outside the disposed matches is byte-identical to the entry
+# copy (so each %sudo line survives; removing a disposed file is allowed only when nothing else in it but comments and blank lines),
+# and `sudo -l -U afldb-admin` equals its pre-change record (when that account exists at entry).
 # A grant added after entry, or a form none of these rules knows, is caught by verify (`sudo -l -U arm`, the file inventory and the
 # same rescan), whose answer is then STOP: back out, dispose of it separately. Conservative by design: when unsure, it refuses.
 # Output: `PHASE4 <CMD> ...` lines, ending `PHASE4 ENTRY RESULT PASS change=group-only|group-and-disposed ...` or `... REFUSED
@@ -108,6 +115,14 @@ logical() { # FILE: LINE<TAB>TEXT per logical line; a trailing backslash joins t
          print s "\t" buf l; buf = "" }
        END { if (buf != "") print s "\t" buf }' "$1" 2>/dev/null
 }
+lspan() { # FILE N: START<TAB>END, the physical lines of the logical line (as logical() joins them) that holds physical line N
+  awk -v want="$2" 'function cmt(t) { return t ~ /^[ \t]*#/ && t !~ /^[ \t]*#[0-9]/ && t !~ /^[ \t]*#include/ }
+       { l = $0
+         if (!cont) { s = NR; if (l ~ /^[ \t]*$/ || cmt(l)) { if (NR == want) { print NR "\t" NR; done = 1; exit }; next } }
+         cont = (l ~ /\\$/)
+         if (!cont && NR >= want) { print s "\t" NR; done = 1; exit } }
+       END { if (!done) { if (cont) print s "\t" NR; else print want "\t" want } }' "$1" 2>/dev/null
+}
 strict_scan() { # FILE<TAB>LINE<TAB>TOKEN<TAB>TEXT for each grant form B3 does not judge (entry is stricter than B3)
   local f n t m first rest lhs ul hl gids items hits
   gids=" $(id -G arm 2>/dev/null) "
@@ -126,7 +141,8 @@ strict_scan() { # FILE<TAB>LINE<TAB>TOKEN<TAB>TEXT for each grant form B3 does n
         User_Alias|Runas_Alias|Host_Alias)
           while IFS= read -r m; do
             case $m in +*) hits+=("netgroup:$m");; esac
-            [ "$first" = User_Alias ] && case $m in ALL) hits+=("ALL-in-User_Alias");; '!'*) hits+=("negated-in-User_Alias:$m");; esac
+            [ "$first" = User_Alias ] && case $m in ALL) hits+=("ALL-in-User_Alias");; '!'*) hits+=("negated-in-User_Alias:$m");;
+              *[\"\\]*) hits+=("unparsed-alias-member:$m");; esac
           done < <(sed -E 's/^[^=]*=//; s/:[[:space:]]*[A-Z][A-Z0-9_]*[[:space:]]*=/,/g' <<< "$rest" | tr ',' '\n' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//');;
         *) # a user spec: User_List Host_List = Cmnd_Spec_List
           [[ $t == *=* ]] || hits+=("unparsed-line")
@@ -170,7 +186,10 @@ sudo_summary() { local o; o=$(sudo_l); if grep -q 'is not allowed to run sudo' <
   elif grep -q 'may run the following commands' <<< "$o"; then echo "arm may run: $(sed -n '/may run the following commands/,$p' <<< "$o" | sed 1d | sed 's/^ *//' | tr '\n' ';')"
   else echo "unrecognised sudo -l answer: $(head -3 <<< "$o" | tr '\n' ';')"; fi; }
 visudo_c() { local o; o=$(visudo -c 2>&1 < /dev/null) && return 0; VISUDO_OUT=$o; return 1; }
-SEALED="groups.pre gid.pre sudo-group.pre sudo-l.pre dir.pre inv.pre copies matches.pre classified.pre includes.pre disposed plan RESULT"
+admin_l() { # the admin account's own sudo route (step 1.8), which no Phase 4 change may touch
+  if getent passwd afldb-admin > /dev/null; then sudo -n -l -U afldb-admin 2>&1 < /dev/null | cat; else echo "no account afldb-admin"; fi; }
+admin_summary() { grep -E '^[[:space:]]+\(' <<< "$1" | sed 's/^ *//' | tr '\n' ';'; }
+SEALED="groups.pre gid.pre sudo-group.pre sudo-l.pre admin-l.pre dir.pre inv.pre copies matches.pre classified.pre includes.pre disposed plan RESULT"
 load() { # verify/backout: the state directory is root-only, sealed, and from an entry that PASSED
   [ -d "$S" ] && [ ! -L "$S" ] && [ "$(stat -c '%u %a' "$S")" = "0 700" ] || die "state $S is not a root-only (0700) directory"
   (cd "$S" && sha256sum -c --strict --quiet SHA256SUMS) > /dev/null 2>&1 || die "state $S: seal check (SHA256SUMS) failed"
@@ -181,12 +200,16 @@ load() { # verify/backout: the state directory is root-only, sealed, and from an
 }
 is_disposed() { grep -qxF -- "$1" "$S/disposed"; }
 copy_of() { awk -F'\t' -v p="$1" '$2 == p {print $1}' "$S/copies"; }
+# classified.pre rows: FILE<TAB>LINE<TAB>TOKEN<TAB>CLASS<TAB>START<TAB>END (the physical lines of the match's logical line)
+in_class() { awk -F'\t' -v p="$1" -v c="$2" -v l="$3" '$1 == p && $4 == c && $5 <= l + 0 && l + 0 <= $6 {f = 1} END {exit !f}' "$S/classified.pre"; }
+lines_of() { awk -F'\t' -v p="$1" -v c="$2" '$1 == p && $4 == c {printf "%s%s(%s%s) ", s, $2, $3, ($5 != $6 ? ", lines " $5 "-" $6 : ""); s = ""}' "$S/classified.pre"; }
 
 # ------------------------------------------------------------------------------------------------ entry (step 4.0)
 entry() {
   [ -d /root ] && [ ! -L /root ] && [ "$(stat -c %u /root)" = 0 ] && ! (( 8#$(stat -c %a /root) & 8#022 )) || die "/root is not a trusted root-owned directory"
   mkdir -m 0700 -- "$S" 2> /dev/null || die "cannot create the NEW state directory $S (it must not exist yet)"
   arm_groups > "$S/groups.pre"; id -g arm > "$S/gid.pre"; getent group sudo > "$S/sudo-group.pre"; sudo_l > "$S/sudo-l.pre"
+  admin_l > "$S/admin-l.pre"
   dirstat > "$S/dir.pre"; inv > "$S/inv.pre"; : > "$S/copies"
   local i=0 f rest n tok txt cls d k m
   while read -r f rest; do
@@ -204,17 +227,29 @@ entry() {
     if ! { [ "$d" = /etc/sudoers ] || [[ $d =~ ^/etc/sudoers\.d/[A-Za-z0-9_~-][A-Za-z0-9._~-]*$ ]]; }; then flag "--dispose $d: only /etc/sudoers or a file directly in /etc/sudoers.d"
     elif ! grep -Eq "^${d//./\\.} [0-9]+ [0-9]+ [0-7]+ [0-9a-f]{64}\$" "$S/inv.pre"; then flag "--dispose $d: not a regular sudoers file here"
     elif ! cut -f1 "$S/matches.pre" | grep -qxF -- "$d"; then flag "--dispose $d: entry reports no match in it, so there is nothing to dispose of"
+    elif ! awk -F'\t' -v p="$d" '$1 == p && $3 != "%sudo" {f = 1} END {exit !f}' "$S/matches.pre"; then
+      flag "--dispose $d: its only match is %sudo (group-only: 4.1's gpasswd -d arm sudo removes it, and its line is never edited), so there is nothing to dispose of"
     else echo "$d" >> "$S/disposed"; fi
   done
   : > "$S/classified.pre"
+  local sp c kp
   while IFS=$'\t' read -r f n tok txt; do
-    if is_disposed "$f"; then cls=disposed; elif [ "$tok" = %sudo ]; then cls=group-only; else cls=unrelated; fi
+    # %sudo first: in a disposed file too it stays group-only, and its line is never listed for change (R9-F-2)
+    if [ "$tok" = %sudo ]; then cls=group-only; elif is_disposed "$f"; then cls=disposed; else cls=unrelated; fi
+    c=$(copy_of "$f"); sp="$n"$'\t'"$n"; [ -n "$c" ] && sp=$(lspan "$S/copy.$c" "$n")
+    printf '%s\t%s\t%s\t%s\t%s\n' "$f" "$n" "$tok" "$cls" "$sp" >> "$S/classified.pre"
     say "match $f:$n token $tok class $cls: $txt"
     if [ "$cls" = unrelated ]; then
       case $f in /etc/sudoers|/etc/sudoers.d/*) flag "$f:$n names $tok ('$txt'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name $f with --dispose to edit it in 4.1";;
         *) flag "$f:$n names $tok ('$txt'): a sudo rule source entry cannot read; dispose of it separately (it cannot be disposed of in 4.1)";; esac
     fi
   done < "$S/matches.pre"
+  # a %sudo line that shares a physical line with a disposed match: no edit of the disposed match could keep %sudo intact
+  while IFS= read -r m; do flag "$m: entry cannot plan an edit that keeps %sudo; dispose of it separately"; done < <(awk -F'\t' '
+    NR == FNR { if ($4 == "disposed") { k++; F[k] = $1; L[k] = $2; T[k] = $3; A[k] = $5; B[k] = $6 }; next }
+    $4 == "group-only" { for (i = 1; i <= k; i++) if (F[i] == $1 && $5 <= B[i] + 0 && A[i] <= $6 + 0)
+      printf "%s:%s (%%sudo, lines %s-%s) shares a line with the disposed match %s:%s (%s)\n", $1, $2, $5, $6, F[i], L[i], T[i] }' \
+    "$S/classified.pre" "$S/classified.pre")
   grep -qx sudo "$S/groups.pre" || flag "arm is not in group sudo: this is not the state Phase 4 changes; re-run Phase 2"
   for k in admin wheel; do grep -qx "$k" "$S/groups.pre" && flag "arm is in group $k (sudo's other admin groups): dispose of it separately"; done
   check_incs < "$S/includes.pre"
@@ -224,6 +259,7 @@ entry() {
   say "pre-change: /etc/sudoers.d: $(cat "$S/dir.pre")"
   while read -r f rest; do say "pre-change: file $f uid gid mode sha256: $rest"; done < "$S/inv.pre"
   say "pre-change: sudo -l -U arm: $(sudo_summary)"
+  say "pre-change: sudo -l -U afldb-admin: $(if grep -qx 'no account afldb-admin' "$S/admin-l.pre"; then echo "no account afldb-admin (not compared by verify)"; else admin_summary "$(cat "$S/admin-l.pre")"; fi)"
   say "pre-change: include directives: $(cut -f2 "$S/includes.pre" | tr '\n' ';')"
   if [ ${#BAD[@]} -gt 0 ]; then echo REFUSED > "$S/RESULT"; finish; fi
 
@@ -237,7 +273,8 @@ entry() {
   k=1
   while read -r d; do
     [ -n "$d" ] || continue; k=$((k + 1)); read -r u g md sh < <(inv_of "$d" < "$S/inv.pre")
-    say "change $k (disposed, step 4.1, [ADM-ROOT]): visudo -f $d, removing or changing line(s) $(awk -F'\t' -v p="$d" '$1 == p {printf "%s(%s) ", $2, $3}' "$S/matches.pre")"
+    kp=$(lines_of "$d" group-only)
+    say "change $k (disposed, step 4.1, [ADM-ROOT]): visudo -f $d, removing or changing ONLY line(s) $(lines_of "$d" disposed)and no other line${kp:+; KEEP line(s) ${kp}exactly as they are (%sudo, group-only: the route to root of afldb-admin)}"
     say "back-out $k ([CON]): install -o $u -g $g -m 0$md $S/copy.$(copy_of "$d") $d && visudo -c && sha256sum $d (must print $sh)"
   done < "$S/disposed"
   say "back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $0 backout --state $S"
@@ -276,6 +313,32 @@ verify() {
     else flag "$p changed outside the plan: was [${PRE[$p]}], now [${CUR[$p]-absent}]"; fi
   done < <(printf '%s\n' "${!PRE[@]}" | sort)
   while IFS= read -r p; do [ -n "${PRE[$p]+x}" ] || flag "$p was added: [${CUR[$p]}]"; done < <(printf '%s\n' "${!CUR[@]}" | sort)
+  # R9-F-2: a disposed file changes ONLY on its disposed lines; every other line, each %sudo line included, is byte-identical
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    local i ln bad=0 kp; i=$(copy_of "$p"); kp=$(lines_of "$p" group-only)
+    if [ "${CUR[$p]-absent}" = absent ]; then   # removal loses every logical line; allowed only when each is a disposed match
+      while IFS=$'\t' read -r ln _; do
+        in_class "$p" disposed "$ln" && continue; bad=1
+        flag "$p was removed, but its line $ln ('$(san "$(sed -n "${ln}p" "$S/copy.$i")")') was not named for change$(in_class "$p" group-only "$ln" && echo " (it is %sudo, group-only: afldb-admin's route to root)")"
+      done < <(logical "$S/copy.$i")
+    else
+      local h a z
+      while IFS= read -r h; do   # normal diff hunks: <old>a<new> adds, <old>c<new> changes, <old>d<new> deletes
+        if [[ $h =~ ^([0-9]+)a ]]; then bad=1; flag "$p: line(s) were added after line ${BASH_REMATCH[1]}, which 4.0 did not plan (a disposed file changes only on its disposed lines)"; continue; fi
+        [[ $h =~ ^([0-9]+)(,([0-9]+))?[cd] ]] || { bad=1; flag "$p: unreadable difference '$h'"; continue; }
+        a=${BASH_REMATCH[1]}; z=${BASH_REMATCH[3]:-$a}
+        for ((ln = a; ln <= z; ln++)); do
+          in_class "$p" disposed "$ln" && continue; bad=1
+          flag "$p:$ln ('$(san "$(sed -n "${ln}p" "$S/copy.$i")")') was changed or removed, but 4.0 did not name it for change$(in_class "$p" group-only "$ln" && echo " (it is %sudo, group-only: afldb-admin's route to root)")"
+        done
+      done < <(diff -- "$S/copy.$i" "$p" | grep -E '^[0-9]')
+    fi
+    [ $bad = 0 ] && say "check kept PASS $p: only its disposed line(s) $(lines_of "$p" disposed)changed; every other line is byte-identical${kp:+, including the %sudo line(s) $kp}"
+  done < "$S/disposed"
+  if [ "$(cat "$S/admin-l.pre" 2>/dev/null)" = "no account afldb-admin" ]; then say "check admin-sudo-l not compared: no account afldb-admin at entry"
+  elif o=$(admin_l); [ -f "$S/admin-l.pre" ] && [ "$o" = "$(cat "$S/admin-l.pre")" ]; then say "check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record: $(admin_summary "$o")"
+  else flag "sudo -l -U afldb-admin differs from the pre-change record (the admin's own route to root): now $(admin_summary "$o"); diff record/now: $(diff "$S/admin-l.pre" <(admin_l) 2>&1 | tr '\n' ';')"; fi
   check_incs < <(incs)
   if visudo_c; then say "check visudo-c PASS"; else flag "visudo -c fails: $(tr '\n' ';' <<< "$VISUDO_OUT")"; fi
   o=$(scan_all); [ -z "$o" ] && say "check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source" \
@@ -317,6 +380,9 @@ backout() {
   [ "$(id -g arm)" = "$(cat "$S/gid.pre")" ] || flag "arm's primary group differs from the pre-change record"
   [ "$(sudo_l)" = "$(cat "$S/sudo-l.pre")" ] && say "check sudo-l PASS sudo -l -U arm equals the pre-change record: $(sudo_summary)" \
     || flag "sudo -l -U arm differs from the pre-change record: now $(sudo_summary); diff record/now: $(diff "$S/sudo-l.pre" <(sudo_l) | tr '\n' ';')"
+  if [ "$(cat "$S/admin-l.pre" 2>/dev/null)" = "no account afldb-admin" ]; then say "check admin-sudo-l not compared: no account afldb-admin at entry"
+  elif [ -f "$S/admin-l.pre" ] && [ "$(admin_l)" = "$(cat "$S/admin-l.pre")" ]; then say "check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record"
+  else flag "sudo -l -U afldb-admin differs from the pre-change record: diff record/now: $(diff "$S/admin-l.pre" <(admin_l) 2>&1 | tr '\n' ';')"; fi
   say "pre-change group line: $(cat "$S/sudo-group.pre"); now: $(getent group sudo) (member order may differ; membership is compared)"
   finish "the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of $S"
 }

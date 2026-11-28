@@ -1,0 +1,16 @@
+== r9p-dev2 2026-11-28T08:12:58Z workstation: afldb-verify-call.sh g0 2026-11-28
+== afldb-verify-call 2026-11-28T08:12:49Z mode=g0 transport=rehearsal pinned-bundle=3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95 key=C:/Users/stuar/AppData/Local/Temp/tmp.rj4fOPt0K1/verify qualification=none qual-sha256=none
+-- qualification: NONE (no qualified off-host endpoint; G0 cannot PASS)
+-- G0a: production, g0 2026-11-28
+== afldb-verify G0 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95 identity: uid=997(afldb-verify) gid=995(afldb-verify) groups=995(afldb-verify),997(afldb-backup-read),999(systemd-journal) at 2026-11-28T08:12:55Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0 (verifier) 2026-11-28T08:12:55Z local Sat 2026-11-28 19:12:55 AEDT day 2026-11-28
+FAIL scheduled origin unproven: 0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+INFO no dump is examined and no OFFHOST-COMPARE line is printed: without a sealed timer run no dump is the scheduled one
+PASS afldb-backup.service Result=success (PID 1: the last run did not fail)
+FAIL FAILED marker(s) in /home/arm/backups/afldb-scheduled/.state (arm-produced): (arm .state unreadable: No such file or directory) 
+INFO afldb-backup-verify.service last: success  0 (record; not a G0 criterion)
+G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged
+AFLDB-VERIFY RESULT G0 STOP nonce=4b12622c6ca06bcec9bfaee01991afa8 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95 at=2026-11-28T08:12:58Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+OWNER VERDICT G0 STOP transport=rehearsal ssh=ssh.exe date=2026-11-28 step=G0a nonce=4b12622c6ca06bcec9bfaee01991afa8 at=2026-11-28T08:12:58Z exit=1 reason="the production verifier answered STOP" qualification=none qual-sha256=none
+exit 1

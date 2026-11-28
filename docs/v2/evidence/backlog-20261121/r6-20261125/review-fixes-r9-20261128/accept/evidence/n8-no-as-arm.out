@@ -1,13 +1,15 @@
-== case n8-no-as-arm: bash afldb-gate-accept.sh --rehearsal --gate release-g0 --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/fx-reverify-no-as-arm.txt --version inputs/fx-version-post.txt --verdict inputs/fx-g0-pass-post.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T07:41:44Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
-   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
-   678894aba22bb0decde387382d6ccb6af4d72223eff26de172336487c26a20c0  inputs/fx-reverify-no-as-arm.txt
-   4087a7e0603c00cde5cc29bbab0524bcb18a723fb55f4c614c1a03a511d6a60f  inputs/fx-version-post.txt
-   b338ab86f537bbd10c996518da5dcfe61f40974150c4fbef4a3f2ba64a15c0d6  inputs/fx-g0-pass-post.txt
+== case n8-no-as-arm: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-no-as-arm.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-g0-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T08:03:44Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
+   f55b5c35182ca19d35f9dc7c7b80d1858c5cf45c4e202d5e6c6e465ad0fd01ae  unmarked/fx-reverify-no-as-arm.txt
+   644074318fb0b49c0bde30f9297a5dcfc8162539d3b49c37f7bfb3122065ebaa  unmarked/fx-version-post.txt
+   aeab2d23b9dc42366d2db05b83edc2ed8626dfde585cb428d8bd44c5d61c8c2c  unmarked/fx-g0-pass-post.txt
 REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
-ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
 ACCEPT reverify FAIL need each header once: root 1, --as-arm 0, verify-verify-install --role prod 1
-ACCEPT version FAIL cannot be ordered after (a) and (b), which did not pass
-ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T05:25:16Z, exit 0, after the version check
-GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=reverify,version reason="reverify: need each header once: root 1, --as-arm 0, verify-verify-install --role prod 1"
+ACCEPT version FAIL [after FAILED reverify] cannot be ordered after (a) and (b), which did not pass
+ACCEPT verdict FAIL bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 is not the re-verified bundle none
+ACCEPT fresh PASS verdict 2026-11-28T05:25:16Z is 3 min after the Phase 4 evidence (2026-11-28T05:21:46Z); checked 14 min later at 2026-11-28T05:40:00Z (test clock)
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=reverify,version,verdict reason="reverify: need each header once: root 1, --as-arm 0, verify-verify-install --role prod 1"
 == exit 1

@@ -18,6 +18,8 @@ The wrapper prints the gate output, then exactly one `OWNER VERDICT <G0|A2|VERSI
 exits 0 only for PASS. Release G0 consumes only `OWNER VERDICT G0 PASS`; NG-PRE consumes only `OWNER VERDICT A2 PASS`, plus the
 separate `backup-origin=` field on the same line. `--rehearsal <ssh-config> --key <key>` exists only for the harness, and it prints
 `transport=rehearsal` in every verdict, so a rehearsal verdict can never be pasted as a production one.
+With `AFLDB_VERIFY_SSH` set (a test hook replacing the ssh client), production transport prints a STUB WARNING line first and labels
+the header and every verdict `transport=production-stub`; that is never a production verdict (R9-F-3).
 
 `version` prints one production line and one off-host line, and exits 0 only when both are PASS (r8; r7 exited 0 even when a host
 answered STOP). r9: the off-host line goes to the qualified endpoint (`../../review-fixes-r9-20261128/offhost/QUALIFY-OFFHOST.md`).

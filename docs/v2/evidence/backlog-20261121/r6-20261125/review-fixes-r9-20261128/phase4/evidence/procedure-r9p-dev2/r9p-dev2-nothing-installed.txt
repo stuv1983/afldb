@@ -1,0 +1,2 @@
+== r9p-dev2 2026-11-28T08:10:41Z console: nothing installed after arm's attempt
+R8P NOTHING-INSTALLED yes

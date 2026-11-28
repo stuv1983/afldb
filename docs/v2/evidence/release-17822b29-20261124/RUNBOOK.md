@@ -208,7 +208,7 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 
 | Time (latest) | Step | Command | PASS line |
 |---|---|---|---|
-| 10:30 | **G0** (r7 owner path, read-only, **Stu runs it on the workstation**: G0a scheduled dump on production, then G0b on the **qualified** off-host endpoint), then **r9 acceptance**. r9: no endpoint is qualified today, so G0 STOPs and the release stops before P2 | `bash "$V7/afldb-verify-call.sh" g0 2026-11-24 > "$AC/g0.txt" 2>&1; echo $? > "$AC/g0.exit"; cat "$AC/g0.txt"`, then `bash "$R9/accept/afldb-gate-accept.sh" --gate release-g0 --owner-checks "$AC/afldb-r9-4.4.txt" --reverify "$AC/afldb-r9-4.5.txt" --version "$AC/afldb-r9-4.6.txt" --verdict "$AC/g0.txt" --verdict-exit "$(cat "$AC/g0.exit")"` (`$V7`, `$R9`, `$AC`: §4.1a; the inputs: OWNER-PROCEDURE 4.4–4.6, saved within 24 h before the call) | **only** a final line beginning `GATE ACCEPT RELEASE-G0 GO transport=production`, exit 0. That GO contains the wrapper's `OWNER VERDICT G0 PASS transport=production … date=2026-11-24 invocation=<INV> dump=<D> sha256=<SHA> dispatch=<scheduled\|catch-up> … offhost=<host> … dispatch-at=… received-at=… complete-at=… received-sha256=<SHA> rehash-sha256=<SHA> qualification=pinned qual-sha256=<pin>` with exit 0; record `<D>`, `<SHA>`, `dispatch=`, `offhost=` and `qual-sha256=`. `qualification=none\|refused\|FIXTURE`, a "possession only" reason, a G0 PASS whose acceptance is NO-GO, and any Phase 3 output are **not** GO evidence |
+| 10:30 | **G0** (r7 owner path, read-only, **Stu runs it on the workstation**: G0a scheduled dump on production, then G0b on the **qualified** off-host endpoint), then **r9 acceptance**. r9: no endpoint is qualified today, so G0 STOPs and the release stops before P2 | `bash "$V7/afldb-verify-call.sh" g0 2026-11-24 > "$AC/g0.txt" 2>&1; echo $? > "$AC/g0.exit"; cat "$AC/g0.txt"`, then `bash "$R9/accept/afldb-gate-accept.sh" --gate release-g0 --owner-checks "$AC/afldb-r9-4.4.txt" --reverify "$AC/afldb-r9-4.5.txt" --version "$AC/afldb-r9-4.6.txt" --verdict "$AC/g0.txt" --verdict-exit "$(cat "$AC/g0.exit")"` (`$V7`, `$R9`, `$AC`: §4.1a; the inputs: OWNER-PROCEDURE 4.4–4.6, saved immediately before the call: the verdict ≤ 3 h after them, the check ≤ 1 h after the verdict, same production boot) | **only** a final line beginning `GATE ACCEPT RELEASE-G0 GO transport=production`, exit 0. That GO contains the wrapper's `OWNER VERDICT G0 PASS transport=production … date=2026-11-24 invocation=<INV> dump=<D> sha256=<SHA> dispatch=<scheduled\|catch-up> … offhost=<host> … dispatch-at=… received-at=… complete-at=… received-sha256=<SHA> rehash-sha256=<SHA> qualification=pinned qual-sha256=<pin>` with exit 0; record `<D>`, `<SHA>`, `dispatch=`, `offhost=` and `qual-sha256=`. `qualification=none\|refused\|FIXTURE`, a "possession only" reason, a G0 PASS whose acceptance is NO-GO, and any Phase 3 output are **not** GO evidence |
 | — | *superseded by r7, information only:* `tr -d '\r' < r1-g0-dump.sh \| $S bash -s -- 2026-11-24` (G0a as arm) and `r6-offhost-verify.sh` over arm's ssh to streamanator (G0b as arm) | as before | their `G0 PROD RESULT PASS` / `R6 OFFHOST RESULT PASS` lines are **not GO evidence** |
 | 10:35 | **P1** serving release and route (read-only) | `tr -d '\r' < r1-p1-precheck.sh \| $S bash -s -- <PREP>` | `P1 RESULT PASS`; note `UNACCEPTED_YEARS` |
 | 10:39 | **Baseline** raw head (writes `/home/arm/r1-rawhead-baseline.json` only) | `tr -d '\r' < r1-rawhead.sh \| $S bash -s -- baseline <UNACCEPTED_YEARS>` | `RAWHEAD RESULT baseline PASS` |
@@ -230,7 +230,8 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 That GO requires all of: (a) the OWNER-PROCEDURE 4.4 owner checks, `OWNER CHECKS RESULT PASS` with B1, B2 and B3 PASS; (b) the 4.5
 re-verification of both installs, with arm out of `sudo`; (c) a 4.6 version check made after them, with production and the
 qualified off-host endpoint PASS; (d) the wrapper's `OWNER VERDICT G0 PASS transport=production` with exit 0, made after (c), naming
-the same off-host endpoint and qualification, and within 24 h of (a) and (b). *(r7 text, now the wrapper's half:)* G0 passes only on
+the same off-host endpoint and qualification, at most 3 h after (a) and (b), from the same production boot, and checked at most 1 h
+later. *(r7 text, now the wrapper's half:)* G0 passes only on
 `OWNER VERDICT G0 PASS transport=production` with wrapper exit 0. The wrapper accepts a
 verifier answer only when it meets every condition below. Anything else is `OWNER VERDICT G0 STOP … step=G0a|G0b reason=…`:
 * the answer has exactly one `AFLDB-VERIFY RESULT` line, and it is the last line;
@@ -291,7 +292,7 @@ Only **exit 0** (`SCHEDULED-COPY-VERIFIED`) passes. Every other result has the s
 r9: every result other than `GATE ACCEPT RELEASE-G0 GO transport=production` (exit 0) has the same action, **STOP before P2**. That
 covers every `OWNER VERDICT G0 STOP`: G0a `scheduled origin unproven: <reason>` (before installation `0 seals … in the window`), G0b
 exit 10 or 1, no qualified off-host endpoint (today's state), "possession only", and a refused or unauthenticated answer. It also
-covers a G0 PASS whose acceptance is NO-GO: owner checks BLOCKED or older than 24 h, a re-verification missing or saved before
+covers a G0 PASS whose acceptance is NO-GO: owner checks BLOCKED or stale (more than 3 h before the verdict) or from another boot, a re-verification missing or saved before
 Phase 4, a version check missing or made before them, or a verdict made before the version check. A Phase 3 install or VERSION PASS
 is never GO evidence (OWNER-PROCEDURE 3.13).
 
@@ -311,8 +312,9 @@ The qualifying backup is the 02:20 run of the gate date. Complete these before i
   `sudo -u postgres` steps, every root step of this runbook and of the plan) must use the same path. Until then MED-2 and MED-3
   stay OPEN;
 * from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
-  **r8:** the revision becomes `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests below become `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`,
-  `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.
+  ~~**r8:** the revision becomes `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests below become `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`,
+  `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.~~
+  **r9 (supersedes r8's pins):** the revision is `@@R9_REV@@`; backup `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (unchanged), verify packet `@@VERIFY_SUMS@@`, bundle `@@BUNDLE_SHA@@`, owner checks `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` (unchanged), phase4 `@@PHASE4_SUMS@@`, acceptance `@@ACCEPT_SUMS@@` (OWNER-PROCEDURE §0). The r8 wrapper has no off-host qualification rule: never use it.
   * The archive is made in the owner's **workstation** clone and hashed there, carried over the admin path, and re-verified in the
     admin root session against the workstation value.
   * Never copy bytes from arm's checkout, never run git as root in it, and never read an expected digest from a file on production.
@@ -352,8 +354,8 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * The off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged).
 4. **Workstation.** `V7` is a fresh `git archive` export of
    `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at `7d69302007568d3141a567c8eba89e4ee473c9a6`.
-   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…` (r8: `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` at
-     `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, in the owner's own clone).
+   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is ~~`df3457cc…`~~ (r7) ~~`58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` at
+     `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`~~ (r8, superseded); r9: `@@BUNDLE_SHA@@` at `@@R9_REV@@`, in the owner's own clone.
    * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
      the qualified endpoint (`role=offhost … qualification=pinned qual-sha256=<pin>`). Without a pin the off-host line is
      `STOP … no qualified off-host endpoint`, with exit 1. r9: this call is an installation diagnostic; the gate evidence is

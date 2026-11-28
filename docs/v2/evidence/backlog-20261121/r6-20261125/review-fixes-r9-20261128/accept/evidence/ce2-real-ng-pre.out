@@ -1,14 +1,15 @@
-== case ce2-real-ng-pre: bash afldb-gate-accept.sh --rehearsal --gate ng-pre --owner-checks inputs/real-oc-3.12-blocked.txt --reverify inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt --version inputs/real-version-3.13-pre-phase4.txt --verdict inputs/fx-a2-pass-post.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T07:41:08Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+== case ce2-real-ng-pre: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate ng-pre --owner-checks inputs/real-oc-3.12-blocked.txt --reverify inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt --version inputs/real-version-3.13-pre-phase4.txt --verdict unmarked/fx-a2-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T08:03:04Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
    eff7599bd6446f20654aa5cc219431d45115890bb1e3a6064ad847b6f2782915  inputs/real-oc-3.12-blocked.txt
    4e55fcc338c3c35cf91821ec4e65e2b87c1d9105e55bbec69f6a7651d5063f57  inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt
    2fbf74dcd7a81fea6b919325db32ef5bdce5e00b3d8c1a0cec53034fdc449d79  inputs/real-version-3.13-pre-phase4.txt
-   0c4c25e847d8116a36d51c5ff4d3d067772b6c75e515d7445dee6facae1d7f30  inputs/fx-a2-pass-post.txt
+   5c198f1083ce0f33dca614977e6f4babdd8e7600ebc4dc7f54cd6a4cc63686dd  unmarked/fx-a2-pass-post.txt
 REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
 ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
 ACCEPT reverify FAIL the --as-arm process still carries an admin group, so this was saved before Phase 4: BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997
-INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator reason="0 RESULT lines (need exactly 1; ssh exit 255)"
-ACCEPT version PASS production VERSION PASS nonce=c297734b2ef971fc827d087a2d43f580 at=2026-11-28T05:21:26Z, after (a) and (b)
-ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T05:25:33Z, exit 0, after the version check
-GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=owner-checks,reverify reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
+ACCEPT version FAIL [after FAILED owner-checks,reverify] its own lines pass (nonce=c297734b2ef971fc827d087a2d43f580 at=2026-11-28T05:21:26Z boot=c3524e4759ab4e0f8050875471b56b12), but it is not accepted: (a) or (b) faile
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T05:25:33Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT fresh PASS verdict 2026-11-28T05:25:33Z is 4 min after the Phase 4 evidence (2026-11-28T05:21:00Z); checked 14 min later at 2026-11-28T05:40:00Z (test clock)
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=owner-checks,reverify,version reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
 == exit 1

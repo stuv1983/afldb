@@ -1,4 +1,5 @@
-[FIXTURE r9] real-oc-3.12-blocked.txt followed by real-oc-4.4-pass.txt (two runs in one file)
+[FIXTURE r9] 'BOOT-ID c3524e4759ab4e0f8050875471b56b12', then real-oc-3.12-blocked.txt, then real-oc-4.4-pass.txt (two runs in one file)
+BOOT-ID c3524e4759ab4e0f8050875471b56b12
 == afldb-owner-checks (R6 r8) 2026-11-28T05:21:00Z host=afldb-prod as uid=0
    script sha256 5f2f9d8bc6572a8007517ac3beed62e63520469c04f5ddd60bfd0b69251c59aa
 CHECK A1 PASS running as root

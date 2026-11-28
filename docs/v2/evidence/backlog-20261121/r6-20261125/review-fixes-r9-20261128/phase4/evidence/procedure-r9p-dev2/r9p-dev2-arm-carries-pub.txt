@@ -1,0 +1,3 @@
+== r9p-dev2 2026-11-28T08:09:35Z arm carries the admin .pub as data (arm's own login, arm's key; CR stripped on the workstation, 1 CR line(s) in the workstation file)
+carried by arm: 100 bytes
+uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo)

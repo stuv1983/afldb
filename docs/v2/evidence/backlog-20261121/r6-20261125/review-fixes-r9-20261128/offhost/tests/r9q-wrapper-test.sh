@@ -7,6 +7,8 @@
 # The wrapper is copied byte for byte (cmp-checked) into a scratch tree that mirrors its repository position, so a qualification pin
 # can be placed at ../../review-fixes-r9-20261128/offhost/QUALIFIED-ENDPOINT relative to it without creating one in the repository.
 # Host keys are fresh throwaway ed25519 keys made here; the stub logs every invocation and the known_hosts file the wrapper hands it.
+# Because the client is always the stub, the wrapper must label production transport transport=production-stub (R9-F-3): every case
+# asserts that the exact token transport=production never appears and that production-stub output opens with the STUB WARNING line.
 # Output: one "TEST <id> PASS|FAIL <expected> | <actual>" line per case, then "R9Q LOCAL RESULT PASS|FAIL".
 set -uo pipefail; export LC_ALL=C
 HERE=$(cd "$(dirname "$0")" && pwd -P)
@@ -94,17 +96,21 @@ run() { # id expected-rc "pattern@@pattern..." env... -- wrapper args...   (patt
       *) grep -qE -- "$p" <<< "$out" || ok=0;;
     esac
   done
+  # R9-F-3, in EVERY case: AFLDB_VERIFY_SSH is always the stub here, so the exact production token must never appear, and any
+  # production-stub output must open with the STUB WARNING line.
+  grep -qE -- 'transport=production( |$)' <<< "$out" && ok=0
+  if grep -q -- 'transport=production-stub' <<< "$out"; then head -n 1 <<< "$out" | grep -q '^STUB WARNING: AFLDB_VERIFY_SSH=' || ok=0; fi
   v=$(grep '^OWNER VERDICT' <<< "$out" | cut -c1-260 | tr '\n' '~')
   N=$((N + 1)); if [ "$ok" = 1 ]; then say "TEST $id PASS exit=$rc | $v"; else BAD=$((BAD + 1)); say "TEST $id FAIL exit=$rc (want $want) | $v"; fi
 }
 D=2026-11-25
 # ---- production transport, no pin (the repository default)
 rm -f "$PIN"
-run T01-unconfigured-info-stop 1 '^OWNER VERDICT G0 STOP transport=production .*step=G0b .*offhost-info=STOP .*no qualified off-host endpoint.* qualification=none qual-sha256=none$@@!^OWNER VERDICT G0 PASS@@!^AFLDB-VERIFY RESULT G0B@@S:afldb-verify@10.0.40.100 g0b ' \
+run T01-unconfigured-info-stop 1 '^OWNER VERDICT G0 STOP transport=production-stub .*step=G0b .*offhost-info=STOP .*no qualified off-host endpoint.* qualification=none qual-sha256=none$@@!^OWNER VERDICT G0 PASS@@!^AFLDB-VERIFY RESULT G0B@@S:afldb-verify@10.0.40.100 g0b ' \
   STUB_OFFHOST=streamanator STUB_EV=corestop -- g0 $D
-run T02-streamanator-full-pass-is-stop 1 '^OWNER VERDICT G0 STOP transport=production .*offhost-info=PASS .*no qualified off-host endpoint.* qualification=none@@^\[unqualified endpoint, information only\] AFLDB-VERIFY RESULT G0B PASS @@^INFORMATION \(unqualified endpoint streamanator@@!^OWNER VERDICT G0 PASS@@!^AFLDB-VERIFY RESULT G0B@@S!PINNED-KNOWN-HOSTS' \
+run T02-streamanator-full-pass-is-stop 1 '^OWNER VERDICT G0 STOP transport=production-stub .*offhost-info=PASS .*no qualified off-host endpoint.* qualification=none@@^\[unqualified endpoint, information only\] AFLDB-VERIFY RESULT G0B PASS @@^INFORMATION \(unqualified endpoint streamanator@@!^OWNER VERDICT G0 PASS@@!^AFLDB-VERIFY RESULT G0B@@S!PINNED-KNOWN-HOSTS' \
   STUB_OFFHOST=streamanator STUB_EV=full -- g0 $D
-run T03-version-unconfigured 1 '^OWNER VERDICT VERSION PASS transport=production host=afldb-prod role=prod nonce=[0-9a-f]{32} qualification=none qual-sha256=none$@@^OWNER VERDICT VERSION STOP transport=production host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none$@@S!10\.0\.40\.100 version' \
+run T03-version-unconfigured 1 '^OWNER VERDICT VERSION PASS transport=production-stub host=afldb-prod role=prod nonce=[0-9a-f]{32} qualification=none qual-sha256=none$@@^OWNER VERDICT VERSION STOP transport=production-stub host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none$@@S!10\.0\.40\.100 version' \
   STUB_OFFHOST=streamanator -- version
 # ---- production pins refused before any verifier call
 mkq "$PIN" $PF streamanator 203.0.113.20 "$FPQ" "$RSP"
@@ -125,7 +131,7 @@ run T10-pin-key-not-in-known-hosts 1 '^OWNER VERDICT G0 STOP .*step=G0b .*is not
 # ---- production pin, valid: the scheduled-transfer evidence decides
 mkq "$PIN" $PF offhost-q 203.0.113.20 "$FPQ" "$RSP"
 QS=$(sha256sum < "$PIN" | cut -c1-64)
-run T11-pinned-full-evidence-pass 0 "^OWNER VERDICT G0 PASS transport=production .*offhost=offhost-q .*dispatch-at=2026-11-24T16:10:02Z received-at=2026-11-24T16:10:30Z complete-at=2026-11-24T16:10:31Z received-sha256=$SHA rehash-sha256=$SHA qualification=pinned qual-sha256=$QS\$@@^G0 SCOPE: .*qualified off-host endpoint offhost-q@@S:PINNED-KNOWN-HOSTS afldb-verify@203.0.113.20: 203.0.113.20 ssh-ed25519 [A-Za-z0-9+/=]+\|\$@@S!afldb-verify@10.0.40.100" \
+run T11-pinned-full-evidence-pass 0 "^OWNER VERDICT G0 PASS transport=production-stub .*offhost=offhost-q .*dispatch-at=2026-11-24T16:10:02Z received-at=2026-11-24T16:10:30Z complete-at=2026-11-24T16:10:31Z received-sha256=$SHA rehash-sha256=$SHA qualification=pinned qual-sha256=$QS\$@@^G0 SCOPE: .*qualified off-host endpoint offhost-q@@S:PINNED-KNOWN-HOSTS afldb-verify@203.0.113.20: 203.0.113.20 ssh-ed25519 [A-Za-z0-9+/=]+\|\$@@S!afldb-verify@10.0.40.100" \
   STUB_OFFHOST=offhost-q STUB_EV=full -- g0 $D
 run T12-pinned-no-dispatch 1 '^OWNER VERDICT G0 STOP .*step=G0b .*reason="possession only: .*no 03:10 root cron dispatch is linked to it \(dispatch-at missing\)" qualification=pinned' STUB_OFFHOST=offhost-q STUB_EV=nodispatch -- g0 $D
 run T13-pinned-no-completion 1 '^OWNER VERDICT G0 STOP .*step=G0b .*reason="possession only: .*has no completion record \(complete-at missing\)" qualification=pinned' STUB_OFFHOST=offhost-q STUB_EV=nocomplete -- g0 $D
@@ -137,7 +143,7 @@ run T18-pinned-dispatch-outside-window 1 '^OWNER VERDICT G0 STOP .*reason="incon
 run T19-pinned-received-sha-differs 1 '^OWNER VERDICT G0 STOP .*reason="received-sha256=0{64} differs' STUB_OFFHOST=offhost-q STUB_EV=wrongsha -- g0 $D
 run T20-pinned-core-stop 1 '^OWNER VERDICT G0 STOP .*reason="the off-host verifier answered STOP; possession only: .*complete-at missing' STUB_OFFHOST=offhost-q STUB_EV=corestop -- g0 $D
 run T21-pinned-wrong-result-host 1 '^OWNER VERDICT G0 STOP .*step=G0b .*reason="host streamanator, expected offhost-q"' STUB_OFFHOST=streamanator STUB_EV=full -- g0 $D
-run T22-version-pinned 0 "^OWNER VERDICT VERSION PASS transport=production host=afldb-prod role=prod .*qualification=pinned qual-sha256=$QS\$@@^OWNER VERDICT VERSION PASS transport=production host=offhost-q role=offhost .*qualification=pinned qual-sha256=$QS\$" STUB_OFFHOST=offhost-q -- version
+run T22-version-pinned 0 "^OWNER VERDICT VERSION PASS transport=production-stub host=afldb-prod role=prod .*qualification=pinned qual-sha256=$QS\$@@^OWNER VERDICT VERSION PASS transport=production-stub host=offhost-q role=offhost .*qualification=pinned qual-sha256=$QS\$" STUB_OFFHOST=offhost-q -- version
 # ---- production transport refuses the fixture flag; rehearsal fixtures
 rm -f "$PIN"
 mkq "$T/fix/Q-ok" $FF offhost-q r7v-offhost "$FPQ" "$RSF" 39600
@@ -162,6 +168,11 @@ run T30-fixture-a2-labelled 1 '^OWNER VERDICT A2 STOP transport=rehearsal .* qua
 mkq "$PIN" $PF offhost-q 203.0.113.20 "$FPQ" "$RSP"
 run T31-rehearsal-ignores-repository-pin 1 '^OWNER VERDICT G0 STOP transport=rehearsal .*no qualified off-host endpoint.* qualification=none qual-sha256=none$' \
   STUB_OFFHOST=r7v-offhost STUB_EV=full -- --rehearsal "$T/cfg" --key "$T/home/.ssh/afldb_verify" g0 $D
+# ---- R9-F-3: a stubbed ssh client on production transport is labelled production-stub everywhere (header, every verdict)
+run T32-stub-label-g0-pass 0 '^STUB WARNING: AFLDB_VERIFY_SSH=.* NOT a production verdict@@^== afldb-verify-call .* mode=g0 transport=production-stub @@^OWNER VERDICT G0 PASS transport=production-stub .* qualification=pinned@@!transport=production( |$)' \
+  STUB_OFFHOST=offhost-q STUB_EV=full -- g0 $D
+run T33-stub-label-a2-no-pin-needed 1 '^STUB WARNING: AFLDB_VERIFY_SSH=@@^== afldb-verify-call .* mode=a2 transport=production-stub @@^OWNER VERDICT A2 STOP transport=production-stub @@!^OWNER VERDICT A2 [A-Z]+ transport=production( |$)' \
+  -- a2 accepted 17822b29e6de-abc r3:yes r4:no 10:00 tue:released inv:0123456789abcdef0123456789abcdef
 rm -f "$PIN"
 left=$(ls -A "$T/tmpd" | wc -l)
 say "[HARNESS] wrapper temp files left in its TMPDIR after the tests: $left"

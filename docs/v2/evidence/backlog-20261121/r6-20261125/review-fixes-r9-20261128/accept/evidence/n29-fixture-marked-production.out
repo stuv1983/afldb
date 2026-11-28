@@ -1,0 +1,12 @@
+== case n29-fixture-marked-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks inputs/fx-oc-4.4-bootid.txt --reverify inputs/fx-reverify-4.5-bootid.txt --version inputs/fx-version-post-prod.txt --verdict inputs/fx-g0-pass-post-prod.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T08:04:40Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   733ae01ed4a19518f357421c341233b8123804f5f18aaaecfd1dc6d8c8b9ce87  inputs/fx-oc-4.4-bootid.txt
+   a1645703742e6fe621d3becadf5041faa276a0207ea8f81ee55c0d0e66424ffa  inputs/fx-reverify-4.5-bootid.txt
+   ec9cf02f824eac092071f5515f2600a93366e9cadcc03bf5f5cab136c95cb6a5  inputs/fx-version-post-prod.txt
+   435a1a4e4c7c4ec720fa0c8e4e22b785e615dd1d4a62a3717a43eb0bc482fa27  inputs/fx-g0-pass-post-prod.txt
+ACCEPT owner-checks FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT reverify FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT version FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT verdict FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+GATE ACCEPT RELEASE-G0 NO-GO failed=owner-checks,reverify,version,verdict reason="owner-checks: the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence"
+== exit 1

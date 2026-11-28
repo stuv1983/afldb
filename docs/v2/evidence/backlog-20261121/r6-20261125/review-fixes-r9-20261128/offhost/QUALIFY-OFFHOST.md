@@ -41,6 +41,12 @@ record (§4).
 | Q6 | The verifier role on M was **installed through M's independent admin path** | §2 | the install and check output |
 | Q7 | A **scheduled 03:10 pull** has run on M and produced the evidence the wrapper requires | §3, after at least one night | the `g0` output for that night |
 
+**Dated gate (R9-F-7).** `g0` accepts only the dates 2026-11-24..29. The wrapper's date check is `^2026-11-2[4-9]$`, and its fixed
+AEDT offset is valid only for those dates. Any other date answers usage (exit 2). This is a deliberate dated gate that fails closed.
+**Q7 cannot be met for any night after 29 Nov 2026** until a reviewed change re-dates the window, together with the offset handling
+and the packet's digests. Re-date it before any real use. A machine built from 29 Nov has its first scheduled night outside the
+window. This procedure does not widen the window.
+
 Q1 to Q5 are what makes M independent of streamanator's `arm`. The wrapper cannot check them. It checks only that the pin exists,
 is well formed, is not streamanator, carries a host key the owner's `known_hosts` holds, and points at a record whose sha256 it
 re-computes. **The record is what establishes independence**, so it needs a second reader (§4.4).
@@ -133,12 +139,18 @@ the completion is reported as **possession only**, and G0 STOPs. So:
 4. **Review and commit.** A second reader (the independent reviewer) checks the record against Q1–Q7, and checks the diff, which
    adds the record and the pin and nothing else. The owner commits it. The pin is a deliberate owner act: no script writes it.
 5. **Check.** From the committed revision, run `bash afldb-verify-call.sh version`. Both lines must be PASS, and the off-host line
-   must be `host=<M> role=offhost … qualification=pinned qual-sha256=<sha256 of the pin>`. Compare that `qual-sha256` with
-   `sha256sum QUALIFIED-ENDPOINT` in the owner's clone.
+   must be `host=<M> role=offhost … qualification=pinned qual-sha256=<sha256 of the pin>`. Compare that `qual-sha256` with the
+   COMMITTED pin, `git show <rev>:$R9/offhost/QUALIFIED-ENDPOINT | sha256sum`, not with the working-tree file.
 6. **Release use.** The wrapper finds the pin at `../../review-fixes-r9-20261128/offhost/QUALIFIED-ENDPOINT` relative to its own
    directory. A release export must therefore keep repository paths and include both directories:
    `git archive --format=tar <rev> $R7/verify $R9/offhost`. An export of `$R7/verify` alone has no pin, and G0 STOPs with
    `qualification=none`. Every G0 and VERSION verdict prints `qualification=` and `qual-sha256=`; the release record copies both.
+7. **A pin counts only from a committed revision (R9-F-6).** The wrapper reads whatever `QUALIFIED-ENDPOINT` file is on disk, and it
+   accepts any record whose bytes hash to `record-sha256`. It cannot tell a reviewed, committed pin from an untracked or edited file in a
+   working clone. Steps 4 and 5 are therefore procedure, not something the wrapper enforces. A `qualification=pinned` verdict is
+   owner evidence only when the wrapper ran from the `git archive` export of step 6 (RUNBOOK §4.1a step 4 calls it `$V7`) of the committed, reviewed revision `<rev>`
+   that the release record names, and when its `qual-sha256` equals `git show <rev>:$R9/offhost/QUALIFIED-ENDPOINT | sha256sum`. A
+   verdict from a working clone, or one whose `qual-sha256` differs from the committed pin, is not owner evidence, even if it is PASS.
 
 **Revocation.** Delete the pin (and commit) when any of Q1–Q5 stops holding: a new hypervisor or storage, a new admin, a key or
 password that streamanator touched, the pull account gaining a privileged group, or a changed host key. G0 then STOPs again. To

@@ -63,10 +63,10 @@ install)
   runuser -u postgres -- psql -X -q -At -c 'SELECT pg_reload_conf()' < /dev/null
   install -d -m 0700 $E
   echo "---- 3.5 verify-backup-install.sh as root (tee $E/3.5-verify-backup-install.txt)"
-  bash $BK/verify-backup-install.sh 2>&1 | tee $E/3.5-verify-backup-install.txt; echo "R8P VBI-ROOT exit ${PIPESTATUS[0]}"
+  { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"; bash $BK/verify-backup-install.sh; } 2>&1 | tee $E/3.5-verify-backup-install.txt; echo "R8P VBI-ROOT exit ${PIPESTATUS[0]}"
   if grep -q -- '--as-arm' $BK/verify-backup-install.sh; then
     echo "---- 3.6 verify-backup-install.sh --as-arm (root drops to arm: setpriv --reset-env, bash --noprofile --norc, stdin /dev/null)"
-    bash $BK/verify-backup-install.sh --as-arm 2>&1 | tee $E/3.6-verify-backup-install-as-arm.txt; echo "R8P VBI-ARM exit ${PIPESTATUS[0]} mode=as-arm"
+    { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"; bash $BK/verify-backup-install.sh --as-arm; } 2>&1 | tee $E/3.6-verify-backup-install-as-arm.txt; echo "R8P VBI-ARM exit ${PIPESTATUS[0]} mode=as-arm"
   else
     echo "---- verify-backup-install.sh as arm through the explicit setpriv form (--as-arm not in this bundle: PENDING)"
     setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -s < $BK/verify-backup-install.sh; echo "R8P VBI-ARM exit $? mode=setpriv-fallback"
@@ -81,9 +81,9 @@ install)
   runuser -u postgres -- psql -X -q -At -c 'SELECT pg_reload_conf()' < /dev/null
   echo "   pg_hba local lines: $(grep '^local' $H | tr -s ' ' | tr '\n' ';')"
   echo "---- 3.11 verify-verify-install.sh --role prod as root (tee $E/3.11-verify-verify-install.txt)"
-  bash $VF/verify-verify-install.sh --role prod 2>&1 | tee $E/3.11-verify-verify-install.txt; echo "R8P VVI exit ${PIPESTATUS[0]}"
+  { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"; bash $VF/verify-verify-install.sh --role prod; } 2>&1 | tee $E/3.11-verify-verify-install.txt; echo "R8P VVI exit ${PIPESTATUS[0]}"
   echo "---- 3.12 owner checks after the installs, BEFORE the access change (tee $E/3.12-owner-checks.txt)"
-  CHECKS --admin afldb-admin --admin-fp "$FP" | tee $E/3.12-owner-checks.txt; echo "R8P CHECKS exit ${PIPESTATUS[0]}"
+  { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"; CHECKS --admin afldb-admin --admin-fp "$FP"; } 2>&1 | tee $E/3.12-owner-checks.txt; echo "R8P CHECKS exit ${PIPESTATUS[0]}"
   handover;;
 phase4)
   echo "---- Phase 4 (owner approval) through afldb-phase4.sh; the console stays open"
@@ -97,15 +97,19 @@ phase4)
 checks44)
   FP=${1:?fp}
   echo "---- 4.4 owner checks after the access change (tee $E/4.4-owner-checks.txt)"
-  CHECKS --admin afldb-admin --admin-fp "$FP" | tee $E/4.4-owner-checks.txt; echo "R8P CHECKS exit ${PIPESTATUS[0]}"
+  { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"; CHECKS --admin afldb-admin --admin-fp "$FP"; } 2>&1 | tee $E/4.4-owner-checks.txt; echo "R8P CHECKS exit ${PIPESTATUS[0]}"
   handover;;
 reverify45)
   echo "---- 4.5 both installs re-verified in a new admin root session (tee $E/4.5-reverify.txt)"
-  : > $E/4.5-reverify.txt
-  bash $BK/verify-backup-install.sh 2>&1 | tee -a $E/4.5-reverify.txt; echo "R8P VBI-ROOT exit ${PIPESTATUS[0]}"
-  if grep -q -- '--as-arm' $BK/verify-backup-install.sh; then bash $BK/verify-backup-install.sh --as-arm 2>&1 | tee -a $E/4.5-reverify.txt; echo "R8P VBI-ARM exit ${PIPESTATUS[0]} mode=as-arm"
-  else setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -s < $BK/verify-backup-install.sh; echo "R8P VBI-ARM exit $? mode=setpriv-fallback"; fi
-  bash $VF/verify-verify-install.sh --role prod 2>&1 | tee -a $E/4.5-reverify.txt; echo "R8P VVI exit ${PIPESTATUS[0]}"
+  # the OWNER-PROCEDURE 4.5 form: { echo "BOOT-ID ..."; <the three checks>; } 2>&1 | tee <file>; the harness's own exit lines go to
+  # fd 3, outside the saved file [HARNESS]
+  exec 3>&1
+  { echo "BOOT-ID $(/usr/bin/tr -d - < /proc/sys/kernel/random/boot_id)"
+    bash $BK/verify-backup-install.sh; echo "R8P VBI-ROOT exit $?" >&3
+    bash $BK/verify-backup-install.sh --as-arm; echo "R8P VBI-ARM exit $? mode=as-arm" >&3
+    bash $VF/verify-verify-install.sh --role prod; echo "R8P VVI exit $?" >&3
+  } 2>&1 | tee $E/4.5-reverify.txt
+  exec 3>&-
   handover;;
 *) echo "unknown step"; exit 2;;
 esac

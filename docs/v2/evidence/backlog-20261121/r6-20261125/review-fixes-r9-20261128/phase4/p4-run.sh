@@ -14,7 +14,8 @@ RUN=$EV/$RID-run.txt; SUM=$EV/$RID-summary.txt; : > "$RUN"; : > "$SUM"
 DEVSSH=(ssh -o BatchMode=yes -i "$HOME/.ssh/afldb_dev" arm@10.0.40.100)
 SCEN=(group-only group-only-backout refuse-90-arm refuse-user-alias refuse-group-adm refuse-admin-group refuse-include
       refuse-dispose-nomatch disposed disposed-removed residual-uid residual-all refuse-uid-alias refuse-continued refuse-negated
-      refuse-nsswitch late-grant old-r8-backout unplanned-edit state-tamper)
+      refuse-nsswitch late-grant old-r8-backout unplanned-edit state-tamper
+      dispose-etc-sudoers dispose-removes-percent-sudo refuse-dispose-percent-sudo refuse-mixed-line refuse-escaped-alias)
 FILES=("$R9/phase4/afldb-phase4.sh" "$R9/phase4/p4-scen.sh" "$R9/phase4/p4-host.sh" "$R9/phase4/p4-ed-remove-arm.sh" "$R8/owner-checks/afldb-owner-checks.sh")
 say() { printf '%s\n' "$*" | tee -a "$SUM" >> "$RUN"; printf '%s\n' "$*"; }
 for f in "${FILES[@]}" "$R9/phase4/p4-run.sh"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done

@@ -954,8 +954,8 @@ arm, or the release `r1-g0-dump.sh` over arm's ssh. They may be run and recorded
 `/home/arm/projects/afldb`; every install runs from a root-owned staging directory outside `/home` holding a `git archive` of the
 pinned revision: the R7 tested revision ~~`7d69302007568d3141a567c8eba89e4ee473c9a6`~~ (review round 1; superseded by the r8 pin below).**
 **r8 (28 Nov 2026) supersedes the pins and the root path below**, following `r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md`:
-* **Pins.** The revision is `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests are `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and
-  `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.
+* **Pins.** ~~The revision is `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests are `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and
+  `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.~~ **r9 (supersedes r8's pins):** the revision is `@@R9_REV@@`; backup `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (unchanged), verify packet `@@VERIFY_SUMS@@`, bundle `@@BUNDLE_SHA@@`, owner checks `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` (unchanged), phase4 `@@PHASE4_SUMS@@`, acceptance `@@ACCEPT_SUMS@@` (OWNER-PROCEDURE §0). The r8 wrapper has no off-host qualification rule: never use it.
 * **Bytes.** They come only from a `git archive` made in the owner's workstation clone, hashed there, carried over the admin path and
   re-verified in the admin root session against the workstation value. They never come from arm's checkout, git is never run as root
   there, and no expected digest is read from a file on production.
@@ -1002,9 +1002,11 @@ pinned revision: the R7 tested revision ~~`7d69302007568d3141a567c8eba89e4ee473c
      and streamanator's pull configuration.
 4. Workstation: `V7` is a fresh `git archive` export of `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify`
    at ~~`7d69302007568d3141a567c8eba89e4ee473c9a6`~~ (r7, superseded). Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is ~~`df3457cc…`~~ (r7, superseded)
-   (r8: at `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`, `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`, in the owner's own clone). Then
-   `bash "$V7/afldb-verify-call.sh" version` must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for `streamanator`
-   (role offhost).
+   ~~(r8: at `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`, `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`, in the owner's own clone)~~; r9: at `@@R9_REV@@`, `@@VERIFY_SUMS@@`,
+   `@@BUNDLE_SHA@@`, exporting `$R7/verify` and `$R9/offhost` together, in the owner's own clone. Then
+   `bash "$V7/afldb-verify-call.sh" version` must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for the
+   **qualified** off-host endpoint (`role=offhost … qualification=pinned`; r9: never streamanator; with no pin the off-host line is
+   `STOP … no qualified off-host endpoint`). This call is an installation diagnostic; GO evidence is `GATE ACCEPT` (§7).
 Until all four are done and a sealed timer run exists for the gate date, A-2 and A-4r7 STOP, by design. Rollback: R7 backup README §6.
 The dated gates are unchanged: A-2 still requires Wednesday 2026-11-25, and `g0` accepts 2026-11-24..29. So a future sitting still
 needs a new date, re-dated and re-pinned packets, the independent PASS at that commit, a new owner approval and that day's evidence.

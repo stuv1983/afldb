@@ -1,4 +1,5 @@
-[FIXTURE r9] real-reverify-4.5-post-phase4.txt with the --as-arm part (its header through its result line) deleted
+[FIXTURE r9] fx-reverify-4.5-bootid.txt with the --as-arm part (its header through its result line) deleted
+BOOT-ID c3524e4759ab4e0f8050875471b56b12
 == verify-backup-install 2026-11-28T05:21:40Z as uid=0(root) gid=0(root) groups=0(root)
 PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in, base unit = deploy/afldb-backup.service), effective unit (exactly the drop-in, no environment or bind settings)
 PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files

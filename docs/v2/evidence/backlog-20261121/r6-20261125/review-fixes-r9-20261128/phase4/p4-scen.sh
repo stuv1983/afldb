@@ -129,6 +129,61 @@ disposed|disposed-removed) # (iv) an explicitly disposed rule: entry --dispose; 
   [ "$(sudo -n -l -U arm 2>&1 < /dev/null)" = "$PRE_L" ]; need "after backout: sudo -l -U arm equals the pre-change answer" $?
   [ "$(snap)" = "$S0" ]; need "after backout: the whole snapshot equals pre-change" $?
   X="entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before";;
+dispose-etc-sudoers|dispose-removes-percent-sudo) # R9-F-2: /etc/sudoers carries an extra arm rule beside the stock %sudo line, and
+                       # is disposed. %sudo stays group-only and is never listed for change. The owner removes only the arm rule:
+                       # verify PASS, %sudo intact, afldb-admin's sudo -l unchanged, backout exact. Or the owner WRONGLY deletes the
+                       # %sudo line too: verify STOP naming it; backout restores /etc/sudoers exactly
+  useradd -m -U -s /bin/bash afldb-admin && usermod -a -G sudo afldb-admin; L FIXTURE "$(id afldb-admin) (the admin: sudo by group, 1.8)"
+  printf '%s\n' '# deploy access for arm (fixture)' 'arm ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers; visudo -c > /dev/null 2>&1; need "fixture: visudo -c with the appended arm rule" $?
+  NS=$(grep -n '^%sudo[[:space:]]' /etc/sudoers | cut -d: -f1); NA=$(grep -n '^arm[[:space:]]' /etc/sudoers | cut -d: -f1)
+  SL=$(sed -n "${NS}p" /etc/sudoers); SLS=$(printf '%s' "$SL" | tr -c '\40-\176' '?')   # SLS: as the script prints it (a tab is ?)
+  L FIXTURE "/etc/sudoers: %sudo at line $NS [$SLS], arm rule at line $NA"
+  # two members of sudo now (arm, afldb-admin): gpasswd -a re-adds arm at the end, so the group files are compared by membership
+  snapm() { snap | grep -vE ' /etc/(group|gshadow)$'; getent group sudo | cut -d: -f4 | tr ',' '\n' | sort | tr '\n' ' '; }
+  cp -p /etc/sudoers /root/fixture-sudoers; S0=$(snapm); AL0=$(sudo -n -l -U afldb-admin 2>&1 < /dev/null | cat)
+  has "$AL0" "(ALL : ALL) ALL"; need "before: afldb-admin may run (ALL : ALL) ALL" $?
+  entry_ok group-and-disposed --dispose /etc/sudoers
+  has "$E" "/etc/sudoers:$NS token %sudo class group-only"; need "%sudo in the disposed /etc/sudoers is classified group-only" $?
+  has "$E" "/etc/sudoers:$NA token arm class disposed"; need "the arm rule (line $NA) is classified disposed" $?
+  has "$E" "removing or changing ONLY line(s) $NA(arm) and no other line; KEEP line(s) $NS(%sudo) exactly as they are"; need "the 4.1 instruction names only line $NA and says to keep line $NS" $?
+  if [ $N = dispose-etc-sudoers ]; then
+    owner_edit /etc/sudoers; step41; verify_is PASS
+    has "$V" "check kept PASS /etc/sudoers: only its disposed line(s) $NA(arm) changed"; need "verify: every other line byte-identical, %sudo included" $?
+    has "$V" "check admin-sudo-l PASS"; need "verify: sudo -l -U afldb-admin equals its pre-change record" $?
+    grep -qxF -- "$SL" /etc/sudoers; need "the %sudo line is still in /etc/sudoers" $?
+    has "$(sudo -n -l -U afldb-admin 2>&1 < /dev/null)" "(ALL : ALL) ALL"; need "after 4.1: afldb-admin may still run (ALL : ALL) ALL" $?
+    A=$(arm_sudo); [ "$A" != 0 ]; need "after 4.1: arm can no longer sudo -n ($A)" $?
+    backout_is PASS
+    cmp -s /root/fixture-sudoers /etc/sudoers; need "after backout: /etc/sudoers is byte-identical to the fixture copy" $?
+    [ "$(arm_sudo)" = 0 ]; need "after backout: arm runs sudo -n id -u as root again" $?
+    [ "$(snapm)" = "$S0" ]; need "after backout: the snapshot equals pre-change (sudo members compared as a set)" $?
+    X="entry=PASS(%sudo group-only, only line $NA listed),verify=PASS(kept,admin-sudo-l),backout=PASS,exact"
+  else
+    sed -i '/^arm[[:space:]]/d; /^%sudo[[:space:]]/d' /etc/sudoers; visudo -c > /dev/null 2>&1; need "visudo -c after the wrong edit (it is valid sudoers)" $?
+    L FIXTURE "the owner WRONGLY deletes the %sudo line too: $(grep -c '^%sudo' /etc/sudoers) %sudo line(s) left"
+    step41; verify_is STOP
+    has "$V" "/etc/sudoers:$NS ('$SLS') was changed or removed, but 4.0 did not name it for change (it is %sudo, group-only"; need "verify names the removed %sudo line" $?
+    has "$V" "sudo -l -U afldb-admin differs from the pre-change record"; need "verify names afldb-admin's lost route" $?
+    has "$V" "Do NOT return to step 4.1"; need "verify says back out" $?
+    backout_is PASS
+    cmp -s /root/fixture-sudoers /etc/sudoers; need "after backout: /etc/sudoers is byte-identical to the fixture copy (%sudo back)" $?
+    [ "$(sudo -n -l -U afldb-admin 2>&1 < /dev/null | cat)" = "$AL0" ]; need "after backout: afldb-admin's sudo -l equals the pre-change answer" $?
+    [ "$(snapm)" = "$S0" ]; need "after backout: the snapshot equals pre-change (sudo members compared as a set)" $?
+    X="verify=STOP(%sudo line $NS removed,afldb-admin route),backout=PASS,exact"
+  fi;;
+refuse-dispose-percent-sudo) # --dispose of a file whose only match is %sudo
+  entry_refused "--dispose /etc/sudoers: its only match is %sudo" --dispose /etc/sudoers
+  X="entry=REFUSED(--dispose /etc/sudoers: only %sudo),nothing-changed";;
+refuse-mixed-line)     # one line names %sudo and arm in a disposed file: no edit could keep one and not the other
+  add_rule /etc/sudoers.d/86-mixed 0440 $'# fixture\n%sudo,arm ALL=(ALL) ALL'
+  entry_refused "/etc/sudoers.d/86-mixed:2 (%sudo, lines 2-2) shares a line with the disposed match /etc/sudoers.d/86-mixed:2 (arm)" --dispose /etc/sudoers.d/86-mixed
+  X="entry=REFUSED(86-mixed:2 %sudo shares a line with arm),nothing-changed";;
+refuse-escaped-alias)  # R9-F-5: `ar\m` in a User_Alias is arm to sudo, and B3 does not see it
+  add_rule /etc/sudoers.d/84-esc 0440 $'User_Alias OPS = deploy, ar\\m\nOPS ALL=(ALL) ALL'
+  has "$(sudo -n -l -U arm 2>&1 < /dev/null | cat)" "(ALL) ALL"; need "sudo itself reads ar\\m as arm (sudo -l -U arm lists the OPS rule '(ALL) ALL')" $?
+  OCB=$(oc_b); has "$(grep '^CHECK B3 ' <<< "$OCB")" /etc/sudoers.d/84-esc; [ $? = 1 ]; need "owner-checks B3 (unchanged, at its pin) does not name 84-esc" $?
+  entry_refused '/etc/sudoers.d/84-esc:1 names unparsed-alias-member:ar\m'
+  X="entry=REFUSED(84-esc:1 unparsed-alias-member),B3-blind,nothing-changed";;
 residual-uid|residual-all) # (v) a grant B3 does not see (a uid-form rule; an ALL user): entry, stricter than B3, REFUSES it
   if [ $N = residual-uid ]; then F=/etc/sudoers.d/91-uid; add_rule $F 0440 '#1000 ALL=(ALL) NOPASSWD: ALL'; WANT="$F:1 names uid:#1000"
   else F=/etc/sudoers.d/92-all; add_rule $F 0440 'ALL ALL=(root) NOPASSWD: /usr/bin/id'; WANT="$F:1 names ALL-user"; fi

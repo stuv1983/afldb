@@ -45,6 +45,9 @@
 #     container's fixed Melbourne offset) is accepted ONLY with --rehearsal, and labels every verdict qualification=FIXTURE:
 #     simulated independence is fixture evidence, never owner evidence. Production transport refuses the flag (exit 2). A rehearsal
 #     never reads the repository pin.
+#   * AFLDB_VERIFY_SSH (a test hook that replaces the ssh client) on production transport labels the header and every verdict
+#     transport=production-stub and prints a STUB WARNING line first (R9-F-3). transport=production appears only when the variable is
+#     unset, i.e. with the default client C:/Windows/System32/OpenSSH/ssh.exe; a stubbed answer is never a production verdict.
 # What a verdict establishes (r8, R8 DEPENDENCIES.md; printed as one SCOPE line before each A2/G0 verdict):
 #   OWNER VERDICT A2 PASS: the pinned root-owned verifier on the authenticated production host, at at=, found every A-2 check passing
 #     for THESE seven arguments (the live host matched them). It does NOT establish that the arguments are right: they come from the
@@ -75,6 +78,13 @@ while :; do case ${1:-} in
   --key) [ "$TRANSPORT" = rehearsal ] || usage; KEY=${2:-}; shift 2 || usage;;
   --qualification-fixture) QFIX=${2:-}; shift 2 || usage; [ -n "$QFIX" ] || usage;;
   *) break;; esac; done
+# r9 (independent review R9-F-3): AFLDB_VERIFY_SSH replaces the ssh client (a test hook). On production transport its verdicts are
+# labelled transport=production-stub, never transport=production, so a stub's answer can never pass for a production verdict.
+# transport=production is printed only with the default client C:/Windows/System32/OpenSSH/ssh.exe.
+if [ -n "${AFLDB_VERIFY_SSH:-}" ] && [ "$TRANSPORT" = production ]; then
+  TRANSPORT=production-stub
+  echo "STUB WARNING: AFLDB_VERIFY_SSH=$AFLDB_VERIFY_SSH replaces the ssh client; every verdict below is transport=production-stub and is NOT a production verdict (unset AFLDB_VERIFY_SSH for a real call)"
+fi
 if [ -n "$QFIX" ] && [ "$TRANSPORT" != rehearsal ]; then
   echo "STOP --qualification-fixture is accepted with --rehearsal only: production transport never takes a fixture qualification (simulated independence is not owner evidence)"; exit 2; fi
 [[ $BUNDLE_SHA =~ ^[0-9a-f]{64}$ ]] || { echo "STOP the wrapper has no pinned bundle digest (run build-sums.sh)"; exit 2; }

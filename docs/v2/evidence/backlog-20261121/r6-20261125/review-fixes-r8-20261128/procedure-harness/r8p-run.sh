@@ -244,7 +244,13 @@ V=$(grep '^OWNER CHECKS RESULT' <<< "$O" | tail -1)
 
 pace
 fetch phase3   # 3.5, 3.6, 3.11, 3.12 as the owner saves them
-cat "$(IN 3.5-verify-backup-install)" "$(IN 3.6-verify-backup-install-as-arm)" "$(IN 3.11-verify-verify-install)" > "$(IN 3-reverify)" 2>/dev/null
+# the counterexample's (b): 3.5, 3.6 and 3.11 were each saved with a BOOT-ID first line; plain extraction makes ONE file that starts
+# with that line once (all three must carry the same value), then each file's remaining lines in order [HARNESS]
+B35=$(head -n 1 "$(IN 3.5-verify-backup-install)"); B36=$(head -n 1 "$(IN 3.6-verify-backup-install-as-arm)"); B311=$(head -n 1 "$(IN 3.11-verify-verify-install)")
+if [[ $B35 =~ ^BOOT-ID\ [0-9a-f]{32}$ ]] && [ "$B35" = "$B36" ] && [ "$B35" = "$B311" ]; then
+  { printf '%s\n' "$B35"; tail -n +2 "$(IN 3.5-verify-backup-install)"; tail -n +2 "$(IN 3.6-verify-backup-install-as-arm)"; tail -n +2 "$(IN 3.11-verify-verify-install)"; } > "$(IN 3-reverify)"
+  log "[HARNESS] in-3-reverify = '$B35' + tail -n +2 of 3.5, 3.6, 3.11 (each began with the same BOOT-ID line)"
+else log "[HARNESS] in-3-reverify NOT built: the BOOT-ID first lines differ or are missing ($B35 | $B36 | $B311)"; : > "$(IN 3-reverify)"; fi
 pace
 WCALL 3.13-version version
 grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod' <<< "$WO" \
@@ -279,8 +285,8 @@ O=$(AS reverify45); printf '%s\n' "$O" | L reverify45 "admin root session (new c
 [ "$(ex VBI-ROOT)" = 0 ] && [ "$(ex VBI-ARM)" = 0 ] && [ "$(ex VVI)" = 0 ] && res reverify PASS "expect=both-install-checks-PASS got=vbi-root 0, vbi-arm 0, vvi 0" || res reverify FAIL "expect=PASS got=vbi-root $(ex VBI-ROOT) vbi-arm $(ex VBI-ARM) vvi $(ex VVI)"
 pace
 fetch phase4   # 4.4 and 4.5 as the owner saves them (the Phase 3 files again, unchanged)
-[ -s "$(IN 4.4-owner-checks)" ] && [ -s "$(IN 4.5-reverify)" ] && [ "$(sed '/^[[:space:]]*$/d' "$(IN 4.4-owner-checks)" | tail -n 1)" = "OWNER CHECKS RESULT PASS" ] \
-  && res saved-4.4-4.5 PASS "expect=saved-files-copied-back got=4.4 $(sha256sum < "$(IN 4.4-owner-checks)" | cut -c1-16), 4.5 $(sha256sum < "$(IN 4.5-reverify)" | cut -c1-16) (last line of 4.4: OWNER CHECKS RESULT PASS)" \
+[[ $(head -n 1 "$(IN 4.4-owner-checks)") =~ ^BOOT-ID\ [0-9a-f]{32}$ ]] && [ "$(head -n 1 "$(IN 4.4-owner-checks)")" = "$(head -n 1 "$(IN 4.5-reverify)")" ] && [ "$(sed '/^[[:space:]]*$/d' "$(IN 4.4-owner-checks)" | tail -n 1)" = "OWNER CHECKS RESULT PASS" ] \
+  && res saved-4.4-4.5 PASS "expect=saved-files-copied-back got=4.4 $(sha256sum < "$(IN 4.4-owner-checks)" | cut -c1-16), 4.5 $(sha256sum < "$(IN 4.5-reverify)" | cut -c1-16) (both begin with the same BOOT-ID line; last line of 4.4: OWNER CHECKS RESULT PASS)" \
   || res saved-4.4-4.5 FAIL "expect=saved-files got=4.4 $(wc -c < "$(IN 4.4-owner-checks)" 2>&1) bytes, 4.5 $(wc -c < "$(IN 4.5-reverify)" 2>&1) bytes"
 pace
 WCALL 4.6-version version
@@ -305,8 +311,8 @@ has() { [[ ",$1," == *",$2,"* ]]; }
 # (a) accept-counterexample: the real Phase 3 outputs (3.12 BLOCKED, 3.5/3.6/3.11 PASS, 3.13 version PASS) and the real a2 verdict then
 for g in release-g0 ng-pre; do
   ACC counterexample "$g" "$(IN 3.12-owner-checks)" "$(IN 3-reverify)" "$(IN 3.13-version)" "$(IN 3.13a-a2)" "$A2X_PRE"
-  [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL ${g^^} NO-GO "* ]] && has "$AFAIL" owner-checks && has "$AFAIL" reverify \
-    && res "accept-counterexample-$g" PASS "expect=NO-GO(owner-checks,reverify among failed) got=exit $ARC failed=$AFAIL" \
+  [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL ${g^^} NO-GO "* ]] && has "$AFAIL" owner-checks && has "$AFAIL" reverify && has "$AFAIL" version \
+    && res "accept-counterexample-$g" PASS "expect=NO-GO(owner-checks,reverify,version among failed) got=exit $ARC failed=$AFAIL" \
     || res "accept-counterexample-$g" FAIL "expect=NO-GO(owner-checks,reverify) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 done
 # (b) accept-post-phase4: the real 4.4, 4.5, 4.6 outputs and the real a2 verdict made after 4.6
@@ -315,13 +321,13 @@ ACC post-phase4 ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-v
   && res accept-post-phase4-ng-pre PASS "expect=NO-GO(failed=verdict only: A2 STOPs in a container) got=exit $ARC failed=$AFAIL; parts a-c: $(grep -E '^ACCEPT (owner-checks|reverify|version) ' <<< "$AO" | cut -d' ' -f2,3 | tr '\n' ',')" \
   || res accept-post-phase4-ng-pre FAIL "expect=NO-GO(failed=verdict only) got=exit $ARC $(cut -c1-240 <<< "$AF"); $(grep -E '^ACCEPT [a-z-]+ FAIL' <<< "$AO" | cut -c1-200 | tr '\n' '|')"
 ACC post-phase4 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST"
-[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && has "$AFAIL" version && ! has "$AFAIL" owner-checks && ! has "$AFAIL" reverify \
-  && res accept-post-phase4-release-g0 PASS "expect=NO-GO(version: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && [ "$AFAIL" = version,verdict ] \
+  && res accept-post-phase4-release-g0 PASS "expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
   || res accept-post-phase4-release-g0 FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 # the same with the release gate's own verdict, the real g0 call after 4.6 (it STOPs: no qualified off-host endpoint)
 ACC post-phase4-g0 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6b-g0)" "$G0X_POST"
-[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && has "$AFAIL" version && ! has "$AFAIL" owner-checks && ! has "$AFAIL" reverify \
-  && res accept-post-phase4-release-g0-g0verdict PASS "expect=NO-GO(version: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && [ "$AFAIL" = version,verdict ] \
+  && res accept-post-phase4-release-g0-g0verdict PASS "expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
   || res accept-post-phase4-release-g0-g0verdict FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 
 # ------------------------------------------------------------------------------------------ fail-closed cases (console stand-in)
