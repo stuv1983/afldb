@@ -322,3 +322,94 @@ blocks. Remaining before the procedure can run: the pin commit (fill `<R8-PIN:te
 touching `verify/README.md`), then the owner's Phases 0 to 4. Not verified: any production fact, including whether the installed
 base unit equals `edf00291…` and whether the service has other drop-ins; the fragment-mismatch refusal; a killed or injected
 probe.
+
+---
+
+## Round 3 (12e46305)
+
+**Revision judged:** `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, as `git diff f8a63bb3 12e46305` (one commit). Line numbers are
+of the blobs at `12e46305`. Rounds 1 and 2 above are unchanged. Changed code and procedure files: `afldb-owner-checks.sh`
+(`5f2f9d8b…`), its `SHA256SUMS` (`70d05b10…`, verified from the git object, as is the entry inside it), `OWNER-PROCEDURE.md`,
+`r8p-run.sh`, `r8p-container.sh`. Nothing under `R7/`, `deploy/`, `tools/` or `src/` changed, so every round-2 statement about
+the gate code, the bundles and their pins stands. I ran no harness; the coordinator's procedure run at `12e46305` was in progress
+when I wrote this, and my view is conditional on it ending PASS.
+
+### Verdict
+
+The three fixes are correct. No change lets a check PASS while arm can modify a root-run path, or while the key or probe
+property fails. The script is still read-only and secret-free. No new CRIT/HIGH/MED finding; two INFO notes. **Q1 NO, Q2 NO**,
+on the same conditions as before.
+
+### R8-F-13 (CRLF key): closed
+
+* Step 1.3 strips CR on the workstation; step 1.5a strips one trailing CR per line, then applies the unchanged shape test, and
+  only the type and key fields are installed (`OWNER-PROCEDURE.md:113-116`). The STOP text no longer blames arm.
+* Reproduced in a Linux container on DEV with synthetic key lines (`review-logs/round3/shape-linux-12e46305.log`): LF and CRLF
+  accepted, and the kept line from the CRLF file is byte-identical to the LF one; two trailing CRs, a CR inside the comment, an
+  options prefix, two lines, a trailing empty line and another key type are all refused.
+* The strip widens nothing: the installed bytes are the two validated fields, and 1.5b still compares their fingerprint.
+* My first local attempt in Git Bash (`key-shape-12e46305.log`) is not valid evidence for the CR cases and is marked so in the
+  log: Git Bash's `grep` and `sed` treat CR differently.
+
+### R8-F-14 (C3): closed
+
+* `am_one`/`am_walk`/`arm_mod` (`afldb-owner-checks.sh:192-254`) walk every component from `/`, follow every link and walk its
+  target in full, and FAIL when arm owns the component or link, when it is group-writable by a group arm is in, world-writable
+  (sticky directory excepted), carries an ACL entry granting write to arm or one of arm's groups, or is absent below a directory
+  arm can write. Anything not evaluable is UNKNOWN (`:315-317`), never PASS.
+* I looked for a PASS with an arm-modifiable component and found none by reading:
+  * ACL permissions are read before the effective-rights comment, so a mask does not hide a grant (conservative).
+  * `default:` ACL entries are reported, not failed. That is right: they grant nothing on the component itself.
+  * After a link, the parent-writable flag is the target's, so an absent leaf below an arm-writable link target still fails.
+  * A sticky world-writable directory passes only for an existing entry arm does not own; an absent entry in it fails.
+* Bare command names are judged through systemd's search path, every slot up to the first that exists (`:256-270`). This is a
+  real gap closed, not only a false-UNKNOWN fix.
+* False BLOCKED on a normal Ubuntu 24.04 host: none that I can foresee. A FAIL now needs a component arm can write, and UNKNOWN
+  needs a failed `stat`/`getfacl`/`readlink`, a relative path or a link loop. The development run judged 112 to 113 root-run
+  units and about 185 paths in an Ubuntu 24.04 systemd container with PASS. Production's own units remain unknown to me, and a
+  root-run unit there that really does execute something arm can write is a true FAIL.
+
+### R8-F-15 (probe timeout): closed
+
+* `arm_probe` runs under root's `/usr/bin/timeout --kill-after=5 60`, outside `setpriv` (`:63-72`). arm cannot signal the
+  timer. A stopped or hung probe ends with a non-zero status, so `PROBE_OK` stays 0 and the caller reports FAIL. A missing
+  `timeout` also fails closed. PASS still needs exit 0 and the nonce sentinel as the last line.
+* Not exercised by any scenario (the procedure says so): a killed, stopped, injected or timed-out probe. By reading only.
+
+### Read-only and secret-free
+
+Unchanged. C3 adds `stat`, `getfacl`, `readlink` and `realpath` reads and prints paths with owner, group and mode. No file
+content, DSN, key material or environment value is printed.
+
+### R8-F-16
+
+I agree with the coordinator's decision to leave it as recorded INFO. The only repository change it asks for inside the pinned
+library is a comment (C20 for C21), and re-pinning both bundles for a comment would cost a full re-test for no security gain. The
+allowlist and `NeedDaemonReload` ideas are hardening against a root act and can wait for the next real change to that file.
+
+### Status of findings
+
+| ID | Status at `12e46305` |
+|---|---|
+| R8-F-1, -2, -3, -5, -6, -7, -8, -9, -10 | closed (round 2) |
+| R8-F-4 | open by design: the pin commit fills `<R8-PIN:tested-rev>` |
+| R8-F-11 | open in part: the R8 `README.md` that `verify/README.md` points at is still untracked |
+| R8-F-12 | closed as a documented residual |
+| R8-F-13 | closed; reproduced |
+| R8-F-14 | closed by reading; scenarios `fc-c3-gw-other`, `fc-c3-gw-arm` in the coordinator's run |
+| R8-F-15 | closed by reading; not exercised |
+| R8-F-16 | INFO, recorded, deliberately not fixed; agreed |
+
+### New notes
+
+| ID | Grade | One line | file:line | Basis |
+|---|---|---|---|---|
+| R8-F-17 | INFO | In the template branch (unit templates with no loaded instance) only absolute executable paths are judged; a bare command name there is skipped, while loaded units get the search-path treatment. Loaded instances are judged through `systemctl show`, so the gap is an uninstantiated template only | `afldb-owner-checks.sh:283` | by reading |
+| R8-F-18 | INFO | C3 reports group-writable and ACL-bearing components but says nothing about a component owned by another non-root user. That is correct for "can arm modify it", and D1/D2 cover arm becoming `postgres`; listing such owners in the report would let the owner see them | `afldb-owner-checks.sh:192-223` | by reading |
+
+### Merge-readiness for `12e46305`
+
+Ready from the repository side, subject to the coordinator's procedure harness run at `12e46305` ending PASS (the backup and
+verify bundles are byte-identical to `f8a63bb3`, whose final runs are recorded). No finding blocks. Remaining: the pin commit
+(fill `<R8-PIN:tested-rev>`; add the R8 `README.md` without touching `verify/README.md`), then the owner's Phases 0 to 4. Not
+verified: any production fact; the probe failure paths; C3 against production's real unit set.

@@ -128,7 +128,7 @@ proof.
 1. Stage the bundle in a new root-owned directory outside `/home` (e.g. `install -d -m 0755 /root/afldb-r7-backup`): the seven files of
    `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `d0023d10…` (this README)
    and `sha256sum -c SHA256SUMS`. r8 sets the source of these bytes and the pin:
-   * The only source is a `git archive` of `<R8-PIN:tested-rev>` made in the owner's **workstation** clone and hashed there. It
+   * The only source is a `git archive` of `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3` made in the owner's **workstation** clone and hashed there. It
      travels over the admin path, and the admin root session re-verifies it against the workstation value (OWNER-PROCEDURE 2.1,
      3.1–3.2).
    * Never copy from arm's checkout `/home/arm/projects/afldb`, never run git as root there, and never read the expected digest from

@@ -1,0 +1,24 @@
+== round 3 step 1.5a shape test in a Linux container 2026-11-28T05:19:43Z [REAL: GNU sed/grep/awk in the pinned base image sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba; FIXTURE: synthetic key lines; DEV host as arm, docker, --network none, not privileged, --rm, name rvw8c1]
+Error: unknown command "bash" for "/bin/alloy"
+Run '/bin/alloy --help' for usage.
+2026/11/28 05:19:47 collector server run finished with error: unknown command "bash" for "/bin/alloy"
+docker exit 1
+residue: containers matching rvw8c: 0
+ssh exit 0
+
+NOTE (reviewer): the attempt above used the image's default entrypoint (the pinned harness base is grafana/alloy on Ubuntu 24.04), which exited at once with a usage error; nothing ran. Second attempt with --entrypoint /usr/bin/bash, 2026-11-28T05:20:33Z:
+container: Ubuntu 24.04.4 LTS; sed 4.9; uid 0
+synthetic base64 length: 68
+lf (CR bytes 0): KEY-SHAPE-OK
+crlf (CR bytes 1): KEY-SHAPE-OK; CR bytes in kept line: 0; kept line equals lf's: yes
+crlf, no comment: KEY-SHAPE-OK
+two CRs at line end: no KEY-SHAPE-OK
+CR inside the comment: no KEY-SHAPE-OK
+options prefix: no KEY-SHAPE-OK
+two lines: no KEY-SHAPE-OK
+key line then an empty CRLF line: no KEY-SHAPE-OK
+no final newline: KEY-SHAPE-OK
+other key type: no KEY-SHAPE-OK
+docker exit 0
+residue: containers matching rvw8c: 0
+ssh exit 0

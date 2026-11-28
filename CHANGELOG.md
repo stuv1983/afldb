@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### R6 r8: independent admin path, owner procedure and read-only checks (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `12e46305`; nothing installed or deployed; MED-2 and MED-3 stay open on F1 and owner installation)
+
+- **Privileged steps use an independent admin path.** The R6 plan, the release runbook and the R7 install, rollback and `postgres` steps run from the console as root or a separate `afldb-admin` account with its own key, never `sudo` in an arm session; bundle bytes and expected digests come only from the owner's workstation clone ([owner procedure](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md), with read-only checks `owner-checks/afldb-owner-checks.sh`).
+- **Installers refuse an arm-descended root session**; `verify-backup-install.sh --as-arm` checks arm's view without arm's login; `install-verify.sh` verifies its library before sourcing it; the wrapper's `version` exits 1 on any STOP.
+- **Sealed backup: the service is pinned whole** (exact drop-in set, empty environment and bind/mount settings, base unit equal to `deploy/afldb-backup.service`).
+- **Owner verifier output labels arm-produced lines** and prints `G0 SCOPE`/`A2 SCOPE` lines; [dependency review](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/DEPENDENCIES.md).
+- Validation: backup (15) and verifier (10) harnesses PASS at `f8a63bb3`, procedure harness PASS at `12e46305`; independent review rounds 1-3 ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/README.md)).
+
 ### R6 r7 review round 1 (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `7d693020`; nothing installed or deployed; MED-2 and MED-3 stay open on F1 and owner installation)
 
 - **Sealed backup: seal format `afldb-backup-seal/4` and a completion record.** The seal records the timer's realtime activation; `dispatch_kind` is catch-up when the timer activated at or after 02:20:00 Melbourne of the dispatch's date or the dispatch came within 5 s, and `sealed_origin` recomputes it (it no longer depends on `RandomizedDelaySec`). The sealer writes `seals/<invocation>.done` last and the gate requires it, so a run that failed after publication is never eligible. The gate also refuses `ExecCondition`/`ExecStartPre`/`ExecStop*`/`ExecReload` commands and a `.env` in the code directory.

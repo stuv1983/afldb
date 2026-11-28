@@ -417,7 +417,7 @@ All of these must be met **before the qualifying 02:20 backup**, the 02:20 run o
 * after OWNER-PROCEDURE Phase 2 (r8) has established, among its other checks, that arm's PostgreSQL roles are not superusers (§4
   item 17; checks D1/D4);
 * from root-owned staging directories outside `/home`. The bytes are a `git archive` of the tested revision
-  `<R8-PIN:tested-rev>`, made in the owner's **workstation** clone, hashed there, and carried over the admin path. The admin root
+  `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, made in the owner's **workstation** clone, hashed there, and carried over the admin path. The admin root
   session re-verifies them against the workstation value. Never copy them from arm's checkout, never run git as root in it, and
   never read an expected digest from a file on production. (r7 named `7d69302007568d3141a567c8eba89e4ee473c9a6` here; r8 changes
   the installers, so the pin moves.)
@@ -449,7 +449,7 @@ and the R6 plan's r7 note.
      `rrsync -ro` path in production arm's `authorized_keys`, and streamanator's pull configuration. No root step is involved.
    * Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`.
 4. **Workstation.**
-   * Stage `verify/` from `<R8-PIN:tested-rev>` in the owner's own clone and run `sha256sum -c SHA256SUMS`
+   * Stage `verify/` from `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3` in the owner's own clone and run `sha256sum -c SHA256SUMS`
      (`49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`; wrapper `BUNDLE_SHA` `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`; r7: `7d693020`, `221b254a…`, `df3457cc…`).
    * Run `afldb-verify-call.sh version`. It must print `OWNER VERDICT VERSION PASS` for both hosts.
 
