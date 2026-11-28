@@ -1,4 +1,4 @@
-== case n31-now-without-rehearsal: bash afldb-gate-accept.sh --gate release-g0 --now 2026-11-28T05:40:00Z --owner-checks unmarked/p3/fx-oc-4.4-bootid.txt --reverify unmarked/p3/fx-reverify-4.5-bootid.txt --version unmarked/p3/fx-version-post-prod.txt --verdict unmarked/p3/fx-g0-pass-post-prod.txt --verdict-exit 0
-usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]
+== case n31-now-without-rehearsal: bash afldb-gate-accept.sh --gate release-g0 --now 2026-11-28T05:40:00Z --owner-checks unmarked/p3/fx-oc-4.4-bootid.txt --reverify unmarked/p3/fx-reverify-4.5-bootid.txt --version unmarked/p3/fx-version-post-prod.txt --verdict unmarked/p3/fx-g0-pass-post-prod.txt --verdict-exit 0 --confirm unmarked/cf/n31-now-without-rehearsal-confirm.txt
+usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N --confirm F [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]
 refused: --now is a test clock, accepted only with --rehearsal; a production evaluation uses this workstation's clock
 == exit 2

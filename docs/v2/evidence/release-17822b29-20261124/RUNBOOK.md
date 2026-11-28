@@ -227,6 +227,8 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 ### 4.1 G0, the 03:10 backup gate (it must PASS before P2)
 
 **r9 (28 Nov 2026): G0 passes only on `GATE ACCEPT RELEASE-G0 GO transport=production` (exit 0) from `$R9/accept/afldb-gate-accept.sh`.**
+**r10 round 2:** the checker also takes `--confirm <a version call made after the G0 call, immediately before the check>` and
+`--pin-rev` is checked against the owner clone's current reviewed head (OWNER-PROCEDURE "Saved evidence"); act on GO at once.
 That GO requires all of: (a) the OWNER-PROCEDURE 4.4 owner checks, `OWNER CHECKS RESULT PASS` with B1, B2 and B3 PASS; (b) the 4.5
 re-verification of both installs, with arm out of `sudo`; (c) a 4.6 version check made after them, with production and the
 qualified off-host endpoint PASS; (d) the wrapper's `OWNER VERDICT G0 PASS transport=production` with exit 0, made after (c), naming

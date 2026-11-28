@@ -53,6 +53,10 @@ AEDT offset is valid only for those dates. Any other date answers usage (exit 2)
 **Q7 cannot be met for any night after 29 Nov 2026** until a reviewed change re-dates the window, together with the offset handling
 and the packet's digests. Re-date it before any real use. A machine built from 29 Nov has its first scheduled night outside the
 window. This procedure does not widen the window.
+**r10 (independent review F3): this limit binds §3a too.** `candidate-g0` uses the same date check, so candidate evidence, owner
+review and acceptance (§3a, §4) can only be completed for a night in 2026-11-24..29. No candidate is installed today (28 Nov), so the
+sequence is rehearsed (r7v scenario n) but **cannot be completed in production with these bytes**: a reviewed change that re-dates
+the window (with the offset handling, the bundle's `g0-core.sh` check and the packet digests) must come first, then this sequence.
 
 Q1 to Q5 are what makes M independent of streamanator's `arm`. The wrapper cannot check them. It checks only that the pin exists,
 is well formed, is not streamanator, carries a host key the owner's `known_hosts` holds, and points at a record whose sha256 it
@@ -106,7 +110,10 @@ The wrapper accepts a G0B PASS only when the RESULT line carries all five eviden
 * `complete-at=`: the END record, with `rc=0`, of the one invocation whose lineage contains that dispatch's PID;
 * `received-at=` and `received-sha256=`: r10: that invocation's RECEIVED record of the dump, with G0a's sha256 (rsync itemised it as
   a file created by this run, moved at least its size, and the run verified it), and its per-dump RECEIPT written within 60 s after
-  that invocation's END rc=0. r9 took a VERIFIED record here, which was written for every copy held;
+  that invocation's END rc=0. r9 took a VERIFIED record here, which was written for every copy held. r10 round 2 (independent
+  review F5, F6): the dump must also have been absent before the run, as a file and as a partial under `.rsync-partial` (a resumed
+  transfer is not a receipt; rsync runs with `--whole-file`), and the wrapper takes RECEIVED only from `offhost-pull.sh`'s file
+  descriptor 3, never from its mixed output, so text the source side prints over ssh or rsync cannot create a RECEIVED record;
 * `rehash-sha256=`: root's re-hash of the copy at check time, equal to G0a's sha256.
 
 The order must be dispatch ≤ received (5 s journal-receipt tolerance) ≤ complete ≤ D 03:10 + 35 min. A copy without the dispatch,
@@ -197,7 +204,7 @@ re-qualify, follow §1–§4 again with a new record.
 
 ## 5. What a qualified G0 PASS still does not establish
 
-* The pull log's BEGIN, VERIFIED and END lines are written by M's pull account. They are trustworthy only because Q5 shows that
+* The pull log's BEGIN, RECEIVED, HELD, END and RECEIPT lines (r10; r9: VERIFIED) are written by M's pull account. They are trustworthy only because Q5 shows that
   this account cannot reach M's root, and M's root is independent of streamanator (Q1–Q4). The dispatch (root cron's journal entry)
   and the check-time re-hash (root) do not depend on the pull account.
 * G0a still rests on production's F1 (R8 OWNER-PROCEDURE Phases 0–4).

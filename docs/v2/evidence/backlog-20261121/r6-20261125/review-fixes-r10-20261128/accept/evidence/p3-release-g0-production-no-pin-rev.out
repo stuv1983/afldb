@@ -1,15 +1,17 @@
-== case p3-release-g0-production-no-pin-rev: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/p3/fx-oc-4.4-bootid.txt --reverify unmarked/p3/fx-reverify-4.5-bootid.txt --version unmarked/p3/fx-version-post-prod.txt --verdict unmarked/p3/fx-g0-pass-post-prod.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T10:53:15Z gate=release-g0 transport=production (read-only; inputs by sha256)
-   1efcf6cd9e9bcda0d3f6c3135f2f38f390ea790627690d8815bec810ba54b72e  unmarked/p3/fx-oc-4.4-bootid.txt
-   bb718bb237bc91b26337ed5948e0a5568a0aaaeaccaffabf23e8eb8eb9671404  unmarked/p3/fx-reverify-4.5-bootid.txt
-   fa5ad8265f8b07c00030f2f0ba5ae0356aa1a50a286129daa7fadf09fbc8bbed  unmarked/p3/fx-version-post-prod.txt
-   34d13a7be13b21c21e07df34152fa458c9b84c962d2120e5e416d06028b0b16b  unmarked/p3/fx-g0-pass-post-prod.txt
-ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T10:47:38Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
-ACCEPT reverify PASS root 2026-11-28T10:47:32Z, --as-arm 2026-11-28T10:47:34Z (arm has no admin group), verify-install 2026-11-28T10:47:37Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
-ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T10:49:46Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both; off-host VERSION PASS from r9-fixtur
-ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T10:51:08Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
-ACCEPT access PASS 4.4, 4.5, 4.6 and the gate verdict all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded between them
+== case p3-release-g0-production-no-pin-rev: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/p3/fx-oc-4.4-bootid.txt --reverify unmarked/p3/fx-reverify-4.5-bootid.txt --version unmarked/p3/fx-version-post-prod.txt --verdict unmarked/p3/fx-g0-pass-post-prod.txt --verdict-exit 0 --confirm unmarked/cf/p3-release-g0-production-no-pin-rev-confirm.txt
+== afldb-gate-accept 2026-11-28T11:39:08Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   bdd9c08473c0a46b8f2b302592610ab8a197fe710c632fdedc04b51e828cfc5e  unmarked/p3/fx-oc-4.4-bootid.txt
+   8c1ad4fc04045f517111c86a4c0cb955c70894d76ff89d37f31c897a6bbcc0c5  unmarked/p3/fx-reverify-4.5-bootid.txt
+   2f847cd7480e155f955767ab293dc2c2739272c6bfc5238b4aeca29f289425b9  unmarked/p3/fx-version-post-prod.txt
+   6e60c4f8645922f6c55ad46db282fec188acc9e11291065940f6a33e1a151176  unmarked/p3/fx-g0-pass-post-prod.txt
+   0a523a76cb9740005aeaadbdc3e10c5d4cea41401778177fde216989bea41bf9  unmarked/cf/p3-release-g0-production-no-pin-rev-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T11:33:32Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T11:33:26Z, --as-arm 2026-11-28T11:33:28Z (arm has no admin group), verify-install 2026-11-28T11:33:31Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:35:40Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both; off-host VERSION PASS from r9-fixtur
+ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T11:37:02Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:38:08Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access PASS 4.4, 4.5, 4.6, the gate verdict and the confirm call all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded from 4.4 to the confirm
 ACCEPT pin FAIL release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>
-ACCEPT fresh PASS verdict 2026-11-28T10:51:08Z is 3 min after the older Phase 4 evidence (2026-11-28T10:47:32Z); checked 2 min later at 2026-11-28T10:53:15Z (workstation clock)
+ACCEPT fresh PASS verdict 2026-11-28T11:37:02Z is 3 min after the older Phase 4 evidence (2026-11-28T11:33:26Z); checked 2 min later at 2026-11-28T11:39:08Z (workstation clock)
 GATE ACCEPT RELEASE-G0 NO-GO failed=pin reason="pin: release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>"
 == exit 1

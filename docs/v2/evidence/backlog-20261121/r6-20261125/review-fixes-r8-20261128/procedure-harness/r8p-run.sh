@@ -175,8 +175,8 @@ WCALL() {
 # r9: the acceptance checker (bytes under test) in --rehearsal mode; AF = its last line, ARC = its exit, AFAIL = its failed= list
 ACC() {
   local n=$1 g=$2
-  AO=$(bash "$KD/accept/afldb-gate-accept.sh" --gate "$g" --owner-checks "$3" --reverify "$4" --version "$5" --verdict "$6" --verdict-exit "$7" --rehearsal 2>&1); ARC=$?
-  printf '%s\nexit %s\n' "$AO" "$ARC" | L "accept-$n-$g" "workstation: afldb-gate-accept.sh --gate $g --rehearsal ($n): inputs ${3##*/} ${4##*/} ${5##*/} ${6##*/} exit $7"
+  AO=$(bash "$KD/accept/afldb-gate-accept.sh" --gate "$g" --owner-checks "$3" --reverify "$4" --version "$5" --verdict "$6" --verdict-exit "$7" --confirm "$8" --rehearsal 2>&1); ARC=$?
+  printf '%s\nexit %s\n' "$AO" "$ARC" | L "accept-$n-$g" "workstation: afldb-gate-accept.sh --gate $g --rehearsal ($n): inputs ${3##*/} ${4##*/} ${5##*/} ${6##*/} exit $7 confirm ${8##*/}"
   AF=$(tail -n 1 <<< "$AO"); AFAIL=$(sed -n 's/.* NO-GO failed=\([^ ]*\) .*/\1/p' <<< "$AF")
 }
 
@@ -313,6 +313,8 @@ WCALL 4.6a-a2 "${A2ARGS[@]}"; A2X_POST=$WRC
   || res wrapper-a2-post FAIL "expect=A2-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
 pace
 WCALL 4.6b-g0 g0 2026-11-28; G0X_POST=$WRC
+pace
+WCALL 4.6e-confirm version   # r10 round 2 (F1): the confirm version call, after the gate calls, immediately before acceptance
 [ "$WRC" != 0 ] && [[ $(sed '/^[[:space:]]*$/d' <<< "$WO" | tail -n 1) == "OWNER VERDICT G0 STOP"* ]] \
   && res wrapper-g0-post PASS "expect=G0-STOP got=exit $WRC; $(grep -m1 '^OWNER VERDICT G0' <<< "$WO" | cut -c1-200)" \
   || res wrapper-g0-post FAIL "expect=G0-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
@@ -322,22 +324,22 @@ WCALL 4.6b-g0 g0 2026-11-28; G0X_POST=$WRC
 has() { [[ ",$1," == *",$2,"* ]]; }
 # (a) accept-counterexample: the real Phase 3 outputs (3.12 BLOCKED, 3.5/3.6/3.11 PASS, 3.13 version PASS) and the real a2 verdict then
 for g in release-g0 ng-pre; do
-  ACC counterexample "$g" "$(IN 3.12-owner-checks)" "$(IN 3-reverify)" "$(IN 3.13-version)" "$(IN 3.13a-a2)" "$A2X_PRE"
+  ACC counterexample "$g" "$(IN 3.12-owner-checks)" "$(IN 3-reverify)" "$(IN 3.13-version)" "$(IN 3.13a-a2)" "$A2X_PRE" "$(IN 4.6e-confirm)"
   [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL ${g^^} NO-GO "* ]] && has "$AFAIL" owner-checks && has "$AFAIL" reverify && has "$AFAIL" version \
     && res "accept-counterexample-$g" PASS "expect=NO-GO(owner-checks,reverify,version among failed) got=exit $ARC failed=$AFAIL" \
     || res "accept-counterexample-$g" FAIL "expect=NO-GO(owner-checks,reverify) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 done
 # (b) accept-post-phase4: the real 4.4, 4.5, 4.6 outputs and the real a2 verdict made after 4.6
-ACC post-phase4 ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST"
+ACC post-phase4 ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST" "$(IN 4.6e-confirm)"
 [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL NG-PRE NO-GO "* ]] && [ "$AFAIL" = verdict ] \
   && res accept-post-phase4-ng-pre PASS "expect=NO-GO(failed=verdict only: A2 STOPs in a container) got=exit $ARC failed=$AFAIL; parts a-c: $(grep -E '^ACCEPT (owner-checks|reverify|version) ' <<< "$AO" | cut -d' ' -f2,3 | tr '\n' ',')" \
   || res accept-post-phase4-ng-pre FAIL "expect=NO-GO(failed=verdict only) got=exit $ARC $(cut -c1-240 <<< "$AF"); $(grep -E '^ACCEPT [a-z-]+ FAIL' <<< "$AO" | cut -c1-200 | tr '\n' '|')"
-ACC post-phase4 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST"
+ACC post-phase4 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST" "$(IN 4.6e-confirm)"
 [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && [ "$AFAIL" = version,verdict ] \
   && res accept-post-phase4-release-g0 PASS "expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
   || res accept-post-phase4-release-g0 FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 # the same with the release gate's own verdict, the real g0 call after 4.6 (it STOPs: no qualified off-host endpoint)
-ACC post-phase4-g0 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6b-g0)" "$G0X_POST"
+ACC post-phase4-g0 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6b-g0)" "$G0X_POST" "$(IN 4.6e-confirm)"
 [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && [ "$AFAIL" = version,verdict ] \
   && res accept-post-phase4-release-g0-g0verdict PASS "expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
   || res accept-post-phase4-release-g0-g0verdict FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
@@ -389,17 +391,24 @@ pace
 WCALL 4.6c-version version
 pace
 WCALL 4.6d-a2 "${A2ARGS[@]}"; A2X_C=$WRC
-ACC access-change ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C"
+ACC access-change ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C" "$(IN 4.6c-version)"
 [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL NG-PRE NO-GO "* ]] && has "$AFAIL" access \
   && grep -q '^ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4' <<< "$AO" && grep -q "access-epoch=$AE2" "$(IN 4.6c-version)" \
   && res access-change-saved-void PASS "expect=NO-GO(access: saved 4.4/4.5 epoch $AE1, new 4.6 epoch $AE2) got=exit $ARC failed=$AFAIL; $(grep -m1 '^ACCEPT access ' <<< "$AO" | cut -c1-160)" \
   || res access-change-saved-void FAIL "expect=NO-GO(access) got=exit $ARC $(cut -c1-200 <<< "$AF"); $(grep -m1 '^ACCEPT access ' <<< "$AO" | cut -c1-200)"
+# r10 round 2 (independent review F1): ALL FOUR saved parts from before the back-out (4.4, 4.5, 4.6, the A-2 call, epoch AE1) and only
+# the confirm call after it (4.6c, epoch AE2): NO-GO failed=access, which r10 round 1 could not see from the four saved files alone
+ACC access-change-all-saved ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST" "$(IN 4.6c-version)"
+[ "$ARC" = 1 ] && has "$AFAIL" access && grep -q '^ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4' <<< "$AO" \
+  && grep -q "access-epoch=$AE1" "$(IN 4.6-version)" && grep -q "access-epoch=$AE1" "$(IN 4.6a-a2)" && grep -q "access-epoch=$AE2" "$(IN 4.6c-version)" \
+  && res access-change-all-saved-void PASS "expect=NO-GO(access: 4.4-4.6 and the gate verdict all epoch $AE1, confirm $AE2) got=exit $ARC failed=$AFAIL" \
+  || res access-change-all-saved-void FAIL "expect=NO-GO(access) got=exit $ARC $(cut -c1-200 <<< "$AF"); $(grep -m1 '^ACCEPT access ' <<< "$AO" | cut -c1-200)"
 pace
 O=$(AS checks44 "$AFP" 4.4r-owner-checks); printf '%s\n' "$O" | L checks44r "admin root session: fresh 4.4 after the back-out"
 pace
 fetch access-change
 V=$(grep '^OWNER CHECKS RESULT' "$(IN 4.4r-owner-checks)" | tail -1)
-ACC access-change-fresh ng-pre "$(IN 4.4r-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C"
+ACC access-change-fresh ng-pre "$(IN 4.4r-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C" "$(IN 4.6c-version)"
 [[ $V == "OWNER CHECKS RESULT BLOCKED "* ]] && [ "$(sed -n 2p "$(IN 4.4r-owner-checks)")" = "ACCESS-EPOCH $AE2" ] && [ "$ARC" = 1 ] && has "$AFAIL" owner-checks \
   && res access-change-fresh-blocked PASS "expect=fresh-4.4-BLOCKED,NO-GO(owner-checks) got=$V; $(grep -E '^CHECK B[12] FAIL' "$(IN 4.4r-owner-checks)" | cut -c1-60 | tr '\n' '|'); exit $ARC failed=$AFAIL" \
   || res access-change-fresh-blocked FAIL "expect=BLOCKED+NO-GO got=$V; exit $ARC failed=$AFAIL"

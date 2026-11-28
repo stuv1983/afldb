@@ -5,6 +5,10 @@
 # access-epoch=<hex> on each production RESULT line; REAL inputs are unchanged), so r9's cases keep their r9 meaning; (2) every
 # production release-g0 case also fails "pin" (no --pin-rev); (3) new cases e1-e9 (access epoch, Astra case 3) and g1-g8 (the pin of
 # a reviewed revision, Astra case 2) in a scratch git repository holding a byte-identical copy of the checker.
+# r10 round 2 (independent review F1, F2): the checker requires --confirm, a version call made after the gate verdict. case_ adds
+# one to every case that names none (made at run time from fx-version-post[-prod] with its two times set to the case clock - 60 s,
+# so it is after every verdict the case uses and within 10 min of the check); cases h1-h6 give their own. The pin cases now run
+# with the production pin at HEAD (C1), and g10/g11 test a pin revoked or superseded at HEAD.
 # r9 text follows.
 # test-gate-accept.sh (R6 r9): exercises afldb-gate-accept.sh on saved outputs. Local only (Git Bash or Linux); contacts no host.
 #   bash test-gate-accept.sh
@@ -169,10 +173,23 @@ shift_now() { # name file...: copies under $U/name with every ISO time moved so 
     s1+="s/$t/@@T$k@@/g;"; s2+="s/@@T$k@@/$(date -u -d "@$(( $(date -u -d "$t" +%s) + off ))" +%FT%TZ)/g;"; done
   for f in "$@"; do sed "$s1" "$f" | sed "$s2" > "$d/$(basename "$f")"; done; }
 
+# ---- the confirm input (r10 round 2): mkconf out template clock [epoch]: a copy of a version transcript with the wrapper header
+# time and the production RESULT at= set to clock - 60 s (and, when given, that RESULT's access-epoch replaced)
+mkconf() {
+  local out=$1 tpl=$2 clk=$3 ep=${4:-} t; t=$(date -u -d "@$(( $(date -u -d "$clk" +%s) - 60 ))" +%FT%TZ)
+  sed -E -e "s/^(== afldb-verify-call )$TSRE( mode=version )/\1$t\2/" \
+    -e "/^AFLDB-VERIFY RESULT VERSION PASS nonce=[0-9a-f]+ host=afldb-prod /s/ at=$TSRE / at=$t /" "$tpl" > "$out"
+  [ -z "$ep" ] || sed -i -E "/^AFLDB-VERIFY RESULT VERSION PASS nonce=[0-9a-f]+ host=afldb-prod /s/ access-epoch=[^ ]+$/ access-epoch=$ep/" "$out"
+}
 # ---- cases: id | expected final line prefix (or USAGE) | expected failed= list (empty for GO) | checker arguments
 NPASS=0; NFAIL=0
 case_() {
-  local id=$1 want=$2 wfail=$3 out last got_fail ok; shift 3
+  local id=$1 want=$2 wfail=$3 out last got_fail ok a clk tpl; shift 3
+  if [ -z "${NOCONF:-}" ] && [[ " $* " != *" --confirm "* ]]; then
+    clk=; tpl=$U/fx-version-post-prod.txt; for a in "$@"; do [ "${prev:-}" = --now ] && clk=$a; [ "$a" = --rehearsal ] && tpl=$U/fx-version-post.txt; prev=$a; done; prev=
+    [ -n "$clk" ] || clk=$(date -u +%FT%TZ)
+    mkdir -p "$U/cf"; mkconf "$U/cf/$id-confirm.txt" "$tpl" "$clk"; set -- "$@" --confirm "$U/cf/$id-confirm.txt"
+  fi
   out=$(bash "${CHKX:-$CHK}" "$@" 2>&1); rc=$?
   printf '%s\n' "== case $id: bash afldb-gate-accept.sh $*" "$out" "== exit $rc" > "$EV/$id.out"
   last=$(tail -n 1 <<< "$out"); got_fail=$(sed -nE 's/.* NO-GO failed=([^ ]+) .*/\1/p' <<< "$last")
@@ -231,7 +248,7 @@ case_ n20-phase4-evidence-2days "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh"
 # R9-F-1: freshness, boot binding, fixture refusal, exact production transport
 case_ n21-verdict-over-3h-after-4.4 "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh" --rehearsal --now 2026-11-28T08:40:00Z --gate release-g0 $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post-late.txt --verdict-exit 0
 case_ n22-check-over-1h-after-verdict "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh" --rehearsal --now 2026-11-28T06:30:00Z --gate release-g0 $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
-case_ n23-verdict-ahead-of-clock "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh" --rehearsal --now 2026-11-28T05:10:00Z --gate release-g0 $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
+case_ n23-verdict-ahead-of-clock "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "confirm,fresh" --rehearsal --now 2026-11-28T05:10:00Z --gate release-g0 $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
 case_ n24-boot-id-mismatch-owner-checks "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "version" --rehearsal $N5 --gate release-g0 \
   --owner-checks $U/fx-oc-4.4-bootid-other.txt --reverify $U/fx-reverify-4.5-bootid.txt --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
 case_ n25-boot-mismatch-verdict "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "verdict" --rehearsal $N5 --gate release-g0 $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post-other-boot.txt --verdict-exit 0
@@ -288,9 +305,8 @@ printf '%s\n' '# r10 accept test pin (scratch repository only)' 'format=afldb-of
   'address=203.0.113.20' 'hostkey=SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' 'record-file=records/q.md' \
   "record-sha256=$(printf 'r10 record\n' | sha256sum | cut -c1-64)" 'qualified-on=2026-11-28' > "$GS/$RP/offhost/QUALIFIED-ENDPOINT"
 gg add -A; gg commit -q -m 'C1: production pin'; C1=$(git -C "$GS" rev-parse HEAD); P1=$(sha256sum < "$GS/$RP/offhost/QUALIFIED-ENDPOINT" | cut -c1-64)
-sed -i 's/^format=.*/format=afldb-offhost-qualification-fixture-v1/' "$GS/$RP/offhost/QUALIFIED-ENDPOINT"; echo 'rehearsal-utc-offset=39600' >> "$GS/$RP/offhost/QUALIFIED-ENDPOINT"
-gg add -A; gg commit -q -m 'C2: fixture pin'; C2=$(git -C "$GS" rev-parse HEAD); P2=$(sha256sum < "$GS/$RP/offhost/QUALIFIED-ENDPOINT" | cut -c1-64)
-echo "[r10] scratch pin repository: C0 $C0 (no pin), C1 $C1 (pin sha256 $P1), C2 $C2 (fixture pin sha256 $P2)" | tee -a "$EV/summary.txt"
+P2=$(sed -e 's/^format=.*/format=afldb-offhost-qualification-fixture-v1/' "$GS/$RP/offhost/QUALIFIED-ENDPOINT" | { cat; echo 'rehearsal-utc-offset=39600'; } | sha256sum | cut -c1-64)
+echo "[r10] scratch pin repository: C0 $C0 (no pin), C1 $C1 (pin sha256 $P1; HEAD for g1-g6); C2 adds the fixture pin (sha256 $P2) before g5, g7, g8; C3/C4 revoke/supersede before g10/g11" | tee -a "$EV/summary.txt"
 qcopy() { # name sha file...: unmarked copies under $U/name with qual-sha256=$FQ replaced by sha
   local d=$U/$1 q=$2 f; shift 2; mkdir -p "$d"; for f in "$@"; do sed "s/qual-sha256=$FQ/qual-sha256=$q/g" "$f" > "$d/$(basename "$f")"; done; }
 qcopy q1 "$P1" $U/fx-version-post-prod.txt $U/fx-g0-pass-post-prod.txt
@@ -301,11 +317,39 @@ CHKX=$GC case_ g1-production-pin-rev-reviewed "GATE ACCEPT RELEASE-G0 GO transpo
 CHKX=$GC case_ g2-production-no-pin-rev "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP --version $U/g/fx-version-post-prod.txt --verdict $U/g/fx-g0-pass-post-prod.txt --verdict-exit 0
 CHKX=$GC case_ g3-production-old-export-c0 "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP --version $U/g/fx-version-post-prod.txt --verdict $U/g/fx-g0-pass-post-prod.txt --verdict-exit 0 --pin-rev $C0
 CHKX=$GC case_ g4-production-pin-not-the-reviewed-one "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP --version $U/g2/fx-version-post-prod.txt --verdict $U/g2/fx-g0-pass-post-prod.txt --verdict-exit 0 --pin-rev $C1
+sed -i 's/^format=.*/format=afldb-offhost-qualification-fixture-v1/' "$GS/$RP/offhost/QUALIFIED-ENDPOINT"; echo 'rehearsal-utc-offset=39600' >> "$GS/$RP/offhost/QUALIFIED-ENDPOINT"
+gg add -A; gg commit -q -m 'C2: fixture pin'; C2=$(git -C "$GS" rev-parse HEAD)
+[ "$(sha256sum < "$GS/$RP/offhost/QUALIFIED-ENDPOINT" | cut -c1-64)" = "$P2" ] || { echo "STOP fixture pin sha256 differs from P2"; exit 2; }
 CHKX=$GC case_ g5-production-fixture-pin "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP --version $U/g2/fx-version-post-prod.txt --verdict $U/g2/fx-g0-pass-post-prod.txt --verdict-exit 0 --pin-rev $C2
 CHKX=$GC case_ g6-production-unknown-rev "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP --version $U/g/fx-version-post-prod.txt --verdict $U/g/fx-g0-pass-post-prod.txt --verdict-exit 0 --pin-rev 0123456789abcdef0123456789abcdef01234567
 qcopy q3 "$P2" $U/fx-version-post.txt $U/fx-g0-pass-post.txt; qcopy q4 "$P1" $U/fx-version-post.txt $U/fx-g0-pass-post.txt
 CHKX=$GC case_ g7-rehearsal-fixture-pin-rev "GATE ACCEPT REHEARSAL RELEASE-G0 GO" "" $REG $OK4 --version $U/q3/fx-version-post.txt --verdict $U/q3/fx-g0-pass-post.txt --verdict-exit 0 --pin-rev $C2
 CHKX=$GC case_ g8-rehearsal-production-pin-rev "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "pin" $REG $OK4 --version $U/q4/fx-version-post.txt --verdict $U/q4/fx-g0-pass-post.txt --verdict-exit 0 --pin-rev $C1
 case_ g9-pin-rev-not-hex USAGE "" $REG $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0 --pin-rev HEAD
+# r10 round 2 (F2): C1's pin passes only while it is the pin at HEAD. C3 deletes it (revoked); C4 commits another production pin
+git -C "$GS" rm -q "$RP/offhost/QUALIFIED-ENDPOINT"; gg commit -q -m 'C3: pin revoked'
+shift_now g10 $U/fx-oc-4.4-bootid.txt $U/fx-reverify-4.5-bootid.txt $U/q1/fx-version-post-prod.txt $U/q1/fx-g0-pass-post-prod.txt
+GP10="--gate release-g0 --owner-checks $U/g10/fx-oc-4.4-bootid.txt --reverify $U/g10/fx-reverify-4.5-bootid.txt --version $U/g10/fx-version-post-prod.txt --verdict $U/g10/fx-g0-pass-post-prod.txt --verdict-exit 0"
+CHKX=$GC case_ g10-production-pin-revoked-at-head "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP10 --pin-rev $C1
+mkdir -p "$GS/$RP/offhost"   # git rm removed the emptied directory
+git -C "$GS" show "$C1:$RP/offhost/QUALIFIED-ENDPOINT" | sed 's/^address=.*/address=203.0.113.21/' > "$GS/$RP/offhost/QUALIFIED-ENDPOINT"; gg add -A; gg commit -q -m 'C4: another pin'
+git -C "$GS" cat-file -e "HEAD:$RP/offhost/QUALIFIED-ENDPOINT" || { echo "STOP C4 has no pin"; exit 2; }
+CHKX=$GC case_ g11-production-pin-superseded-at-head "GATE ACCEPT RELEASE-G0 NO-GO" "pin" $GP10 --pin-rev $C1
+# ---- r10 round 2 (independent review F1): the confirm call. h1 is the reviewer's sequence: 4.4, 4.5, 4.6 and the gate verdict all
+# saved with epoch AO, then an access change (epoch AE), then the confirm: NO-GO access. h2 is its control (no change: GO).
+H4="--owner-checks $U/fx-oc-4.4-bootid-epoch-before.txt --reverify $U/fx-reverify-4.5-bootid-epoch-before.txt --version $U/fx-version-post-epoch-before.txt --verdict $U/fx-g0-pass-post-epoch-before.txt --verdict-exit 0"
+mkdir -p "$U/h"; mkconf "$U/h/cf-after-change.txt" "$U/fx-version-post.txt" 2026-11-28T05:40:00Z
+mkconf "$U/h/cf-no-change.txt" "$U/fx-version-post.txt" 2026-11-28T05:40:00Z "$AO"
+VAT=$(sed -nE 's/^OWNER VERDICT G0 PASS .* g0a-at=([0-9T:Z-]+) .*/\1/p' "$U/fx-g0-pass-post.txt")
+mkconf "$U/h/cf-stale.txt" "$U/fx-version-post.txt" "$(date -u -d "@$(( $(date -u -d "$VAT" +%s) + 120 ))" +%FT%TZ)"   # 1 min after the verdict, about 14 min before N5
+mkconf "$U/h/cf-before-verdict.txt" "$U/fx-version-post.txt" "$VAT"
+sed -E '/^AFLDB-VERIFY RESULT VERSION PASS nonce=[0-9a-f]+ host=afldb-prod /s/ boot=[0-9a-f]{32} / boot=00000000000000000000000000000000 /' "$U/h/cf-after-change.txt" > "$U/h/cf-other-boot.txt"
+case_ h1-all-four-saved-then-change "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "access" $REG $H4 --confirm $U/h/cf-after-change.txt
+case_ h2-all-four-saved-no-change "GATE ACCEPT REHEARSAL RELEASE-G0 GO" "" $REG $H4 --confirm $U/h/cf-no-change.txt
+case_ h3-confirm-over-10-min "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "confirm" $REG $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0 --confirm $U/h/cf-stale.txt
+case_ h4-confirm-before-verdict "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "confirm" $REG $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0 --confirm $U/h/cf-before-verdict.txt
+case_ h5-confirm-other-boot "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "confirm" $REG $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0 --confirm $U/h/cf-other-boot.txt
+case_ h7-a2-stop-saved-then-change "GATE ACCEPT REHEARSAL NG-PRE NO-GO" "verdict,access" $NGP --owner-checks $U/fx-oc-4.4-bootid-epoch-before.txt --reverify $U/fx-reverify-4.5-bootid-epoch-before.txt --version $U/fx-version-post-offhost-unqualified-epoch-before.txt --verdict $U/fx-a2-stop-attributed-post.txt --verdict-exit 1 --confirm $U/h/cf-after-change.txt
+NOCONF=1 case_ h6-no-confirm USAGE "" $REG $OK4 --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
 echo "GATE ACCEPT TESTS RESULT $([ $NFAIL = 0 ] && echo PASS || echo FAIL) cases=$((NPASS + NFAIL)) pass=$NPASS fail=$NFAIL checker-sha256=$(sha256sum < "$CHK" | cut -c1-64)" | tee -a "$EV/summary.txt"
 [ $NFAIL = 0 ]

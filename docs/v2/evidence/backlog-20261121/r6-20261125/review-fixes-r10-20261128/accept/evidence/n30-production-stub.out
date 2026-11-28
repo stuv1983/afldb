@@ -1,14 +1,16 @@
-== case n30-production-stub: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/n30/fx-oc-4.4-bootid.txt --reverify unmarked/n30/fx-reverify-4.5-bootid.txt --version unmarked/n30/fx-version-post-stub.txt --verdict unmarked/n30/fx-g0-pass-post-stub.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T10:54:48Z gate=release-g0 transport=production (read-only; inputs by sha256)
-   7da92ddc1dc74bea6a4487f229e3896f197fe79e40bfc3a006d77549582181c1  unmarked/n30/fx-oc-4.4-bootid.txt
-   80c53e1a24302e905bc7ba440c809ebbefab4731402bbbfa44486e0feb14c38f  unmarked/n30/fx-reverify-4.5-bootid.txt
-   0ecfcc47d9a6f826d997472029e6b2a2fc691e66cc96fa0a6676e311f8a6915b  unmarked/n30/fx-version-post-stub.txt
-   7193bf1a5bc810d8f1d64e7fcb7bc5fc313a771e2023eca3daabb87cd6d33e45  unmarked/n30/fx-g0-pass-post-stub.txt
-ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T10:49:11Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
-ACCEPT reverify PASS root 2026-11-28T10:49:05Z, --as-arm 2026-11-28T10:49:07Z (arm has no admin group), verify-install 2026-11-28T10:49:10Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+== case n30-production-stub: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/n30/fx-oc-4.4-bootid.txt --reverify unmarked/n30/fx-reverify-4.5-bootid.txt --version unmarked/n30/fx-version-post-stub.txt --verdict unmarked/n30/fx-g0-pass-post-stub.txt --verdict-exit 0 --confirm unmarked/cf/n30-production-stub-confirm.txt
+== afldb-gate-accept 2026-11-28T11:40:53Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   d0dfd733e017fa0768a8b81dadbcccd95b7fe152b977cf1d013ce35e50418bf2  unmarked/n30/fx-oc-4.4-bootid.txt
+   16d8d72f841f58520886b4c4b5223e80042811385f8245327b24796ad9fd3dbe  unmarked/n30/fx-reverify-4.5-bootid.txt
+   40683dc5c1ae4d864e7230aecff69490a20e397bbd9cd7883d2d21a2c6095ad5  unmarked/n30/fx-version-post-stub.txt
+   6d5b1a112f59860c2d36080283232db14002731c5cd804b5a345ec3bc8178d59  unmarked/n30/fx-g0-pass-post-stub.txt
+   f6971d2d5a946019406ebd2c3097cf678019ed971e3a37b87c34145aaebc1905  unmarked/cf/n30-production-stub-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T11:35:16Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T11:35:10Z, --as-arm 2026-11-28T11:35:12Z (arm has no admin group), verify-install 2026-11-28T11:35:15Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
 ACCEPT version FAIL transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate
 ACCEPT verdict FAIL transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate
-INFO access: the passing parts agree on epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605; the failed parts are not compared
+INFO confirm: not judged (the gate verdict did not pass); its access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605 is compared in (f)
+INFO access: the passing parts agree on epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605; the failed or unjudged parts are not compared
 ACCEPT pin FAIL release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>
 GATE ACCEPT RELEASE-G0 NO-GO failed=version,verdict,pin reason="version: transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate"
 == exit 1

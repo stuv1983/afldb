@@ -1,13 +1,16 @@
-== case n29-fixture-marked-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks inputs/fx-oc-4.4-bootid.txt --reverify inputs/fx-reverify-4.5-bootid.txt --version inputs/fx-version-post-prod.txt --verdict inputs/fx-g0-pass-post-prod.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T10:54:46Z gate=release-g0 transport=production (read-only; inputs by sha256)
+== case n29-fixture-marked-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks inputs/fx-oc-4.4-bootid.txt --reverify inputs/fx-reverify-4.5-bootid.txt --version inputs/fx-version-post-prod.txt --verdict inputs/fx-g0-pass-post-prod.txt --verdict-exit 0 --confirm unmarked/cf/n29-fixture-marked-production-confirm.txt
+== afldb-gate-accept 2026-11-28T11:40:51Z gate=release-g0 transport=production (read-only; inputs by sha256)
    1b0b09e9d916ebff150c5e3ab0a13b70105d3c9c8b235c81422b5332ef9f6768  inputs/fx-oc-4.4-bootid.txt
    d21c1beacdc65640a0af1fdf02d539e9b96e5db4a442a03b148ae0fc21dceeaf  inputs/fx-reverify-4.5-bootid.txt
    fe516c0cc515848f0c90087107109d63405d60e82d3ad2568c9f8336c3a092e5  inputs/fx-version-post-prod.txt
    e06f14a1e61c08267c9fa4133a3b9ea743d62027224d8c10e0981b309a3b2b16  inputs/fx-g0-pass-post-prod.txt
+   fb60e01c3d1215b4d5f1378a0de0b605d9814ad674eb7dbfcd022f83de880e1a  unmarked/cf/n29-fixture-marked-production-confirm.txt
 ACCEPT owner-checks FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
 ACCEPT reverify FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
 ACCEPT version FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
 ACCEPT verdict FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+INFO confirm: not judged (the gate verdict did not pass); its access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605 is compared in (f)
+INFO access: the passing parts agree on epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605; the failed or unjudged parts are not compared
 ACCEPT pin FAIL release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>
 GATE ACCEPT RELEASE-G0 NO-GO failed=owner-checks,reverify,version,verdict,pin reason="owner-checks: the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence"
 == exit 1

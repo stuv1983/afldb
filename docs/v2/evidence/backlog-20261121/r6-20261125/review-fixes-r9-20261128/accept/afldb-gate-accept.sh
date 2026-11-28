@@ -3,7 +3,9 @@
 # NG-PRE. Read-only: it reads the saved outputs named below, writes nothing but stdout, and contacts no host.
 #   bash afldb-gate-accept.sh --gate release-g0|ng-pre \
 #     --owner-checks <saved 4.4 output> --reverify <saved 4.5 output> --version <saved 4.6 output> \
-#     --verdict <saved wrapper output of the gate call> --verdict-exit <the wrapper's exit status> [--rehearsal [--now <UTC>]]
+#     --verdict <saved wrapper output of the gate call> --verdict-exit <the wrapper's exit status> \
+#     --confirm <saved wrapper output of a version call made AFTER the gate call, immediately before this check> \
+#     [--pin-rev <rev>] [--rehearsal [--now <UTC>]]
 # GO needs ALL of:
 #  (a) owner checks after Phase 4: first line "BOOT-ID <32 hex>" (printed by root in [ADM-ROOT] before the check), one header
 #      "== afldb-owner-checks (R6 r8) <ts> host=afldb-prod as uid=0", every CHECK line PASS, each required id present (B1, B2, B3
@@ -42,20 +44,33 @@
 #      the wrapper; this checker reads the pin `git show <rev>:<R9>/offhost/QUALIFIED-ENDPOINT` from ITS OWN clone and requires its
 #      sha256 to equal the qual-sha256 of (c) and (d). An uncommitted, edited or absent pin, or a revision without one (an "old
 #      export"), is NO-GO. In a rehearsal --pin-rev is optional and checked when given.
+#      r10 round 2 (independent review F2): the pin at --pin-rev must also be byte-equal to the pin at this clone's HEAD, so a pin
+#      the owner later revoked (deleted or replaced in a newer reviewed commit) no longer passes with its old --pin-rev. Run the
+#      checker in the owner's clone with the current reviewed head checked out.
+#  (h) CONFIRM (r10 round 2, independent review F1): (a)-(d) are saved files, so an access change made after ALL of them (a
+#      back-out or `invalidate` after the gate call) is invisible in them. --confirm is a wrapper "version" call made AFTER the gate
+#      verdict, immediately before this check: its authenticated production RESULT must be after the verdict's at=, on the same
+#      boot, with the (b) bundle, at most 10 min before this check (by this workstation's clock; 5 min skew allowed), and its
+#      access-epoch joins (f). So an access change at any time before the confirm call gives failed=access. A change made after the
+#      confirm call is outside what a saved transcript can show: the procedure makes this check immediately after the confirm
+#      call and acts on GO at once, and any afldb-phase4.sh action after it prints VOID for this GO too. (h) is judged only when
+#      (d) passed (the result is NO-GO otherwise).
 # Final line: GATE ACCEPT [REHEARSAL ]<RELEASE-G0|NG-PRE> GO|NO-GO ...   Exit: 0 GO, 1 NO-GO, 2 usage.
 set -uo pipefail; export LC_ALL=C
-usage() { echo "usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]"; [ -n "${1:-}" ] && echo "refused: $1"; exit 2; }
-OC= RV= VS= VD= VX= GATE= TR=production NOWARG= PINREV= PFULL=
+usage() { echo "usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N --confirm F [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]"; [ -n "${1:-}" ] && echo "refused: $1"; exit 2; }
+OC= RV= VS= VD= CF= VX= GATE= TR=production NOWARG= PINREV= PFULL=
 PINPATH=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/offhost/QUALIFIED-ENDPOINT
 while [ $# -gt 0 ]; do case $1 in
   --owner-checks) OC=${2:-}; shift 2 || usage;;  --reverify) RV=${2:-}; shift 2 || usage;;
   --version) VS=${2:-}; shift 2 || usage;;       --verdict) VD=${2:-}; shift 2 || usage;;
   --verdict-exit) VX=${2:-}; shift 2 || usage;;  --gate) GATE=${2:-}; shift 2 || usage;;
+  --confirm) CF=${2:-}; shift 2 || usage;;
   --pin-rev) PINREV=${2:-}; shift 2 || usage; [[ $PINREV =~ ^[0-9a-f]{7,40}$ ]] || usage "--pin-rev must be a commit id (hex)";;
   --now) NOWARG=${2:-}; shift 2 || usage;;
   --rehearsal) TR=rehearsal; shift;;             *) usage;; esac; done
 case $GATE in release-g0) G=RELEASE-G0; VMODE=g0; VV=G0;; ng-pre) G=NG-PRE; VMODE=a2; VV=A2;; *) usage;; esac
-for f in "$OC" "$RV" "$VS" "$VD"; do [ -n "$f" ] && [ -f "$f" ] && [ -r "$f" ] || usage; done
+[ -n "$CF" ] || usage "--confirm <a version call made after the gate call, immediately before this check> is required (r10: a saved set cannot show an access change made after it)"
+for f in "$OC" "$RV" "$VS" "$VD" "$CF"; do [ -n "$f" ] && [ -f "$f" ] && [ -r "$f" ] || usage; done
 [[ $VX =~ ^[0-9]{1,3}$ ]] || usage
 TS='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z'
 if [ -n "$NOWARG" ]; then
@@ -69,10 +84,11 @@ QK=pinned; [ "$TR" = rehearsal ] && QK=FIXTURE; OH=; OQ=
 MAXEV=10800    # (e) the verdict is at most 3 h after each of (a) and (b): 4.4-4.6 immediately before the gate call
 MAXCHK=3600    # (e) this check runs at most 1 h after the verdict, by this workstation's clock
 SKEW=300       # (e) a verdict more than 5 min ahead of this workstation's clock is refused
+MAXCF=600      # (h) the confirm call is at most 10 min before this check
 BID='^BOOT-ID ([0-9a-f]{32})$'
 AER='^ACCESS-EPOCH ([0-9a-f]{32})$'
 aepoch() { local l2; l2=$(sed -n 2p <<< "$1"); [ "$(cnt '^ACCESS-EPOCH ' "$1")" = 1 ] && [[ $l2 =~ $AER ]] && echo "${BASH_REMATCH[1]}"; return 0; }
-A_AE= B_AE= C_AE= D_AE=
+A_AE= B_AE= C_AE= D_AE= E_AE= E_EPO=
 san() { printf '%s' "$*" | tr -c '\40-\176' '?' | tr '"' "'" | cut -c1-200; }
 FAILED=(); WHY=
 bad() { echo "ACCEPT $1 FAIL $(san "$2")"; FAILED+=("$1"); [ -n "$WHY" ] || WHY="$1: $(san "$2")"; }
@@ -85,7 +101,7 @@ lno() { grep -nE -- "$1" <<< "$2" | head -n 1 | cut -d: -f1; }
 fixture() { [ "$(cnt '^\[FIXTURE r9\]' "$1")" != 0 ]; }   # a committed test fixture is never evidence
 secs() { date -u -d "$1" +%s; }
 echo "== afldb-gate-accept $(date -u +%FT%TZ) gate=$GATE transport=$TR (read-only; inputs by sha256)"
-for f in "$OC" "$RV" "$VS" "$VD"; do echo "   $(sha256sum < "$f" | cut -c1-64)  $f"; done
+for f in "$OC" "$RV" "$VS" "$VD" "$CF"; do echo "   $(sha256sum < "$f" | cut -c1-64)  $f"; done
 [ "$TR" = rehearsal ] && echo "REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot"
 [ "$CLOCK" = test ] && echo "TEST CLOCK: --now $NOW stands in for this workstation's clock (rehearsal only)"
 FXMSG="is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence"
@@ -208,14 +224,48 @@ if whdr verdict "$D" "$VMODE"; then
   fi
 fi
 
-# (f) access epoch (r10): one recorded access state from the saved 4.4 to the gate verdict ----------------------------------
+# (h) confirm: a version call AFTER the gate verdict, immediately before this check (r10 round 2) ---------------------------------
+E=$(rd "$CF"); E_AT=
+if [ -n "$D_AT" ] && ! failed verdict; then
+  if whdr confirm "$E" version; then
+    PP="^OWNER VERDICT VERSION PASS transport=$TR host=afldb-prod role=prod nonce=([0-9a-f]{32})( |$)"
+    if [ "$(cnt "$PP" "$E")" != 1 ]; then bad confirm "need exactly one 'OWNER VERDICT VERSION PASS transport=$TR host=afldb-prod role=prod nonce=...' line"
+    else
+      N=$(grep -E "$PP" <<< "$E" | sed -E "s/$PP.*/\1/")
+      RR="^AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod boot=([0-9a-f]{32}) bundle=([0-9a-f]{64}) at=($TS) exit=0 role=prod( access-epoch=([^ ]+))?$"
+      if [ "$(cnt "$RR" "$E")" != 1 ]; then bad confirm "no authenticated 'AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod ...' line"
+      else
+        RL=$(grep -E "$RR" <<< "$E"); [[ $RL =~ $RR ]]; EB=${BASH_REMATCH[1]}; EBU=${BASH_REMATCH[2]}; E_AT=${BASH_REMATCH[3]}; E_AE=${BASH_REMATCH[5]:-}
+        ES=$(secs "$E_AT"); NS=$(secs "$NOW")
+        if ! [[ $E_AT > $D_AT ]]; then bad confirm "made at $E_AT, not after the gate verdict ($D_AT): make the confirm version call after the gate call, immediately before this check"
+        elif [ -n "$C_BOOT" ] && [ "$EB" != "$C_BOOT" ]; then bad confirm "production boot $EB is not the boot $C_BOOT of 4.6 and the verdict: production rebooted, repeat 4.4-4.6 and the gate call"
+        elif [ "$EBU" != "$B_BUNDLE" ]; then bad confirm "bundle $EBU is not the re-verified bundle ${B_BUNDLE:-none}"
+        elif (( NS - ES > MAXCF )); then bad confirm "made at $E_AT, more than $((MAXCF / 60)) min before this check ($NOW, $CLOCK clock): make a new confirm call and check at once"
+        elif (( ES - NS > SKEW )); then bad confirm "made at $E_AT, more than $((SKEW / 60)) min ahead of the $CLOCK clock ($NOW): check this workstation's clock"
+        else good confirm "production VERSION PASS nonce=$N at=$E_AT, after the verdict, same boot and bundle, $(( (NS - ES) / 60 )) min before this check"; fi
+      fi
+    fi
+  else E_AE=; fi
+else
+  # the verdict did not pass, so the result is NO-GO and (h) is not judged; a well-formed confirm still reports its access epoch to
+  # (f), so an access change after the saved parts is named even then
+  PP="^OWNER VERDICT VERSION PASS transport=$TR host=afldb-prod role=prod nonce=([0-9a-f]{32})( |$)"
+  if ! fixture "$E" && [ "$(cnt "^== afldb-verify-call ($TS) mode=version transport=$TR( |$)" "$E")" = 1 ] && [ "$(cnt "$PP" "$E")" = 1 ]; then
+    N=$(grep -E "$PP" <<< "$E" | sed -E "s/$PP.*/\1/")
+    RR="^AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod boot=[0-9a-f]{32} bundle=[0-9a-f]{64} at=$TS exit=0 role=prod access-epoch=([^ ]+)$"
+    [ "$(cnt "$RR" "$E")" = 1 ] && { RL=$(grep -E "$RR" <<< "$E"); [[ $RL =~ $RR ]]; E_AE=${BASH_REMATCH[1]}; E_EPO=1; }
+  fi
+  echo "INFO confirm: not judged (the gate verdict did not pass)${E_EPO:+; its access epoch $E_AE is compared in (f)}"
+fi
+
+# (f) access epoch (r10): one recorded access state from the saved 4.4 to the confirm call ----------------------------------
 # Parts that already failed are skipped (the result is NO-GO anyway); every part that passed must carry the SAME 32-hex epoch.
 # r10: the VOID instruction comes FIRST, because san() keeps 200 characters of a reason and the epoch list is long
-VOIDMSG="VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6 and the gate call"
+VOIDMSG="VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm"
 AEM=; AEV=; AEN=0; AEX=
-for pe in "4.4 owner checks|owner-checks|$A_AE" "4.5 re-verification|reverify|$B_AE" "4.6 version RESULT|version|$C_AE" "gate verdict RESULT|verdict|$D_AE"; do
+for pe in "4.4 owner checks|owner-checks|$A_AE" "4.5 re-verification|reverify|$B_AE" "4.6 version RESULT|version|$C_AE" "gate verdict RESULT|verdict|$D_AE" "confirm RESULT|confirm|$E_AE"; do
   pn=${pe%%|*}; r=${pe#*|}; pk=${r%%|*}; pv=${r#*|}
-  failed "$pk" && continue
+  failed "$pk" && continue; [ "$pk" = confirm ] && [ -z "$E_AT" ] && [ -z "$E_EPO" ] && continue
   AEN=$((AEN + 1)); AEV="${AEV:+$AEV, }$pn ${pv:-missing}"
   if ! [[ $pv =~ ^[0-9a-f]{32}$ ]]; then AEM="${AEM:+$AEM; }$pn carries no 32-hex access epoch (${pv:-missing}; 'none' means no access change was ever recorded on this host, so this is not post-Phase-4 evidence)"
   elif [ -z "$AEX" ]; then AEX=$pv
@@ -224,8 +274,8 @@ done
 if [ "$AEN" = 0 ]; then :
 elif [ -n "$AEM" ]; then
   if [[ $AEM == *DIFFERS* ]]; then bad access "$VOIDMSG (access epochs differ: $AEV)"; else bad access "$AEM"; fi
-elif [ "$AEN" != 4 ]; then echo "INFO access: the passing parts agree on epoch $AEX; the failed parts are not compared"
-else good access "4.4, 4.5, 4.6 and the gate verdict all carry access epoch $AEX: no access change was recorded between them"; fi
+elif [ "$AEN" != 5 ]; then echo "INFO access: the passing parts agree on epoch $AEX; the failed or unjudged parts are not compared"
+else good access "4.4, 4.5, 4.6, the gate verdict and the confirm call all carry access epoch $AEX: no access change was recorded from 4.4 to the confirm"; fi
 
 # (g) release-g0: the pin of the reviewed revision (r10, Astra case 2) ------------------------------------------------------
 if [ "$GATE" = release-g0 ]; then
@@ -241,6 +291,9 @@ if [ "$GATE" = release-g0 ]; then
     if [ "$PF" != "$PFMT" ]; then bad pin "the pin at $PFULL has format=${PF:-none}; a $TR evaluation needs format=$PFMT (a fixture never satisfies production acceptance)"
     elif [ -z "$OQ" ]; then bad pin "the pin at $PFULL hashes to $PSHA, but the version check named no qualified off-host endpoint to bind it to"
     elif [ "$PSHA" != "$OQ" ]; then bad pin "the pin committed at $PFULL hashes to $PSHA, but 4.6 and the G0 call ran with qual-sha256=$OQ: the export that ran them is not that reviewed revision (or its pin was edited)"
+    elif ! HSHA=$(git -C "$GD" cat-file blob "HEAD:$PINPATH" 2>/dev/null | sha256sum | cut -c1-64) || ! git -C "$GD" cat-file -e "HEAD:$PINPATH" 2>/dev/null; then
+      bad pin "this clone's HEAD has no $PINPATH: the pin committed at $PFULL was revoked or is not on the reviewed head; check out the current reviewed head"
+    elif [ "$HSHA" != "$PSHA" ]; then bad pin "the pin at $PFULL ($PSHA) differs from the pin at this clone's HEAD ($HSHA): it was superseded or revoked"
     else good pin "the pin committed at $PFULL (format=$PF) hashes to $PSHA = the qual-sha256 of 4.6 and the G0 PASS"; fi
   fi
 fi
@@ -261,6 +314,6 @@ if [ -n "$D_AT" ]; then
 fi
 
 if [ ${#FAILED[@]} = 0 ]; then
-  echo "$PFX $G GO transport=$TR boot=$C_BOOT access-epoch=$AEX${PFULL:+ pin-rev=$PFULL} owner-checks-at=$A_TS reverify-at=$B_TS version-at=$C_AT verdict-at=$D_AT checked-at=$NOW clock=$CLOCK"; exit 0
+  echo "$PFX $G GO transport=$TR boot=$C_BOOT access-epoch=$AEX${PFULL:+ pin-rev=$PFULL} owner-checks-at=$A_TS reverify-at=$B_TS version-at=$C_AT verdict-at=$D_AT confirm-at=$E_AT checked-at=$NOW clock=$CLOCK"; exit 0
 fi
 echo "$PFX $G NO-GO failed=$(IFS=,; echo "${FAILED[*]}") reason=\"$WHY\""; exit 1

@@ -422,7 +422,8 @@ There is no fixed state path. Never edit the directory or seal into another atte
   what is compared.
 * `REFUSED` names what does not match (a file changed outside the plan, an altered record, another attempt); nothing was changed.
   `FAIL` means the restore itself did not prove the pre-change state; the result names it. Review it in [CON], restore it by hand
-  from the named copy, and do not continue Phase 4.
+  from the named copy, then record that hand change with `afldb-phase4.sh invalidate --reason "<what you restored>"` (r10 round 2,
+  F7: the epoch the back-out wrote predates the hand change; the script prints a `HAND:` line saying so), and do not continue Phase 4.
 * If 4.3 failed, repair the admin account in [CON] (Phase 1 steps 1.9–1.12) before trying Phase 4 again from 4.0 (which creates
   a new attempt directory). Never repair the admin account through arm's sudo, which would type a password into an arm session. If [CON] has been
   closed and the admin path fails, the recovery is Phase 0 again.
@@ -437,13 +438,20 @@ checks know, and every root action uses [ADM-ROOT].
 ```
 bash $R9/accept/afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks ~/afldb-r9-accept/afldb-r9-4.4.txt \
   --reverify ~/afldb-r9-accept/afldb-r9-4.5.txt --version ~/afldb-r9-accept/afldb-r9-4.6.txt \
-  --verdict <saved gate output> --verdict-exit <its exit status> [--pin-rev <reviewed pin commit>]
+  --verdict <saved gate output> --verdict-exit <its exit status> --confirm ~/afldb-r9-accept/confirm.txt \
+  [--pin-rev <reviewed pin commit>]
 ```
+
+r10 round 2 (independent review F1): the saved 4.4-4.6 and gate verdict cannot show an access change made AFTER them, so the checker also requires `--confirm`: a wrapper `version` call made after the gate call and **immediately before the check** (`bash $R7/verify/afldb-verify-call.sh version > ~/afldb-r9-accept/confirm.txt 2>&1; cat ~/afldb-r9-accept/confirm.txt`). Its authenticated production RESULT must be after the verdict, on the same boot, with the 4.5 bundle and the same access epoch, and at most 10 min before the check (`failed=confirm` or `failed=access` otherwise). Act on GO at once: an access change after the confirm call is outside what any saved transcript can show, and every `afldb-phase4.sh` action prints VOID for an earlier GO too. A back-out or `invalidate` between the gate call and the confirm is caught (`failed=access`).
 
 r10: for `release-g0`, `--pin-rev` is **required**: the commit, in this clone, that added the reviewed qualification pin
 (`$R9/offhost/QUALIFIED-ENDPOINT`, QUALIFY-OFFHOST.md §3), and the 4.6 and G0 calls must have run from a `git archive` export of that
 commit. The checker reads the pin from that commit and requires its sha256 to equal the `qual-sha256=` of 4.6 and of the G0 PASS
 (`failed=pin` otherwise: an export without the pin, a fixture-format pin, or an edited pin). `ng-pre` does not take it.
+r10 round 2 (F2): run the checker with the owner clone's **current reviewed head** checked out; the pin at `--pin-rev` must equal the
+pin at that HEAD, so a pin revoked or superseded later (QUALIFY-OFFHOST.md "Revocation") fails `failed=pin` with its old
+`--pin-rev`. (F4) The checker binds the pin's bytes, not the wrapper's: that 4.6 and the G0 call ran from an unedited `git archive`
+export of that commit is the owner's procedure step (QUALIFY-OFFHOST.md §4 step 7), not something the checker can prove.
 
 prints `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production` (exit 0). Run 4.4–4.6
 immediately before the gate call, on the gate day: the gate verdict must come after 4.6 and at most 3 h after the OLDER of 4.4 and
@@ -599,6 +607,6 @@ The rehearsal does **not** exercise:
 | 4.2 | the printed verify command | [ADM-ROOT] | realised change = plan; arm not allowed to sudo | STOP: back-out, then dispose of the residual separately; never back to 4.1 |
 | 4.3 | new `ADM`; `sudo -k; sudo -v` | [WS], [ADM] | admin path survives | fails: back-out in [CON] with **the back-out command printed for this attempt** (`… backout --state <dir> --seal <sha256>`) → `PHASE4 BACKOUT RESULT PASS` |
 | 4.4–4.6 | `BOOT-ID` and `ACCESS-EPOCH` lines plus the Phase 2 command `\| tee /root/afldb-r9-4.4.txt`; a new [ADM-ROOT] with both install checks and `verify-verify-install.sh --role prod`, after `BOOT-ID` and `ACCESS-EPOCH` lines, `\| tee /root/afldb-r9-4.5.txt`; copy both to [WS] (4.5a); wrapper `version \| tee ~/afldb-r9-accept/afldb-r9-4.6.txt` | [ADM-ROOT], [WS] | `OWNER CHECKS RESULT PASS`; both installs intact with arm out of `sudo`; VERSION PASS after both; all three saved on [WS], one access epoch | BLOCKED or FAIL: F1 stays open. **Any later permission change or back-out voids all three and the gate verdict, same boot and inside 3 h included: repeat 4.4–4.6 and G** (record an outside change first with `afldb-phase4.sh invalidate --reason …`) |
-| G | the gate call saved with its exit status, then `bash $R9/accept/afldb-gate-accept.sh --gate release-g0\|ng-pre …` (release-g0: `--pin-rev <reviewed pin commit>`) | [WS] | `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production`, exit 0 | any other final line: **NO-GO** (no release, no reboot) |
+| G | the gate call saved with its exit status, then **immediately** the confirm `version` call saved as `confirm.txt`, then `bash $R9/accept/afldb-gate-accept.sh --gate release-g0\|ng-pre … --confirm ~/afldb-r9-accept/confirm.txt` (release-g0: `--pin-rev <reviewed pin commit>`, current reviewed head checked out); act on GO at once | [WS] | `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production`, exit 0 | any other final line: **NO-GO** (no release, no reboot) |
 | 4.7 | close [CON] | [CON] | — | only after 4.3–4.6 |
 | S | Qualify an independent off-host endpoint by `$R9/offhost/QUALIFY-OFFHOST.md` (r10 §3: candidate evidence by `candidate-g0`/`candidate-version`, owner review, pin commit, then the gate from an export of that commit; Q1–Q7, record, second reader). streamanator is refused | the endpoint's console / its [ADM-ROOT] / [WS] | G0B independent of streamanator's arm | no committed pin, or the off-host `version` line is not PASS with `qualification=pinned`: G0 STOPs and the release stops before P2. There is no arm-attested alternative |

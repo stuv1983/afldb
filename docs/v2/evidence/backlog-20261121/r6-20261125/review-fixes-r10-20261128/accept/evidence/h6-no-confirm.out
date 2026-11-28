@@ -1,0 +1,4 @@
+== case h6-no-confirm: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-g0-pass-post.txt --verdict-exit 0
+usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N --confirm F [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]
+refused: --confirm <a version call made after the gate call, immediately before this check> is required (r10: a saved set cannot show an access change made after it)
+== exit 2

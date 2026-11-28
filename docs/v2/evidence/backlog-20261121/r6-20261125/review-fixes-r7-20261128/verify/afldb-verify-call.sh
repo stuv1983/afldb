@@ -37,7 +37,7 @@
 #     off-host OWNER VERDICT VERSION STOP ... reason="no qualified off-host endpoint", and exits 1.
 #   * SCHEDULED-TRANSFER EVIDENCE: even from a qualified endpoint, G0B PASS counts only when its RESULT line carries dispatch-at= (the
 #     root cron journal time of the 03:10 dispatch), complete-at= (the END of the invocation linked to it), received-at= and
-#     received-sha256= (that invocation's VERIFIED record) and rehash-sha256= (root's check-time re-hash), each present, both sha256
+#     received-sha256= (r10: that invocation's RECEIVED record and RECEIPT; r9: VERIFIED) and rehash-sha256= (root's check-time re-hash), each present, both sha256
 #     fields equal to G0a's, dispatch-at inside [D 03:10, +60 s), received-at >= dispatch-at - 5 s (the core's journal-receipt
 #     tolerance), received-at <= complete-at <= D 03:10 + 2100 s and <= the RESULT at=. A matching file without the dispatch or the
 #     completion is POSSESSION ONLY, and G0 STOPs saying so.

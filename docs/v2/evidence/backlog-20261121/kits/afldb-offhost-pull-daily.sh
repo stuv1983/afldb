@@ -41,7 +41,8 @@ lineage=$(lineage_of "$$" "$(date +%s)") || lineage=''
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 run="$stamp-$$"
 printf '%s BEGIN run=%s cron_pid=%s lineage=%s\n' "$stamp" "$run" "$cron_pid" "$lineage" >> "$STATE/offhost-pull.log"
-out=$(timeout 1800 bash "$OPS/offhost-pull.sh" "$PROD:/" "$DEST/" --keep 30 2>&1); rc=$?
+rf="$STATE/.receipt-$run"; : > "$rf"   # r10 round 2 (F6): receipts arrive on fd 3 only, never parsed from the mixed output
+out=$(timeout 1800 bash "$OPS/offhost-pull.sh" "$PROD:/" "$DEST/" --keep 30 3>"$rf" 2>&1); rc=$?
 printf '%s\n' "$out" | sed "s/^/OUTPUT run=$run /" >> "$STATE/offhost-pull.log"
 # R6 r10 (Astra case 1): RECEIPT, not possession. offhost-pull.sh prints "RECEIVED <dump> sha256=<h> bytes=<b> size=<s>" only for a
 # dump THIS run transferred in full (rsync itemised it as created here) and then verified. Each such dump, re-hashed now and equal,
@@ -50,8 +51,9 @@ printf '%s\n' "$out" | sed "s/^/OUTPUT run=$run /" >> "$STATE/offhost-pull.log"
 # before the run, or left by an earlier run) is never RECEIVED and never gets a RECEIPT: it is HELD (possession only).
 received=''
 if [ "$rc" -eq 0 ]; then
-  received=$(printf '%s\n' "$out" | sed -n 's/^[0-9TZ:-]* offhost-pull: RECEIVED \(afldb_prod-[0-9]\{8\}-[0-9]\{6\}\.dump\) sha256=\([0-9a-f]\{64\}\) bytes=\([0-9]\{1,15\}\) size=[0-9]\{1,15\}$/\1 \2 \3/p')
+  received=$(sed -n 's/^RECEIVED \(afldb_prod-[0-9]\{8\}-[0-9]\{6\}\.dump\) sha256=\([0-9a-f]\{64\}\) bytes=\([0-9]\{1,15\}\) size=[0-9]\{1,15\}$/\1 \2 \3/p' "$rf")
 fi
+rm -f "$rf"
 rcv=''
 while read -r name want bytes; do
   [ -n "$name" ] || continue

@@ -592,6 +592,20 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     const retry = pull();
     expect(retry.status, `${retry.stdout}${retry.stderr}`).toBe(0);
     expect(rcv(retry.stdout)).toEqual(['afldb_prod-20261106-022000.dump']);
+    // r10 round 2 (independent review F5): a partial left under .rsync-partial before the run is not a receipt, even when this run
+    // completes the file and verifies it.
+    put('afldb_prod-20261107-022000.dump');
+    mkdirSync(join(dest, '.rsync-partial'), { recursive: true });
+    writeFileSync(join(dest, '.rsync-partial', 'afldb_prod-20261107-022000.dump'), 'dump');
+    const resumed = pull();
+    expect(resumed.status, `${resumed.stdout}${resumed.stderr}`).toBe(0);
+    expect(resumed.stdout).toMatch(/not a receipt: afldb_prod-20261107-022000\.dump/);
+    expect(rcv(resumed.stdout)).toEqual([]);
+    // r10 round 2 (F6): the machine-readable receipt is written to fd 3, which rsync and ssh never get; callers parse fd 3 only.
+    put('afldb_prod-20261108-022000.dump');
+    const fd3 = spawnSync('bash', ['-c', 'bash tools/maintenance/offhost-pull.sh "$1" "$2" --keep 3 3>&1 1>/dev/null 2>/dev/null', '_', src, dest], { encoding: 'utf8', env });
+    expect(fd3.status).toBe(0);
+    expect(fd3.stdout.trim().split('\n')).toEqual([expect.stringMatching(/^RECEIVED afldb_prod-20261108-022000\.dump sha256=[0-9a-f]{64} bytes=\d+ size=\d+$/)]);
   });
 
   it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {

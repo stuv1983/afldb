@@ -68,4 +68,21 @@ labelled r10.
 * The fixed recovery path (`/root/afldb-phase4-state`) is gone from the procedure and the checklist; the staged script is
   `/root/afldb-r10-phase4`.
 
+### Round 2: the independent review's findings ([INDEPENDENT-REVIEW.md](INDEPENDENT-REVIEW.md), judged `07f05f3d`)
+
+* **F1 (HIGH, case 3 defeated in round 1).** Four saved files cannot show an access change made after all of them: a complete
+  pre-change 4.4–4.6 plus gate verdict still gave GO after a back-out. The checker now requires `--confirm`: a wrapper `version`
+  call made after the gate verdict and at most 10 min before the check, whose authenticated production RESULT is after the verdict,
+  on the same boot and bundle. Its access epoch joins (f) even when the verdict fails, so the change is named on DEV too. A change
+  after the confirm call is the stated residual (act on GO at once; every `afldb-phase4.sh` action prints VOID for an earlier GO).
+* **F2 (MED).** The pin at `--pin-rev` must equal the pin at the checker clone's HEAD; a revoked or superseded pin fails.
+* **F3 (MED).** Not changed: r9's dated window (2026-11-24..29) is a deliberate fail-closed gate. QUALIFY-OFFHOST now states that
+  §3a/§4 cannot be completed in production with these bytes until a reviewed re-dating.
+* **F5, F6 (LOW).** `offhost-pull.sh` uses `--whole-file`, gives no receipt for a dump present (or partial) before the run, and
+  writes the machine-readable RECEIVED record to fd 3, which rsync and ssh never get; the daily wrapper parses fd 3 only.
+* **F7 (LOW).** A FAIL/REFUSED apply or back-out prints `HAND: … invalidate --reason …`, and the procedure says to record a hand
+  restoration with `invalidate`.
+* **F4, F8, F9.** Texts: the checker binds pin bytes, not wrapper bytes (procedure step); apply adds a final newline to a selected
+  file that lacks one, while back-out restores the exact original bytes; VERIFIED wording replaced by RECEIVED/HELD/END/RECEIPT.
+
 @VERIFICATION@

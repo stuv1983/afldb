@@ -387,7 +387,7 @@ else NL+="candidate-g0:UNEXPECTED($N1) "; NOK=0; fi
 sleep 4; wcall "$LN" candidate-version --host r7v-offhost --address r7v-offhost --hostkey "$OFP" --utc-offset "$OFFOFF"; N2=$WRC; printf '%s\n' "$WOUT" > "$KD/n-cand-ver.txt"
 if [ "$N2" = 3 ] && grep -q '^CANDIDATE EVIDENCE VERSION COMPLETE transport=rehearsal .*host=r7v-offhost role=offhost' <<< "$WOUT" && ! grep -q '^OWNER VERDICT' <<< "$WOUT"; then NL+="candidate-version:exit3,no-verdict "
 else NL+="candidate-version:UNEXPECTED($N2) "; NOK=0; fi
-out=$(bash "$GACC" --rehearsal --gate release-g0 --owner-checks "$KD/n-cand-g0.txt" --reverify "$KD/n-cand-g0.txt" --version "$KD/n-cand-ver.txt" --verdict "$KD/n-cand-g0.txt" --verdict-exit 3 2>&1); N3=$?
+out=$(bash "$GACC" --rehearsal --gate release-g0 --owner-checks "$KD/n-cand-g0.txt" --reverify "$KD/n-cand-g0.txt" --version "$KD/n-cand-ver.txt" --verdict "$KD/n-cand-g0.txt" --verdict-exit 3 --confirm "$KD/n-cand-ver.txt" 2>&1); N3=$?
 { echo "\$ bash afldb-gate-accept.sh --rehearsal --gate release-g0 ... --version <candidate-version> --verdict <candidate-g0> --verdict-exit 3"; printf '%s\n' "$out"; echo "[HARNESS] exit $N3"; } >> "$LN"
 if [ "$N3" = 1 ] && grep -qE '^GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=.*verdict' <<< "$out" && grep -q '^ACCEPT verdict FAIL ' <<< "$out" && ! grep -qE '^GATE ACCEPT .* GO( |$)' <<< "$out"; then NL+="gate-on-candidate:NO-GO "
 else NL+="gate-on-candidate:UNEXPECTED($N3) "; NOK=0; fi
@@ -415,7 +415,7 @@ else NL+="pinned-export:UNEXPECTED($N5/$N6) "; NOK=0; fi
 gpin() { # rev transport-flag...: the gate checker IN THE OWNER CLONE on exp1's transcripts (4.4/4.5 absent here: only (g) is judged)
   local r=$1; shift
   out=$(bash "$SR/$R9P/accept/afldb-gate-accept.sh" "$@" --gate release-g0 --owner-checks "$KD/n-cand-g0.txt" --reverify "$KD/n-cand-g0.txt" \
-    --version "$KD/n-ver-exp1.txt" --verdict "$KD/n-g0-exp1.txt" --verdict-exit 0 --pin-rev "$r" 2>&1)
+    --version "$KD/n-ver-exp1.txt" --verdict "$KD/n-g0-exp1.txt" --verdict-exit 0 --confirm "$KD/n-ver-exp1.txt" --pin-rev "$r" 2>&1)
   { echo "\$ bash <owner clone>/afldb-gate-accept.sh $* --gate release-g0 ... --pin-rev $r"; printf '%s\n' "$out"; } >> "$LN"; GP=$(grep '^ACCEPT pin ' <<< "$out"); }
 gpin "$NC1" --rehearsal; [[ $GP == "ACCEPT pin PASS the pin committed at $NC1 (format=afldb-offhost-qualification-fixture-v1) hashes to $NPS"* ]] && NL+="checker-pin-C1:PASS " || { NL+="checker-pin-C1:UNEXPECTED "; NOK=0; }
 gpin "$NC0" --rehearsal; [[ $GP == "ACCEPT pin FAIL revision $NC0 has no $R9P/offhost/QUALIFIED-ENDPOINT"* ]] && NL+="checker-pin-C0:FAIL " || { NL+="checker-pin-C0:UNEXPECTED "; NOK=0; }

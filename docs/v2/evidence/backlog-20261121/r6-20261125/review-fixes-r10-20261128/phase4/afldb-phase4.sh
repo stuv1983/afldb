@@ -87,6 +87,9 @@ say() { printf 'PHASE4 %s %s\n' "$TAG" "$(san "$*")"; }
 flag() { BAD+=("$(san "$*")"); say "$WORD $*"; }
 finish() { # PASS detail
   if [ ${#BAD[@]} = 0 ]; then say "RESULT PASS $*"; exit 0; fi
+  # r10 round 2 (independent review F7): a FAIL or REFUSED apply/backout may leave the owner restoring something by hand. The epoch
+  # this run wrote (if any) was written BEFORE that hand change, so it does not cover it: the hand change must be recorded too.
+  case $CMD in apply|backout) say "HAND: any change you now make by hand (sudoers, group membership, files) is an access change this run's epoch does not cover: after it, run afldb-phase4.sh invalidate --reason \"<what you changed>\" before saving any 4.4";; esac
   local IFS=';'; say "RESULT $WORD ${BAD[*]}"; exit 1
 }
 die() { flag "$*"; finish; }
