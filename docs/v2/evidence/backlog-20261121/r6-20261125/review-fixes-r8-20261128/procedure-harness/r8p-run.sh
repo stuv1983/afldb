@@ -313,11 +313,11 @@ WCALL 4.6a-a2 "${A2ARGS[@]}"; A2X_POST=$WRC
   || res wrapper-a2-post FAIL "expect=A2-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
 pace
 WCALL 4.6b-g0 g0 2026-11-28; G0X_POST=$WRC
-pace
-WCALL 4.6e-confirm version   # r10 round 2 (F1): the confirm version call, after the gate calls, immediately before acceptance
 [ "$WRC" != 0 ] && [[ $(sed '/^[[:space:]]*$/d' <<< "$WO" | tail -n 1) == "OWNER VERDICT G0 STOP"* ]] \
   && res wrapper-g0-post PASS "expect=G0-STOP got=exit $WRC; $(grep -m1 '^OWNER VERDICT G0' <<< "$WO" | cut -c1-200)" \
   || res wrapper-g0-post FAIL "expect=G0-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
+pace
+WCALL 4.6e-confirm version   # r10 round 2 (F1): the confirm version call, after the gate calls, immediately before acceptance
 
 # ------------------------------------------------------------------------------------------ r9 acceptance checker (workstation, --rehearsal)
 # has <list> <part>: the comma-separated failed= list names <part>

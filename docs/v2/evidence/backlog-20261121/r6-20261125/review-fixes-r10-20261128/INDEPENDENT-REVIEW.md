@@ -61,3 +61,20 @@ Verdicts:
 3. **Invalidated evidence: DEFEATED (F1).** A complete pre-change set (4.4–4.6 plus verdict) still yields GO for up to 1 h after a
    back-out or `invalidate`; the texts claim the checker catches it. Residual: by-hand paths without an epoch (F7).
 4. **Recovery on the wrong attempt or change: NOT DEFEATED.** Residual: trailing-newline byte claim (F8).
+
+## Round 2 re-review (same reviewer, judged `67c80882c3caf3883ee037136da025404336c3a7`)
+
+Read-only, as before; no git commands, tests or harnesses. Verdicts: **1 NOT DEFEATED, 2 NOT DEFEATED, 3 NOT DEFEATED for any
+recorded change before the confirm call, 4 NOT DEFEATED.** F1, F2, F5 and F6 were judged closed with no new GO path (a confirm
+cannot be replayed, taken from another run or skipped; the verdict-failed branch only names the epoch; fd 3 is closed for rsync and
+its ssh child).
+
+| ID | Grade | Finding | Disposition |
+|---|---|---|---|
+| R2-1 | LOW | The RUNBOOK G0 row and the plan NG-PRE row printed the checker command without `--confirm` (usage, exit 2: fail-closed, but not runnable as written). | **Fixed in the pin commit** (text only): both rows now carry the confirm call and `--confirm`. |
+| R2-2 | LOW | "HEAD" is whatever is checked out: a stale checkout at the revoked commit still passes the F2 check; the GO line records `pin-rev=` but not the HEAD compared. | **Residual, stated:** the procedure requires the current reviewed head checked out. Printing `head=` is a follow-up for the next checker revision (not made here, so the delivered checker is the tested one). |
+| R2-3 | INFO | A change in the up-to-10-min gap between the confirm call and the check gives GO. | **Residual, stated** in OWNER-PROCEDURE "Saved evidence" and checklist G ("immediately", "act on GO at once"). |
+| R2-4 | INFO | Sender text shaped like an itemise line can still mark a dump received, but only one absent before the run and present and hash-verified after it, i.e. one the run did transfer. | No change needed. |
+
+Also noted: the `HAND:` line names `afldb-phase4.sh invalidate` without the `env -i …` prefix that the procedure's printed
+invalidate command uses (the procedure text is the one to run).
