@@ -17,6 +17,7 @@
 #    AFLDB-VERIFY RESULT <G0|A2|G0B|VERSION> <PASS|STOP> nonce=<n> host=<h> boot=<b> bundle=<sha256 of SHA256SUMS> at=<UTC> exit=<n> <fields>
 #    r9: G0B's fields are date dump sha256 dispatch-at received-at complete-at received-sha256 rehash-sha256 (g0b-core.sh; `none` when
 #    the core did not establish one), and a G0B PASS without all five evidence fields is turned into an internal STOP.
+#    r10: every RESULT line ends access-epoch=<32 hex|none|untrusted|malformed|unread> (see AEF below).
 set -uo pipefail
 export LC_ALL=C PATH=/usr/sbin:/usr/bin
 umask 077
@@ -50,6 +51,12 @@ HOST=$(cat /proc/sys/kernel/hostname 2>/dev/null); BOOT=$(cat /proc/sys/kernel/r
 [[ $HOST =~ ^[A-Za-z0-9.-]{1,64}$ ]] || HOST=unknown; [[ $BOOT =~ ^[0-9a-f]{32}$ ]] || BOOT=none
 BSUM=$(sha256sum < "$SUMS" 2>/dev/null); BSUM=${BSUM%% *}; [[ $BSUM =~ ^[0-9a-f]{64}$ ]] || BSUM=none
 declare -A FLD=()
+# r10 (Astra case 3): the ACCESS EPOCH. afldb-phase4.sh (apply, backout, invalidate) writes a new random 32-hex value to the root-owned
+# /var/lib/afldb-access/epoch BEFORE every access change it makes or records. Every RESULT line ends access-epoch=<it> (none: no file;
+# untrusted: not a root-owned, protected, single-link regular file on a root-owned path; malformed; unread: before lib.sh), read when
+# the line is printed. The workstation acceptance check requires the epoch of the saved 4.4 and 4.5 outputs to equal the epoch of the
+# 4.6 version check and of the gate verdict, so any recorded access change after 4.4 voids 4.4-4.6 and every earlier verdict.
+AEF=/var/lib/afldb-access/epoch; AE=unread
 result() { # PASS|STOP exit
   local f extra=
   case $MODE in
@@ -61,7 +68,8 @@ result() { # PASS|STOP exit
          for f in dispatch-at received-at complete-at received-sha256 rehash-sha256; do extra+=" $f=${FLD[$f]:-none}"; done;;
     VERSION) extra=" role=${FLD[role]:-none}";;
   esac
-  echo "AFLDB-VERIFY RESULT $MODE $1 nonce=$NONCE host=$HOST boot=$BOOT bundle=$BSUM at=$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=$2$extra"
+  type access_epoch > /dev/null 2>&1 && access_epoch
+  echo "AFLDB-VERIFY RESULT $MODE $1 nonce=$NONCE host=$HOST boot=$BOOT bundle=$BSUM at=$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=$2$extra access-epoch=$AE"
   exit "$2"
 }
 stop_selfcheck() { echo "STOP verifier self-check: $1"; result STOP 3; }
@@ -69,6 +77,12 @@ o=$(stat -c '%u %a %F' -- / /usr /usr/local /usr/local/lib "$VB" "$VB/lib.sh" "$
 while read -r u a t; do [ "$u" = 0 ] && ! (( 8#$a & 8#022 )) && [ "$t" != "symbolic link" ] || stop_selfcheck "a bundle path is not root-owned and protected"; done <<< "$o"
 h=$(sha256sum < "$VB/lib.sh"); grep -qxF "${h%% *}  lib.sh" "$SUMS" || stop_selfcheck "lib.sh does not match SHA256SUMS"
 . "$VB/lib.sh"
+access_epoch() {
+  local v=
+  if [ ! -e "$AEF" ] && [ ! -L "$AEF" ]; then AE=none; return 0; fi
+  trusted_path "$AEF" record || { AE=untrusted; return 0; }
+  read -r -n 64 v < "$AEF" 2>/dev/null; [[ $v =~ ^[0-9a-f]{32}$ ]] && AE=$v || AE=malformed
+}
 
 bundle_selfcheck() {
   local l n h want have p a; local -a L names=()

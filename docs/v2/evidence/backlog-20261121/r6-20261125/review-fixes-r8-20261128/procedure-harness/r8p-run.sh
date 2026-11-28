@@ -19,6 +19,11 @@
 # Phase 4 back-out runs last at the console stand-in. Every saved owner input is $LOGS/<RID>-in-<step>.log.
 # Scenarios print `SCENARIO <name> PASS|FAIL|PENDING expect=... got=...`; the run ends `R8 PROCEDURE HARNESS RESULT PASS|FAIL`.
 # A PENDING scenario (an interface agent B owns that is not in the bytes under test) makes the result FAIL, never PASS.
+# r10 (Astra cases 3 and 4): Phase 4 is $R10/phase4/afldb-phase4.sh: 4.0 entry makes its own state directory and prints the apply,
+# verify and back-out commands with state and seal; 4.1 and 4.2 run them as printed; the console back-out runs the command 4.1
+# printed, in a fresh session. 4.4 and 4.5 carry ACCESS-EPOCH. access-change: after the saved 4.4-4.6 PASS, the back-out (a same-boot
+# access change) prints VOID; a new 4.6 and gate verdict with the saved 4.4/4.5 is NO-GO failed=access; fresh 4.4r is BLOCKED and
+# NO-GO failed=owner-checks.
 set -uo pipefail; export LC_ALL=C
 VREV=; BREV=
 while :; do case ${1:-} in --verify-rev) VREV=${2:?rev}; shift 2;; --bundles-rev) BREV=${2:?rev}; shift 2;; *) break;; esac; done
@@ -27,6 +32,7 @@ WT=/d/dev/afldb-closeout-20261127
 R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128
 R8=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128
 R9=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128
+R10=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r10-20261128
 HD=$WT/$R8/procedure-harness; LOGS=$HD/logs; mkdir -p "$LOGS"
 DEVSSH=(ssh -o BatchMode=yes -i "$HOME/.ssh/afldb_dev" arm@10.0.40.100)
 WSSH=C:/Windows/System32/OpenSSH/ssh.exe; WKEYGEN=C:/Windows/System32/OpenSSH/ssh-keygen.exe
@@ -38,7 +44,7 @@ res() { local n=$1 s=$2; shift 2; say "SCENARIO $n $s $*"; case $s in PASS) ;; P
 pace() { sleep 4; }   # the owner's home firewall IPS blocks bursts of SSH connections: keep them few and spaced
 
 # ------------------------------------------------------------------------------------------ inputs and their verification
-STAGE_PATHS=("$R7/backup" "$R7/verify" "$R8/owner-checks" "$R9/phase4/afldb-phase4.sh" "$R9/phase4/SHA256SUMS" tools/maintenance/backup.sh)
+STAGE_PATHS=("$R7/backup" "$R7/verify" "$R8/owner-checks" "$R10/phase4/afldb-phase4.sh" "$R10/phase4/SHA256SUMS" tools/maintenance/backup.sh)
 SENT=("$R8/procedure-harness/r8p-host.sh" "$R8/procedure-harness/r8p-container.sh" "$R8/procedure-harness/r8p-admin.sh"
       deploy/afldb-backup.service deploy/afldb-backup.timer deploy/afldb-backup-failed.service)
 WSIDE=("$R9/accept/afldb-gate-accept.sh" "$R9/accept/SHA256SUMS")   # run on the workstation only, from the same revision's bytes
@@ -51,7 +57,7 @@ cleanup() {
 trap cleanup EXIT
 { echo "== r8p-run $RID $(date -u +%FT%TZ) workstation $(hostname) id=[$(id)]; worktree HEAD $(git -C "$WT" rev-parse HEAD)"
   echo "[HARNESS] client $WSSH ($("$WSSH" -V 2>&1 | tr -d '\r'))"; } | tee -a "$LOG"
-for f in "${SENT[@]}" "${WSIDE[@]}" "$R8/owner-checks/afldb-owner-checks.sh" "$R9/phase4/afldb-phase4.sh"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done
+for f in "${SENT[@]}" "${WSIDE[@]}" "$R8/owner-checks/afldb-owner-checks.sh" "$R10/phase4/afldb-phase4.sh"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done
 mkdir -p "$KD/accept"
 if [ -n "$VREV" ]; then
   REV=$(git -C "$WT" rev-parse --verify "$VREV^{commit}") || { echo "STOP unknown revision $VREV"; exit 2; }
@@ -69,7 +75,7 @@ else
   if [ -n "$BREV" ]; then
     BR=$(git -C "$WT" rev-parse --verify "$BREV^{commit}") || { echo "STOP unknown revision $BREV"; exit 2; }
     git -C "$WT" archive --format=tar --output="$KDM/stage.tar" "$BR" "$R7/backup" "$R7/verify" tools/maintenance/backup.sh || { echo "STOP git archive"; exit 2; }
-    tar -C "$WT" -rf "$KD/stage.tar" "$R8/owner-checks" "$R9/phase4/afldb-phase4.sh" "$R9/phase4/SHA256SUMS" || { echo "STOP tar"; exit 2; }
+    tar -C "$WT" -rf "$KD/stage.tar" "$R8/owner-checks" "$R10/phase4/afldb-phase4.sh" "$R10/phase4/SHA256SUMS" || { echo "STOP tar"; exit 2; }
     log "[TRANSPORT] --bundles-rev: the R7 bundles and backup.sh are git archive $BR; the owner checks are WORKTREE bytes (development evidence, not a committed revision)"
     BYTES="bundles $BR + worktree owner checks"
   else
@@ -82,7 +88,7 @@ fi
 BSUMS=$(tar -xOf "$KD/stage.tar" "$R7/backup/SHA256SUMS" | sha256sum | cut -c1-64)
 VSUMS=$(tar -xOf "$KD/stage.tar" "$R7/verify/SHA256SUMS" | sha256sum | cut -c1-64)
 CSUMS=$(tar -xOf "$KD/stage.tar" "$R8/owner-checks/SHA256SUMS" | sha256sum | cut -c1-64)
-P4SUMS=$(tar -xOf "$KD/stage.tar" "$R9/phase4/SHA256SUMS" | sha256sum | cut -c1-64)
+P4SUMS=$(tar -xOf "$KD/stage.tar" "$R10/phase4/SHA256SUMS" | sha256sum | cut -c1-64)
 # the acceptance checker: its SHA256SUMS line must hold for the bytes the workstation will run
 ACCSUMS=$(sha256sum < "$KD/accept/SHA256SUMS" | cut -c1-64)
 (cd "$KD/accept" && grep ' afldb-gate-accept.sh$' SHA256SUMS | sha256sum -c --strict --quiet) || { echo "STOP the acceptance checker does not match its SHA256SUMS line"; exit 2; }
@@ -266,12 +272,18 @@ WCALL 3.13a-a2 "${A2ARGS[@]}"; A2X_PRE=$WRC
 
 # ------------------------------------------------------------------------------------------ Phase 4 (proposed; owner approval): change existing access
 pace
-O=$(AS phase4); printf '%s\n' "$O" | L phase4 "admin root session: Phase 4 through afldb-phase4.sh (4.0 entry, 4.1 gpasswd -d arm sudo, 4.2 verify)"
-grep -q '^PHASE4 ENTRY RESULT PASS change=group-only ' <<< "$O" && [ "$(ex P4-ENTRY)" = 0 ] \
+O=$(AS phase4); printf '%s\n' "$O" | L phase4 "admin root session: Phase 4 through afldb-phase4.sh (4.0 entry, 4.1 and 4.2 as 4.0 printed them)"
+P4STATE=$(sed -n 's/^PHASE4 STATE //p' <<< "$O" | head -n 1); P4SEAL=$(sed -n 's/^PHASE4 SEAL //p' <<< "$O" | head -n 1)
+BOCMD=$(awk -v p="PHASE4 APPLY if 4.2 STOPs or 4.3 fails, back-out from [CON], also from a fresh console session: " 'index($0, p) == 1 {x = substr($0, length(p) + 1)} END {print x}' <<< "$O")
+log "[HARNESS] 4.0 printed state $P4STATE seal $P4SEAL; 4.1 printed back-out: $BOCMD"
+grep -q '^PHASE4 ENTRY RESULT PASS change=group-only ' <<< "$O" && [ "$(ex P4-ENTRY)" = 0 ] && [[ $P4STATE == /root/afldb-phase4/attempt-* && $P4SEAL =~ ^[0-9a-f]{64}$ ]] \
+  && [[ $BOCMD == *" backout --state $P4STATE --seal $P4SEAL" ]] \
   && res phase4-entry PASS "expect=ENTRY-PASS(group-only) got=$(grep -m1 '^PHASE4 ENTRY RESULT' <<< "$O" | cut -c1-140); $(grep -m1 '^PHASE4 ENTRY match' <<< "$O" | cut -c1-90)" \
   || res phase4-entry FAIL "expect=ENTRY-PASS(group-only) got=$(grep -E '^PHASE4 ENTRY (RESULT|REFUSED)|R8P P' <<< "$O" | tr '\n' '|' | cut -c1-300)"
-[ "$(ex GPASSWD)" = 0 ] && grep -q '^   id arm: ' <<< "$O" && ! grep '^   id arm: ' <<< "$O" | grep -q '(sudo)' \
-  && res phase4 PASS "expect=arm-removed-from-sudo got=$(grep -m1 '^   id arm: ' <<< "$O" | cut -c1-140)" || res phase4 FAIL "expect=arm-removed-from-sudo got=gpasswd $(ex GPASSWD); $(grep -m1 '^   id arm: ' <<< "$O")"
+AE1=$(sed -n 's/^   access epoch after 4.1: //p' <<< "$O")
+[ "$(ex P4-APPLY)" = 0 ] && grep -q '^PHASE4 APPLY RESULT PASS' <<< "$O" && grep -q '^   id arm: ' <<< "$O" && ! grep '^   id arm: ' <<< "$O" | grep -q '(sudo)' && [[ $AE1 =~ ^[0-9a-f]{32}$ ]] \
+  && res phase4 PASS "expect=apply-as-printed:arm-removed-from-sudo,new-epoch got=$(grep -m1 '^   id arm: ' <<< "$O" | cut -c1-140); epoch $AE1 (before: $(sed -n 's/^   access epoch before 4.1: //p' <<< "$O"))" \
+  || res phase4 FAIL "expect=apply-as-printed got=apply $(ex P4-APPLY); $(grep -m1 '^   id arm: ' <<< "$O"); epoch ${AE1:-none}"
 grep -q '^PHASE4 VERIFY RESULT PASS' <<< "$O" && [ "$(ex P4-VERIFY)" = 0 ] \
   && res phase4-verify PASS "expect=VERIFY-PASS got=$(grep -m1 'check sudo-l' <<< "$O" | cut -c1-120)" \
   || res phase4-verify FAIL "expect=VERIFY-PASS got=$(grep -E '^PHASE4 VERIFY (RESULT|STOP)' <<< "$O" | tr '\n' '|' | cut -c1-300)"
@@ -363,10 +375,34 @@ grep -qx 'OWNER CHECKS RESULT PASS' <<< "$B" && res control-after-revert PASS "e
 
 # ------------------------------------------------------------------------------------------ r9 Phase 4 back-out (console stand-in), after every scenario above
 pace
-O=$(HX exec phase4-backout 2>&1); printf '%s\n' "$O" | L phase4-backout "console: afldb-phase4.sh backout (the documented Phase 4 back-out)"
+O=$(printf '%s\n' "$BOCMD" | HX exec phase4-backout 2>&1); printf '%s\n' "$O" | L phase4-backout "console (fresh session): the back-out command 4.1 printed, as printed"
+AE2=$(sed -n 's/^   access epoch after: //p' <<< "$O")
 grep -q '^PHASE4 BACKOUT RESULT PASS' <<< "$O" && [ "$(ex P4-BACKOUT)" = 0 ] && grep '^   id arm: ' <<< "$O" | grep -q '(sudo)' \
+  && grep -q "^PHASE4 BACKOUT VOID: STOP: every saved 4.4, 4.5 and 4.6 output and every gate verdict made before this moment is VOID" <<< "$O" && [[ $AE2 =~ ^[0-9a-f]{32}$ && $AE2 != "$AE1" ]] \
   && res phase4-backout PASS "expect=BACKOUT-PASS(arm back in sudo, sudo -l as before) got=$(grep -m1 '^PHASE4 BACKOUT RESULT' <<< "$O" | cut -c1-120); $(grep -m1 '^   id arm: ' <<< "$O" | cut -c1-120)" \
   || res phase4-backout FAIL "expect=BACKOUT-PASS got=$(grep -E '^PHASE4 BACKOUT|R8P P4-BACKOUT|^STOP' <<< "$O" | tr '\n' '|' | cut -c1-300)"
+
+# ------------------------------------------------------------------------------------------ r10 access-change (Astra case 3): the back-out
+# above is a same-boot access change made after the saved 4.4-4.6 PASS. Its printed VOID line stops progress (asserted above); a new
+# 4.6 and a new gate verdict, judged with the SAVED 4.4/4.5, are NO-GO failed=access; fresh 4.4 checks are BLOCKED and NO-GO.
+pace
+WCALL 4.6c-version version
+pace
+WCALL 4.6d-a2 "${A2ARGS[@]}"; A2X_C=$WRC
+ACC access-change ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C"
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL NG-PRE NO-GO "* ]] && has "$AFAIL" access \
+  && grep -q '^ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4' <<< "$AO" && grep -q "access-epoch=$AE2" "$(IN 4.6c-version)" \
+  && res access-change-saved-void PASS "expect=NO-GO(access: saved 4.4/4.5 epoch $AE1, new 4.6 epoch $AE2) got=exit $ARC failed=$AFAIL; $(grep -m1 '^ACCEPT access ' <<< "$AO" | cut -c1-160)" \
+  || res access-change-saved-void FAIL "expect=NO-GO(access) got=exit $ARC $(cut -c1-200 <<< "$AF"); $(grep -m1 '^ACCEPT access ' <<< "$AO" | cut -c1-200)"
+pace
+O=$(AS checks44 "$AFP" 4.4r-owner-checks); printf '%s\n' "$O" | L checks44r "admin root session: fresh 4.4 after the back-out"
+pace
+fetch access-change
+V=$(grep '^OWNER CHECKS RESULT' "$(IN 4.4r-owner-checks)" | tail -1)
+ACC access-change-fresh ng-pre "$(IN 4.4r-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6c-version)" "$(IN 4.6d-a2)" "$A2X_C"
+[[ $V == "OWNER CHECKS RESULT BLOCKED "* ]] && [ "$(sed -n 2p "$(IN 4.4r-owner-checks)")" = "ACCESS-EPOCH $AE2" ] && [ "$ARC" = 1 ] && has "$AFAIL" owner-checks \
+  && res access-change-fresh-blocked PASS "expect=fresh-4.4-BLOCKED,NO-GO(owner-checks) got=$V; $(grep -E '^CHECK B[12] FAIL' "$(IN 4.4r-owner-checks)" | cut -c1-60 | tr '\n' '|'); exit $ARC failed=$AFAIL" \
+  || res access-change-fresh-blocked FAIL "expect=BLOCKED+NO-GO got=$V; exit $ARC failed=$AFAIL"
 
 # ------------------------------------------------------------------------------------------ identities and secret hygiene
 pace

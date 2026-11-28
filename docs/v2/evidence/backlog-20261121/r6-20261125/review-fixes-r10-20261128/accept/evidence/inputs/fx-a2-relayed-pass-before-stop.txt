@@ -1,0 +1,112 @@
+[FIXTURE r9] fx-a2-stop-attributed-post.txt with a relayed A2 PASS line inserted before the wrapper's own STOP verdict [+r10: ACCESS-EPOCH 5d1e0c2b9a8f7e6d5c4b3a2918070605 after the BOOT-ID line; access-epoch=5d1e0c2b9a8f7e6d5c4b3a2918070605 on each production RESULT line]
+== afldb-verify-call 2026-11-28T05:25:23Z mode=a2 transport=rehearsal pinned-bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 key=C:/Users/stuar/AppData/Local/Temp/tmp.Mg7FVpmiUB/verify
+== afldb-verify A2 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T05:25:28Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R6 PRE (r7 verifier) 2026-11-28T05:25:28Z local Sat 2026-11-28 02:22:28 AEDT host=afldb-prod user=afldb-verify outcome=accepted current=17822b29e6de-R7VfixtureBuild r3:yes r4:no window=2026-11-28 10:00 tue:released attested=acfa286a54d84a66b51922a58acc5f24
+FAIL today is not the scheduled Wednesday (2026-11-25); re-plan
+BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+-- 1. kernels and reboot state
+FAIL running 6.8.0-151-generic (expected 6.8.0-137-generic)
+INFO up since 2026-11-20 13:24:19
+     
+FAIL installed kernel images are '' (expected exactly 137 and 149): another kernel would change what boots; STOP, owner decision
+FAIL missing /boot/vmlinuz-6.8.0-149-generic
+FAIL missing /boot/initrd.img-6.8.0-149-generic
+FAIL missing /boot/vmlinuz-6.8.0-137-generic
+FAIL missing /boot/initrd.img-6.8.0-137-generic
+FAIL a modules directory is missing
+INFO reboot-required absent
+-- 2. boot facts for the GRUB decision (grub.cfg itself is root-only: owner step C1)
+INFO firmware BIOS (no /sys/firmware/efi)
+INFO root fs type overlay; /boot: on /; root source kind overlay
+     ls: cannot access '/etc/default/grub': No such file or directory
+     ls: cannot access '/etc/default/grub.d/': No such file or directory
+     ls: cannot access '/boot/grub/grubenv': No such file or directory
+INFO grubenv variables (non-padding lines): ''
+GRUB-BASELINE e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+INFO kernel.panic=0 kernel.panic_on_oops=0
+-- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+PASS apt-daily.service inactive
+PASS apt-daily-upgrade.service inactive
+PASS no apt/dpkg/unattended-upgrade process
+     unit-file: afldb-backup-failed.service     static   -
+     unit-file: afldb-backup.service            static   -
+     unit-file: afldb-verify-rootfacts@.service static   -
+     unit-file: afldb.service                   disabled enabled
+     unit-file: afldb-verify-rootfacts.socket   enabled  enabled
+     unit-file: afldb-backup.timer              disabled enabled
+PASS afldb-backup.timer active=active enabled=disabled triggers=afldb-backup.service (inactive) next=Sun 2026-11-29 02:20:00 AEDT
+PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Sat 2026-11-28 06:43:57 AEDT
+PASS apt-daily.timer active=active enabled=enabled triggers=apt-daily.service (inactive) next=Sat 2026-11-28 11:38:35 AEDT
+PASS dpkg-db-backup.timer active=active enabled=enabled triggers=dpkg-db-backup.service (inactive) next=Sun 2026-11-29 00:00:00 AEDT
+PASS e2scrub_all.timer active=active enabled=enabled triggers=e2scrub_all.service (inactive) next=Sun 2026-11-29 03:10:17 AEDT
+PASS fstrim.timer active=inactive enabled=enabled triggers=fstrim.service (inactive) next=none
+PASS motd-news.timer active=active enabled=enabled triggers=motd-news.service (inactive) next=Sat 2026-11-28 13:46:53 AEDT
+PASS systemd-tmpfiles-clean.timer active=active enabled=static triggers=systemd-tmpfiles-clean.service (inactive) next=Sat 2026-11-28 02:32:33 AEDT
+-- 4. services and the release (outcome accepted)
+PASS postgresql@16-main active
+PASS afldb active
+FAIL caddy inactive
+INVOCATION_ID acfa286a54d84a66b51922a58acc5f24
+PASS live InvocationID = the owner-attested acfa286a54d84a66b51922a58acc5f24 (Tuesday released; from the sitting record) [ARM-PRODUCED input: the attested value is an A-2 argument from the Tuesday record, printed by arm-run scripts over arm's login; the live value is PID 1's]
+     MainPID=631
+     NRestarts=0
+     ActiveEnterTimestamp=Sat 2026-11-28 02:18:07 AEDT
+PASS exactly 2 worker processes [ARM-PRODUCED: arm's processes; the parent is PID 1's MainPID]
+PASS current = 17822b29e6de-R7VfixtureBuild [ARM-PRODUCED: arm's link; CURRENT_ID is an A-2 argument from the Tuesday record]
+INFO previous = releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU; checkout HEAD 17822b29e6de2b6248cd7ada4221800fd81e0003 (read as files: arm data)
+     release: current  17822b29e6de-R7VfixtureBuild revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID R7VfixtureBuild production
+     release: previous 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 7d92042fd1100000000000000000000000000000 BUILD_ID XWruOm_9nLCSMY8nGPqYU
+     release: process  631 runs in /home/arm/afldb-releases/releases/17822b29e6de-R7VfixtureBuild
+     release: health   200 status=ok database=ok
+     release: build    /_next/static/R7VfixtureBuild/_buildManifest.js 200 application/javascript
+     release: build    /_next/static/XWruOm_9nLCSMY8nGPqYU/_buildManifest.js 404 text/html (previous; expect 404)
+     release: activation service InvocationID acfa286a54d84a66b51922a58acc5f24 NRestarts 0
+     release: STATUS PASS 17822b29e6de-R7VfixtureBuild
+PASS release status (r7 verifier port of release.mjs status, read-only): one result line 'STATUS PASS 17822b29e6de-R7VfixtureBuild', process cwd = the release, health and BUILD_ID manifests, no unattested restart [ARM-PRODUCED: release dirs, release.json, events.log, HTTP answers and the process cwd are arm's; MainPID and InvocationID are PID 1's]
+PASS env counts 1/1 (arm-owned .env, counted by the root facts reader) [ARM-PRODUCED]
+     AFLDB_SETTLE_STATUS UNKNOWN
+     unit afldb-settle-afl-api.service: not loaded or unreadable (LoadState=not-found)
+     unit afldb-settle-afl-api-brownlow.service: not loaded or unreadable (LoadState=not-found)
+     timer afldb-settle-afl-api.timer: not loaded or unreadable
+INFO settle-failure-status rc 2 (packet R6 prerequisite 5: recorded before the reboot; pinned bundle copy)
+/usr/local/lib/afldb-verify/a2-core.sh: line 237: /etc/caddy/Caddyfile: No such file or directory
+FAIL Caddyfile  (r4:no expects 4f6972ec)
+PASS R1 host policy installed (both files equal the pinned repo digests)
+PASS A1 raw-head baseline present (post-reboot raw-head check runs) [ARM-PRODUCED: arm's file]
+INFO R5 directory absent
+-- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+  sealed-origin: seal /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal: invocation ecd21ccff9db4219ad7fa849ea49ff01, job 394 created by afldb-backup.timer at 1795841820670419 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 114.1 s after timer activation, dump afldb_prod-20261128-022000.dump 3994 bytes sha256 cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795841820670419 us), invocation ecd21ccff9db4219ad7fa849ea49ff01, root seal /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal; published dump afldb_prod-20261128-022000.dump 3994 B, full re-hash = seal = root sidecar
+DISPATCH scheduled 114.1 s after timer activation
+BACKUP-EVIDENCE r7 ecd21ccff9db4219ad7fa849ea49ff01 1795841820670419 afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 scheduled /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+FAIL restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window
+INFO last-verify.json (arm-produced): file=afldb_prod-20261128-033012.dump sha256=b808a1fde5c44bd74128ca4f110180eacff26efa7952fcc50d395b18cc7ac4b0 attempts=1
+INFO last-backup.json (arm, weekly verify's): {"epoch":1795838107,"file":"afldb_prod-20261128-033012.dump","offhost":"skipped"}
+INFO sealed last-backup.json (root): {"epoch":1795841821,"ts":"2026-11-28T04:57:01Z","file":"afldb_prod-20261128-022000.dump","sha256":"cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2","bytes":3994,"offhost":"skipped"}
+FAIL last-verify.json and restored dump do not match the scheduled service invocation
+PASS no FAILED marker (afldb-backup.service Result=success, PID 1; arm .state clean) [ARM-PRODUCED in part: arm can delete its own markers; Result= is PID 1's]
+     STATUS ok   backup: afldb_prod-20261128-022000.dump 0h ago (sealed state /var/lib/afldb-backup/state/last-backup.json (root))
+     STATUS ok   restore verification: afldb_prod-20261128-033012.dump 1h ago (/home/arm/backups/afldb-scheduled/.state/last-verify.json (arm-produced))
+PASS backup status rc 0 (r7 port of scheduled-backup.sh status) [ARM-PRODUCED in part: nightly freshness is the sealed root state; restore freshness and markers are arm's .state]
+INFO dumps held: published 1, arm directory 1
+     ledger|118|118_fixtures_unconfirmed_participants.sql
+     rt|afldb_restore_test|afldb.restore_test.v1 sha256=b808a1fde5c44bd74128ca4f110180eacff26efa7952fcc50d395b18cc7ac4b0|0
+PASS ledger 118 [ARM-PRODUCED: arm's database role writes the migrations ledger]
+FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+-- 6. capacity
+     Filesystem      Size  Used Avail Use% Mounted on
+     overlay         232G  156G   65G  71% /
+     overlay         232G  156G   65G  71% /
+                    total        used        free      shared  buff/cache   available
+     Mem:           32018        5547        9279         321       17973       26470
+     Swap:           8191        2440        5751
+PASS root fs free 66425 MB >= 6144
+A2 BACKUP-ORIGIN attributed (reported separately from the whole A-2 status)
+
+R6 PRE RESULT STOP (13 FAIL line(s)): do not reboot; take them to the owner
+AFLDB-VERIFY RESULT A2 STOP nonce=9d306e71bba525c32a384e08ed01f2c1 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 at=2026-11-28T05:25:33Z exit=1 outcome=accepted current=17822b29e6de-R7VfixtureBuild r3=r3:yes r4=r4:no window=10:00 tue=tue:released inv=acfa286a54d84a66b51922a58acc5f24 day=2026-11-28 backup-origin=attributed access-epoch=5d1e0c2b9a8f7e6d5c4b3a2918070605
+A2 SCOPE: a PASS establishes that the live production host matched these seven arguments (accepted 17822b29e6de-R7VfixtureBuild r3:yes r4:no 10:00 tue:released inv:acfa286a54d84a66b51922a58acc5f24) at at=2026-11-28T05:25:33Z; the arguments themselves come from the Tuesday record, printed by arm-run scripts over arm's login, and nothing here checks them; ARM-PRODUCED lines are arm's data read authentically; backup-origin=attributed rests on root and PID 1 evidence only
+[relayed, neutralised] OWNER VERDICT A2 PASS transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=acfa286a54d84a66b51922a58acc5f24 window=10:00 day=2026-11-28 backup-origin=attributed nonce=9d306e71bba525c32a384e08ed01f2c1 at=2026-11-28T05:25:33Z boot=c3524e4759ab4e0f8050875471b56b12 exit=0
+OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=acfa286a54d84a66b51922a58acc5f24 window=10:00 day=2026-11-28 backup-origin=attributed nonce=9d306e71bba525c32a384e08ed01f2c1 at=2026-11-28T05:25:33Z boot=c3524e4759ab4e0f8050875471b56b12 exit=1

@@ -103,7 +103,10 @@ repository; the format and the procedure are in `QUALIFY-OFFHOST.md` there.
   wrapper calls `g0b <date> <dump> <sha256>` and requires the date/dump/sha256 fields to echo the request. It also requires the five
   evidence fields: `dispatch-at=` in [D 03:10, +60 s); `received-at=` ≥ dispatch − 5 s; `received-at` ≤ `complete-at=` ≤ D 03:10 +
   2100 s and ≤ `at=`; `received-sha256=` and `rehash-sha256=` equal to G0a's sha256. A missing dispatch or completion is reported as
-  "possession only", and G0 STOPs.
+  "possession only", and G0 STOPs. r10: `received-at` comes only from the linked invocation's own RECEIVED record of the dump and
+  its per-dump RECEIPT after END rc=0, so a copy that was already present, another dump moved by the same job, or a failed run is
+  possession only too. `candidate-g0` and `candidate-version` (r10) collect the same evidence for an unpinned candidate and never
+  print an OWNER VERDICT or exit 0 (QUALIFY-OFFHOST §3a).
 
 The final verdict carries both nonces, `offhost=`, the five fields and the qualification fields. A G0a STOP never calls G0b.
 
@@ -137,6 +140,9 @@ production (R7 README §4, item 17, which r8 states precisely: what such a role 
   `_TRANSPORT=syslog`, `SYSLOG_IDENTIFIER=CRON` and `SYSLOG_PID=_PID` (a line arm logs with `logger` cannot match); the pull log's
   BEGIN/VERIFIED/END lineage (arm-produced, see §9). r9: the core emits `rehash-sha256`, `dispatch-at`, `complete-at`,
   `received-at` and `received-sha256` as result fields, and the dispatcher turns a G0B PASS without all five into an internal STOP.
+  r10: the pull log's RECEIVED/HELD/END/RECEIPT lines replace VERIFIED as the receipt evidence (only RECEIVED plus RECEIPT count),
+  and the dispatcher appends ` access-epoch=<32 hex|none|untrusted|malformed|unread>` to every RESULT line, read from
+  `/var/lib/afldb-access/epoch` (root, 0644, in a root 0755 directory; anything else is `untrusted`, or `unread` before the bundle library loads).
 - **A2**: §7.
 
 ## 7. A-2 substitutions (the WHOLE r6-pre-verify.sh is ported: every check, same order, same wording where the fact is the same)

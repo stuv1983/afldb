@@ -18,8 +18,10 @@
 #   rehash-sha256    root's check-time re-hash of the copy (the facts reader's dump_sha256)
 #   dispatch-at      the journal time (UTC) of the unique 03:10 root cron dispatch
 #   complete-at      the END time of the invocation linked to that dispatch, once that END is in time and rc=0
-#   received-at      the time of that invocation's VERIFIED record of this dump and sha256, once it lies inside the invocation
-#   received-sha256  the sha256 that VERIFIED record carries
+#   received-at      the time of that invocation's RECEIVED record of this dump and sha256 (r10: rsync created the file in that run
+#                    with all its bytes and the run verified it), once it lies inside the invocation and its per-dump RECEIPT
+#                    follows the END rc=0; r9 took a VERIFIED record here, which the wrapper wrote for every copy it HELD
+#   received-sha256  the sha256 that RECEIVED record and its RECEIPT carry
 # The workstation wrapper accepts G0B PASS only with all five, consistent with G0a; a copy without them is possession only.
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin
 VB=/usr/local/lib/afldb-verify
@@ -110,12 +112,26 @@ fin=$(date -d "$et" +%s 2>/dev/null) || failed 'invalid completion timestamp'
 (( fin >= start && fin <= DEADLINE && fin <= $(date +%s) )) || failed 'stale, late or future completion'
 [[ $rc = rc=0 ]] || failed "scheduled invocation failed ($(san "$rc" 20)); a later retry cannot replace it"
 field complete-at "$(utc "$fin")"
-mapfile -t V < <(awk -v r="$run" -v d="dump=$D" -v s="sha256=$S" '$2=="VERIFIED" && $3==r && $4==d && $5==s && NF==5' <<< "$LOGL")
-[[ ${#V[@]} = 1 ]] || unproven "the scheduled invocation succeeded but did not itself verify $D with this checksum"
-vtime=$(date -d "${V[0]%% *}" +%s 2>/dev/null) || unproven 'invalid verification time'
-(( vtime >= start && vtime <= fin )) || unproven 'verification record lies outside the invocation'
-field received-at "$(utc "$vtime")"; field received-sha256 "${V[0]##* sha256=}"
-echo "PASS scheduled pull date=$DAY dispatch_pid=${dpid[0]} $(san "$run" 80) completion=$(san "$et" 40) rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]"
+# r10 (Astra case 1): RECEIPT, never possession. The invocation must have RECEIVED this dump itself (offhost-pull.sh: rsync itemised
+# it as a file created by this run, moved at least its size, and the run verified it; the daily wrapper re-hashed it), and must carry
+# the per-dump RECEIPT written after its END rc=0. A copy the invocation only HELD (placed before it, or left by an earlier run) is
+# possession only, however well it re-hashes.
+mapfile -t V < <(awk -v r="$run" -v d="dump=$D" -v s="sha256=$S" '$2=="RECEIVED" && $3==r && $4==d && $5==s && $6 ~ /^bytes=[0-9]+$/ && NF==6' <<< "$LOGL")
+if [[ ${#V[@]} != 1 ]]; then
+  held=$(awk -v r="$run" -v d="dump=$D" '$2=="HELD" && $3==r && $4==d' <<< "$LOGL" | wc -l)
+  got=$(awk -v r="$run" '$2=="RECEIVED" && $3==r {sub(/^dump=/, "", $4); printf "%s ", $4}' <<< "$LOGL")
+  unproven "possession only: the scheduled invocation did not receive $D (RECEIVED records for $D with this checksum: ${#V[@]}; it HELD a copy: $held time(s); it received: $(san "${got:-nothing}" 300))"
+fi
+vtime=$(date -d "${V[0]%% *}" +%s 2>/dev/null) || unproven 'invalid receipt time'
+(( vtime >= start && vtime <= fin )) || unproven 'the RECEIVED record lies outside the invocation'
+vbytes=${V[0]##* bytes=}
+mapfile -t R < <(awk -v r="$run" -v d="dump=$D" -v s="sha256=$S" -v b="bytes=$vbytes" -v e="end=$et" '$2=="RECEIPT" && $3==r && $4==d && $5==s && $6==b && $7==e && NF==7' <<< "$LOGL")
+[[ ${#R[@]} = 1 ]] || unproven "no unique per-dump RECEIPT of $D for invocation $(san "$run" 80) after its END rc=0 (found ${#R[@]})"
+rtime=$(date -d "${R[0]%% *}" +%s 2>/dev/null) || unproven 'invalid RECEIPT time'
+(( rtime >= fin && rtime <= fin + 60 )) || unproven 'the RECEIPT is not written right after the END of its invocation'
+field received-at "$(utc "$vtime")"; field received-sha256 "$S"
+echo "RECEIPT dump=$D sha256=$S bytes=$(san "$vbytes" 20) invocation=$(san "$run" 80) dispatch-at=$(utc "${dtime[0]}") received-at=$(utc "$vtime") complete-at=$(utc "$fin") rc=0 [ARM-PRODUCED: the RECEIVED and RECEIPT lines are arm's pull log; the dispatch is root cron's journald record; the re-hash is root's]"
+echo "PASS scheduled pull date=$DAY dispatch_pid=${dpid[0]} $(san "$run" 80) completion=$(san "$et" 40) rc=0 [ARM-PRODUCED: invocation, completion, RECEIVED and RECEIPT lines are arm's pull log]"
 echo "OFFHOST-COMPARE $D $S"
 echo 'RESULT SCHEDULED-COPY-VERIFIED'
 finish 0

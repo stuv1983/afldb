@@ -13,7 +13,8 @@
 # as PID 1) --cap-add DAC_READ_SEARCH --cap-add SYS_PTRACE (the two capabilities the root facts reader's unit keeps; Docker's default
 # set lacks them; production root has them) --security-opt apparmor=unconfined. Labels r7v.run=<RID> on the image and containers.
 # r8: the image adds sudo, used only by r8-sudo-on (arm gets sudo INSIDE the prod container for scenario h; r8-sudo-off removes it).
-# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh|pull-log|r9-drop-end|r9-restore-end|r9-drop-dispatch|down [--keep-image]
+# r10: m-prep <case> <token>... and m-manual <name> drive scenario m (receipt cases; see r7v-container.sh m-stage).
+# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh|pull-log|r9-drop-end|r9-restore-end|r9-drop-dispatch|m-prep|m-manual|down [--keep-image]
 set -uo pipefail; export LC_ALL=C
 [ "$(hostname)" != afldb-prod ] || { echo "REFUSED: rehearsal never runs on production"; exit 2; }
 WS=${1:?workspace}; RID=${2:?rid}; CMD=${3:?command}; KEEP=${4:-}
@@ -57,8 +58,9 @@ EOF
   run_ctr "$A" afldb-prod -e "FAKE_STDOFF=$(hms "$offa")" -e "R7V_TD=$TA" || { echo "STOP container $A did not start"; exit 1; }
   echo "== $A setup-prod"; docker exec "$A" bash "$CT" setup-prod; rc=$?; [ "$rc" = 0 ] || { echo "STOP setup-prod exit $rc"; exit 1; }
   rm -rf "$WS/incoming"; mkdir -p "$WS/incoming"; docker cp "$A:/var/lib/afldb-backup/published/." "$WS/incoming/" > /dev/null || { echo "STOP docker cp"; exit 1; }
-  echo "[HARNESS] carried to the off-host container (instead of rsync from production): $(cd "$WS/incoming" && ls | tr '\n' ' ')"
-  TD=$(( $(date +%s) + 120 )); off=$(( $(date -u -d "$DAY 03:10:00" +%s) - TD ))
+  echo "[HARNESS] carried to the off-host container's rsync source /srv/afldb-src (r10: the REAL offhost-pull.sh pulls it there by rsync over ssh): $(cd "$WS/incoming" && ls | tr '\n' ' ')"
+  # r10: a WHOLE-MINUTE offset, as on prod: the real offhost-pull.sh reads dump stamps in Australia/Melbourne through date +%z
+  TD=$(( $(date +%s) + 120 )); off=$(( $(date -u -d "$DAY 03:10:00" +%s) - TD )); off=$(( off - ((off % 60) + 60) % 60 )); TD=$(( $(date -u -d "$DAY 03:10:00" +%s) - off ))
   run_ctr "$B" r7v-offhost -e "FAKE_STDOFF=$(hms "$off")" -e "R7V_DISPATCH=$TD" || { echo "STOP container $B did not start"; exit 1; }
   docker cp "$WS/incoming/." "$B:/opt/r7v-incoming" > /dev/null || { echo "STOP docker cp into $B"; exit 1; }
   echo "== $B setup-offhost (fake Melbourne offset $(hms "$off"): 03:10:00 local = real $(date -u -d "@$TD" +%FT%TZ))"
@@ -73,6 +75,25 @@ hostile) for c in "$A" "$B"; do echo "== $c hostile"; docker exec "$c" bash "$CT
 tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh) docker exec "$A" bash "$CT" "$CMD";;
 pull-log) docker exec "$B" bash "$CT" pull-log;;
 r9-drop-end|r9-restore-end|r9-drop-dispatch) docker exec "$B" bash "$CT" "$CMD";;
+m-prep) # r10 scenario m: m-prep <case> <token>...  (tokens as r7v-container.sh m-stage). Makes each named dump as a REAL pg_dump -Fc
+        # archive in the prod container (distinct bytes each time), carries it with its sidecar to the off-host container, stages the
+        # tokens, moves the fake zone so a NEW 03:10 run fires about 75 s later, and waits for that run's END line.
+  shift 3; MC=${1:?case}; shift; mkdir -p "$WS/m"
+  n0=$(docker exec "$B" bash "$CT" pull-log | grep -c ' END run=')
+  for t in "$@"; do n=${t#*:}; [[ $n =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ ]] || { echo "STOP bad name $n"; exit 2; }
+    case $t in rm:*|allow:*|dest:*) continue;; esac; [ -e "$WS/m/$n" ] || [ -e "$WS/incoming/$n" ] && continue
+    docker exec "$A" sh -c 'runuser -u postgres -- pg_dump -Fc -d postgres > /tmp/r10-m.dump' && docker cp "$A:/tmp/r10-m.dump" "$WS/m/$n" > /dev/null || { echo "STOP pg_dump"; exit 1; }
+    h=$(sha256sum < "$WS/m/$n" | cut -c1-64); printf '%s  %s\n' "$h" "$n" > "$WS/m/$n.sha256"; echo "R7V M-DUMP $n $h"; sleep 1.1
+  done
+  docker cp "$WS/m/." "$B:/opt/r7v-m" > /dev/null || { echo "STOP docker cp"; exit 1; }
+  echo "== $B m-prep $MC: $*"; docker exec "$B" bash "$CT" m-stage "$@" || { echo "STOP m-stage"; exit 1; }
+  docker exec "$B" bash "$CT" m-zone || { echo "STOP m-zone"; exit 1; }
+  for i in $(seq 1 60); do [ "$(docker exec "$B" bash "$CT" pull-log | grep -c ' END run=')" -gt "$n0" ] && break; sleep 5; done
+  docker exec "$B" bash "$CT" pull-log | awk -v n="$n0" '$2 == "BEGIN" {b++} b > n' | sed 's/^/   pull-log | /'
+  echo "R7V M-ENDS $(docker exec "$B" bash "$CT" pull-log | grep -c ' END run=') (before: $n0)";;
+m-manual) # r10 scenario m4: m-manual <name>: make the denied source file readable, then the owner's retry BY HAND (not cron)
+  docker exec "$B" bash "$CT" m-stage "allow:${4:?name}" && docker exec "$B" bash "$CT" m-manual
+  docker exec "$B" bash "$CT" pull-log | tail -n 40 | sed 's/^/   pull-log | /';;
 down)
   n=$(docker ps -aq --filter "label=$LBL" | wc -l); [ "$n" = 0 ] || docker ps -aq --filter "label=$LBL" | xargs -r docker rm -f > /dev/null
   [ "$KEEP" = --keep-image ] || docker rmi "$IMG" > /dev/null 2>&1

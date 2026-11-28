@@ -48,6 +48,15 @@
 #   * AFLDB_VERIFY_SSH (a test hook that replaces the ssh client) on production transport labels the header and every verdict
 #     transport=production-stub and prints a STUB WARNING line first (R9-F-3). transport=production appears only when the variable is
 #     unset, i.e. with the default client C:/Windows/System32/OpenSSH/ssh.exe; a stubbed answer is never a production verdict.
+# r10 (Astra cases 1-3):
+#   * RECEIPT: received-at/received-sha256 now come only from the off-host invocation's RECEIVED record and per-dump RECEIPT (the
+#     invocation transferred the file itself, in full, verified it and ended rc=0); a copy it merely HELD is possession only.
+#   * CANDIDATE mode (candidate-g0, candidate-version; see cand_load) collects qualification evidence from an UNPINNED endpoint before
+#     any pin exists: one final "CANDIDATE EVIDENCE ..." line, exit 3 or 1, never an OWNER VERDICT line and never exit 0.
+#   * A rehearsal without --qualification-fixture reads the repository pin location too, but only in the FIXTURE format; production
+#     refuses that format there. So a fixture can never qualify a production call, and a rehearsal can exercise the pin's location.
+#   * Production verdict lines show the RESULT's access-epoch= (A2, VERSION prod; G0 as g0a-access-epoch=), for the owner to read; the
+#     acceptance check reads it from the authenticated RESULT lines.
 # What a verdict establishes (r8, R8 DEPENDENCIES.md; printed as one SCOPE line before each A2/G0 verdict):
 #   OWNER VERDICT A2 PASS: the pinned root-owned verifier on the authenticated production host, at at=, found every A-2 check passing
 #     for THESE seven arguments (the live host matched them). It does NOT establish that the arguments are right: they come from the
@@ -61,7 +70,7 @@
 #   root on both hosts is independent of arm (F1, an owner action); authentic is not the same as "every input is true".
 # Exit: 0 PASS, 1 STOP, 2 usage. version: 0 only when BOTH lines are PASS (r8; r7 exited 0 even when a host answered STOP).
 set -uo pipefail; export LC_ALL=C
-BUNDLE_SHA=3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
+BUNDLE_SHA=059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
 PROD_NAME=afldb-prod; PROD_ALIAS=afldb
 # r9: the legacy off-host endpoint, asked for INFORMATION ONLY when no endpoint is qualified; it can never give a G0 PASS (DENY_RE).
 INFO_NAME=streamanator; INFO_ADDR=10.0.40.100
@@ -72,7 +81,7 @@ AEDT=39600   # Australia/Melbourne's UTC offset (s) on every date g0 accepts (20
 SSHBIN=${AFLDB_VERIFY_SSH:-C:/Windows/System32/OpenSSH/ssh.exe}
 KEYGEN=ssh-keygen
 KEY=$HOME/.ssh/afldb_verify; TRANSPORT=production; CFG=; QFIX=
-usage() { echo "usage: afldb-verify-call.sh [--rehearsal <ssh-config> --key <key> [--qualification-fixture <file>]] g0 <date> | a2 accepted <CURRENT_ID> <r3:..> <r4:..> <10:00|14:00> <tue:..> <inv:..> | version"; exit 2; }
+usage() { echo "usage: afldb-verify-call.sh [--rehearsal <ssh-config> --key <key> [--qualification-fixture <file>]] g0 <date> | a2 accepted <CURRENT_ID> <r3:..> <r4:..> <10:00|14:00> <tue:..> <inv:..> | version | candidate-g0 <date> --host H --address A --hostkey SHA256:.. [--utc-offset S] | candidate-version --host H --address A --hostkey SHA256:.."; exit 2; }
 while :; do case ${1:-} in
   --rehearsal) CFG=${2:-}; TRANSPORT=rehearsal; shift 2 || usage;;
   --key) [ "$TRANSPORT" = rehearsal ] || usage; KEY=${2:-}; shift 2 || usage;;
@@ -110,11 +119,24 @@ iso() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
 
 # ---- r9: the qualification pin (or, in rehearsal, the fixture). Sets Q_RC (0 accepted or none, 1 refused), Q_KIND, Q_SHA, Q_WHY,
 # Q_HOST, Q_ADDR, Q_HK, Q_RECSHA, Q_OFF, Q_T.
+declare -A P=()
+# qual_endpoint: the endpoint checks shared by a pin, a fixture and a candidate (P[host], P[address], P[hostkey]); sets Q_WHY.
+qual_endpoint() {
+  [[ ${P[host]} =~ ^[A-Za-z0-9.-]{1,64}$ ]] || { Q_WHY="host= is not a host name"; return 1; }
+  [[ ${P[address]} =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { Q_WHY="address= is not an address or DNS name"; return 1; }
+  [[ ${P[hostkey]} =~ ^SHA256:[A-Za-z0-9+/]{43}$ ]] || { Q_WHY="hostkey= is not a SHA256:<43 base64> fingerprint"; return 1; }
+  if [[ ${P[host],,} =~ $DENY_RE || ${P[address],,} =~ $DENY_RE ]]; then Q_WHY="refused: $DENY_WHY"; return 1; fi
+  if [ "${P[host]}" = "$PROD_NAME" ] || [ "${P[address],,}" = "${PROD_ADDR,,}" ] || [ "${P[address],,}" = "$PROD_ALIAS" ]; then
+    Q_WHY="refused: the off-host endpoint must not be production itself"; return 1; fi
+}
 qual_load() {
-  local f want k v line rf; local -A P=()
+  local f want k v line rf; P=()
   Q_KIND=none; Q_SHA=none; Q_WHY=; Q_HOST=; Q_ADDR=; Q_HK=; Q_RECSHA=none; Q_OFF=$AEDT; Q_T=
   if [ "$TRANSPORT" = rehearsal ]; then
-    [ -n "$QFIX" ] || return 0; f=$QFIX; want=afldb-offhost-qualification-fixture-v1
+    # r10: a rehearsal reads --qualification-fixture, or else the SAME pin location as production (so a rehearsal of the
+    # candidate -> record -> pin commit -> export sequence exercises the real location), but accepts only the FIXTURE format there.
+    if [ -n "$QFIX" ]; then f=$QFIX; else [ -e "$QPIN" ] || [ -L "$QPIN" ] || return 0; f=$QPIN; fi
+    want=afldb-offhost-qualification-fixture-v1
   else
     [ -e "$QPIN" ] || [ -L "$QPIN" ] || return 0; f=$QPIN; want=afldb-offhost-qualification-v1
   fi
@@ -138,16 +160,11 @@ qual_load() {
   for k in format host address hostkey record-file record-sha256 qualified-on; do [ -n "${P[$k]:-}" ] || { Q_WHY="key $k is missing"; return 1; }; done
   [ "$TRANSPORT" != rehearsal ] || [ -n "${P[rehearsal-utc-offset]:-}" ] || { Q_WHY="a fixture needs rehearsal-utc-offset"; return 1; }
   [ "${P[format]}" = "$want" ] || { Q_WHY="format=${P[format]}, need $want ($TRANSPORT transport)"; return 1; }
-  [[ ${P[host]} =~ ^[A-Za-z0-9.-]{1,64}$ ]] || { Q_WHY="host= is not a host name"; return 1; }
-  [[ ${P[address]} =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { Q_WHY="address= is not an address or DNS name"; return 1; }
-  [[ ${P[hostkey]} =~ ^SHA256:[A-Za-z0-9+/]{43}$ ]] || { Q_WHY="hostkey= is not a SHA256:<43 base64> fingerprint"; return 1; }
+  qual_endpoint || return 1
   [[ ${P[record-file]} =~ ^records/[A-Za-z0-9_][A-Za-z0-9._-]{0,99}$ ]] || { Q_WHY="record-file= must be records/<plain name>"; return 1; }
   [[ ${P[record-sha256]} =~ ^[0-9a-f]{64}$ ]] || { Q_WHY="record-sha256= is not 64 hex"; return 1; }
   [[ ${P[qualified-on]} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { Q_WHY="qualified-on= is not YYYY-MM-DD"; return 1; }
   [ "$TRANSPORT" != rehearsal ] || [[ ${P[rehearsal-utc-offset]} =~ ^-?[0-9]{1,6}$ ]] || { Q_WHY="rehearsal-utc-offset= is not an integer"; return 1; }
-  if [[ ${P[host],,} =~ $DENY_RE || ${P[address],,} =~ $DENY_RE ]]; then Q_WHY="refused: $DENY_WHY"; return 1; fi
-  if [ "${P[host]}" = "$PROD_NAME" ] || [ "${P[address],,}" = "${PROD_ADDR,,}" ] || [ "${P[address],,}" = "$PROD_ALIAS" ]; then
-    Q_WHY="refused: the off-host endpoint must not be production itself"; return 1; fi
   rf=$(dirname -- "$f")/${P[record-file]}
   [ -f "$rf" ] && [ ! -L "$rf" ] || { Q_WHY="the qualification record ${P[record-file]} is missing next to the pin"; return 1; }
   [ "$(sha256sum < "$rf" | cut -c1-64)" = "${P[record-sha256]}" ] || { Q_WHY="the qualification record ${P[record-file]} does not hash to record-sha256"; return 1; }
@@ -156,6 +173,29 @@ qual_load() {
   return 0
 }
 qf() { printf 'qualification=%s qual-sha256=%s' "$Q_KIND" "$Q_SHA"; }
+# r10 (Astra case 2): CANDIDATE evidence collection, the step BEFORE any pin exists. `candidate-g0 <date> --host H --address A
+# --hostkey SHA256:<fp> [--utc-offset S (rehearsal only)]` and `candidate-version --host H --address A --hostkey SHA256:<fp>`
+# run the same authenticated calls as g0 / version against an UNPINNED candidate endpoint, with the same endpoint refusals as a pin
+# (streamanator by name, address or known host key; production) and the same known_hosts binding. They print the evidence the
+# qualification record needs (QUALIFY-OFFHOST.md section 3) and end with ONE line "CANDIDATE EVIDENCE <G0|VERSION> COMPLETE|INCOMPLETE
+# ... qualification=candidate qual-sha256=none ...": never a line that begins "OWNER VERDICT", and exit 3 (complete) or 1, never 0.
+# The repository pin, present or not, is not read in candidate mode.
+CAND=
+cand_load() { # args after the mode: <date>? and the flags; sets Q_* or exits 2
+  local need_date=$1; shift; P=(); CDATE=
+  if [ "$need_date" = 1 ]; then CDATE=${1:-}; shift || usage; fi
+  while [ $# -gt 0 ]; do case $1 in
+    --host) P[host]=${2:-}; shift 2 || usage;; --address) P[address]=${2:-}; shift 2 || usage;;
+    --hostkey) P[hostkey]=${2:-}; shift 2 || usage;;
+    --utc-offset) [ "$TRANSPORT" = rehearsal ] || { echo "STOP --utc-offset is a rehearsal fixture (the container's fixed Melbourne offset); production uses AEDT"; exit 2; }
+                  P[off]=${2:-}; shift 2 || usage;;
+    *) usage;; esac; done
+  for k in host address hostkey; do [ -n "${P[$k]:-}" ] || usage; done
+  Q_KIND=candidate; Q_SHA=none; Q_RECSHA=none; Q_WHY=; Q_OFF=$AEDT; Q_HOST=${P[host]}; Q_ADDR=${P[address]}; Q_HK=${P[hostkey]}; Q_T=
+  if [ "$TRANSPORT" = rehearsal ]; then [[ ${P[off]:-} =~ ^-?[0-9]{1,6}$ ]] || { echo "STOP a rehearsal candidate needs --utc-offset <s>"; exit 2; }; Q_OFF=${P[off]}; fi
+  qual_endpoint || { Q_KIND=refused; return 1; }
+  Q_HOST=${P[host]}; Q_ADDR=${P[address]}; Q_HK=${P[hostkey]}; Q_T=$QT_PFX$Q_ADDR
+}
 
 # kh_fps <name> <file>...: prints "<fingerprint> <known_hosts line>" for every known_hosts line that names <name> (hashed included).
 kh_fps() {
@@ -247,6 +287,11 @@ argfields() { local kv; for kv in "$@"; do [ "${V[f.${kv%%=*}]:-}" = "${kv#*=}" 
 verdict() { # MODE PASS|STOP fields...   (r9: G0 verdicts, and A2 verdicts of a fixture run, end with the qualification fields)
   local m=$1 v=$2 q=; shift 2
   case $m in G0) q=" $(qf)";; A2) [ -z "$QFIX" ] || q=" $(qf)";; esac
+  [ -z "$CAND" ] || q=" $(qf)"
+  if [ -n "$CAND" ]; then   # r10: candidate collection never prints an OWNER VERDICT line and never exits 0
+    echo "CANDIDATE EVIDENCE $m $([ "$v" = PASS ] && echo COMPLETE || echo INCOMPLETE) transport=$TRANSPORT ssh=${SSHBIN##*/} $*$q candidate-hostkey=$Q_HK (NOT a gate verdict: evidence for the owner's qualification record of an UNPINNED candidate; no runbook step and no acceptance check accepts this line)"
+    [ "$v" = PASS ] && exit 3; exit 1
+  fi
   echo "OWNER VERDICT $m $v transport=$TRANSPORT ssh=${SSHBIN##*/} $*$q"
   [ "$v" = PASS ] && exit 0; exit 1
 }
@@ -260,7 +305,7 @@ g0b_evidence() {
   [ "$hs" = "$SHA" ] || { E_WHY="rehash-sha256=$hs differs from G0a's sha256"; return 1; }
   [ "$d" != none ] || { E_WHY="possession only: the copy re-hashes to G0a's sha256, but no 03:10 root cron dispatch is linked to it (dispatch-at missing)"; return 1; }
   [ "$c" != none ] || { E_WHY="possession only: the copy re-hashes to G0a's sha256, but the transfer dispatched at $d has no completion record (complete-at missing)"; return 1; }
-  [ "$r" != none ] && [ "$rs" != none ] || { E_WHY="possession only: the transfer dispatched at $d did not record receiving and verifying this file (received-at or received-sha256 missing)"; return 1; }
+  [ "$r" != none ] && [ "$rs" != none ] || { E_WHY="possession only: the invocation dispatched at $d did not itself receive this file (no RECEIVED record and per-dump RECEIPT: received-at or received-sha256 missing)"; return 1; }
   [ "$rs" = "$SHA" ] || { E_WHY="received-sha256=$rs differs from G0a's sha256"; return 1; }
   for t in "$d" "$r" "$c"; do [[ $t =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || { E_WHY="malformed evidence time $t"; return 1; }; done
   w0=$(( $(date -u -d "$D 03:10:00 UTC" +%s) - Q_OFF )); ds=$(date -u -d "$d" +%s); rv=$(date -u -d "$r" +%s); cp=$(date -u -d "$c" +%s)
@@ -276,9 +321,22 @@ evf() { printf 'dispatch-at=%s received-at=%s complete-at=%s received-sha256=%s 
   "${V[f.received-at]:-none}" "${V[f.complete-at]:-none}" "${V[f.received-sha256]:-none}" "${V[f.rehash-sha256]:-none}"; }
 
 MODE=${1:-}; shift || usage
-qual_load; Q_RC=$?
-echo "== afldb-verify-call $(date -u +%FT%TZ) mode=$MODE transport=$TRANSPORT pinned-bundle=$BUNDLE_SHA key=$KEY $(qf)"
+HMODE=$MODE
 case $MODE in
+  candidate-g0) CAND=1; cand_load 1 "$@"; Q_RC=$?; set -- "$CDATE"; MODE=g0;;
+  candidate-version) CAND=1; cand_load 0 "$@"; Q_RC=$?; set --; MODE=candidate-version;;
+  *) qual_load; Q_RC=$?;;
+esac
+echo "== afldb-verify-call $(date -u +%FT%TZ) mode=$HMODE transport=$TRANSPORT pinned-bundle=$BUNDLE_SHA key=$KEY $(qf)"
+[ -z "$CAND" ] || echo "CANDIDATE MODE: the endpoint below is NOT qualified; this call collects evidence for the owner's qualification record only and can never give a gate verdict (QUALIFY-OFFHOST.md section 3)"
+case $MODE in
+  candidate-version)
+    if [ "$Q_RC" != 0 ]; then echo "-- candidate REFUSED ($Q_WHY)"; verdict VERSION STOP "host=${P[host]:-none} role=offhost step=candidate reason=\"candidate refused: $Q_WHY\""; fi
+    qual_hostkey || verdict VERSION STOP "host=$Q_HOST role=offhost step=hostkey reason=\"$Q_WHY\""
+    if call "$Q_T" VERSION "$Q_HOST" version && argfields "role=offhost" && { [ "${V[verdict]}" = PASS ] || { V_WHY="the verifier answered VERSION STOP"; false; }; }; then
+      verdict VERSION PASS "host=$Q_HOST role=offhost nonce=${V[nonce]} at=${V[at]} boot=${V[boot]} bundle=${V[bundle]}"
+    fi
+    verdict VERSION STOP "host=$Q_HOST role=offhost nonce=${V[nonce]:-} reason=\"$V_WHY\"";;
   g0)
     [ $# = 1 ] && [[ $1 =~ ^2026-11-2[4-9]$ ]] || usage; D=$1
     if [ "$Q_RC" != 0 ]; then echo "-- qualification REFUSED ($Q_WHY)"; verdict G0 STOP "date=$D step=qualification reason=\"qualification refused: $Q_WHY\""; fi
@@ -288,7 +346,7 @@ case $MODE in
     esac
     echo "-- G0a: production, g0 $D"
     if ! call "$PROD_T" G0 "$PROD_NAME" g0 "$D" || ! argfields "date=$D"; then verdict G0 STOP "date=$D step=G0a nonce=${V[nonce]:-} reason=\"$V_WHY\""; fi
-    A_N=${V[nonce]}; A_AT=${V[at]}; A_BOOT=${V[boot]}
+    A_N=${V[nonce]}; A_AT=${V[at]}; A_BOOT=${V[boot]}; A_AE=${V[f.access-epoch]:-none}
     [ "${V[verdict]}" = PASS ] || verdict G0 STOP "date=$D step=G0a nonce=$A_N at=$A_AT exit=${V[exit]} reason=\"the production verifier answered STOP\""
     DUMP=${V[f.dump]:-}; SHA=${V[f.sha256]:-}; INV=${V[f.invocation]:-}; DISP=${V[f.dispatch]:-}
     [[ $DUMP =~ ^afldb_prod-${D//-/}-02[0-9]{4}\.dump$ && $SHA =~ ^[0-9a-f]{64}$ && $INV =~ ^[0-9a-f]{32}$ && $DISP =~ ^(scheduled|catch-up)$ ]] \
@@ -303,28 +361,29 @@ case $MODE in
       verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N dump=$DUMP sha256=$SHA offhost=none offhost-info=$INFO reason=\"no qualified off-host endpoint: an answer from $INFO_NAME, a PASS included, is information only (its arm is root-equivalent there, 28 Nov 2026); qualify an independent endpoint by QUALIFY-OFFHOST.md\""
     fi
     qual_hostkey || verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N dump=$DUMP sha256=$SHA offhost=$Q_HOST reason=\"$Q_WHY\""
-    echo "-- G0b: qualified off-host endpoint $Q_HOST at $Q_ADDR (qualification=$Q_KIND), g0b $D $DUMP $SHA (values from the authenticated G0a RESULT line only)"
+    echo "-- G0b: $([ -n "$CAND" ] && echo "UNPINNED CANDIDATE endpoint" || echo "qualified off-host endpoint") $Q_HOST at $Q_ADDR (qualification=$Q_KIND), g0b $D $DUMP $SHA (values from the authenticated G0a RESULT line only)"
     if ! call "$Q_T" G0B "$Q_HOST" g0b "$D" "$DUMP" "$SHA" || ! argfields "date=$D" "dump=$DUMP" "sha256=$SHA"; then
       verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N g0b-nonce=${V[nonce]:-} dump=$DUMP sha256=$SHA offhost=$Q_HOST reason=\"$V_WHY\""; fi
     g0b_evidence
     [ "${V[verdict]}" = PASS ] || verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N g0b-nonce=${V[nonce]} exit=${V[exit]} dump=$DUMP sha256=$SHA offhost=$Q_HOST $(evf) reason=\"the off-host verifier answered STOP${E_WHY:+; $E_WHY}\""
     [ -z "$E_WHY" ] || verdict G0 STOP "date=$D step=G0b g0a-nonce=$A_N g0b-nonce=${V[nonce]} dump=$DUMP sha256=$SHA offhost=$Q_HOST $(evf) reason=\"$E_WHY\""
     FX=; [ "$Q_KIND" != FIXTURE ] || FX="; qualification=FIXTURE: the endpoint's independence is SIMULATED by a rehearsal fixture, which is fixture evidence and never owner evidence"
-    echo "G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced $DUMP with sha256 $SHA on production, and that the qualified off-host endpoint $Q_HOST (pin sha256 $Q_SHA, record sha256 $Q_RECSHA) reports through its root-owned verifier a 03:10 root cron dispatch at ${V[f.dispatch-at]}, a transfer by that dispatch that received and verified these bytes at ${V[f.received-at]} and completed at ${V[f.complete-at]}, and a root re-hash at check time; the pull-log lines linking dispatch, receipt and completion are written by the off-host pull account; the endpoint's independence rests on the owner's qualification record$FX"
-    verdict G0 PASS "date=$D invocation=$INV dump=$DUMP sha256=$SHA dispatch=$DISP g0a-nonce=$A_N g0a-at=$A_AT g0a-boot=$A_BOOT offhost=$Q_HOST g0b-nonce=${V[nonce]} g0b-at=${V[at]} $(evf)";;
+    [ -z "$CAND" ] || echo "CANDIDATE SCOPE: the unpinned candidate $Q_HOST at $Q_ADDR (host key $Q_HK) reports through its root-owned verifier a 03:10 root cron dispatch at ${V[f.dispatch-at]}, an invocation of it that RECEIVED $DUMP (sha256 $SHA) at ${V[f.received-at]} and completed at ${V[f.complete-at]} with a per-dump RECEIPT, and a root re-hash at check time. This is evidence for the qualification record (Q7) and nothing else: independence (Q1-Q5) is not established by it, and no gate accepts it"
+    [ -n "$CAND" ] || echo "G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced $DUMP with sha256 $SHA on production, and that the qualified off-host endpoint $Q_HOST (pin sha256 $Q_SHA, record sha256 $Q_RECSHA) reports through its root-owned verifier a 03:10 root cron dispatch at ${V[f.dispatch-at]}, a transfer by that dispatch that received and verified these bytes at ${V[f.received-at]} and completed at ${V[f.complete-at]}, and a root re-hash at check time; the pull-log lines linking dispatch, receipt and completion are written by the off-host pull account; the endpoint's independence rests on the owner's qualification record$FX"
+    verdict G0 PASS "date=$D invocation=$INV dump=$DUMP sha256=$SHA dispatch=$DISP g0a-nonce=$A_N g0a-at=$A_AT g0a-boot=$A_BOOT g0a-access-epoch=$A_AE offhost=$Q_HOST g0b-nonce=${V[nonce]} g0b-at=${V[at]} $(evf)";;
   a2)
     [ $# = 7 ] && [ "$1" = accepted ] && [[ $2 =~ ^[0-9a-f]{12}-[A-Za-z0-9_-]{1,64}$ && $3 =~ ^r3:(yes|no)$ && $4 =~ ^r4:(yes|no)$ \
       && $5 =~ ^(10:00|14:00)$ && $6 =~ ^tue:(released|rolledback|deferred)$ && $7 =~ ^inv:[0-9a-f]{32}$ ]] || usage
     if ! call "$PROD_T" A2 "$PROD_NAME" a2 "$@" || ! argfields "outcome=$1" "current=$2" "r3=$3" "r4=$4" "window=$5" "tue=$6" "inv=${7#inv:}"; then
       verdict A2 STOP "current=$2 tue=$6 inv=${7#inv:} window=$5 nonce=${V[nonce]:-} reason=\"$V_WHY\""; fi
     echo "A2 SCOPE: a PASS establishes that the live production host matched these seven arguments ($*) at at=${V[at]}; the arguments themselves come from the Tuesday record, printed by arm-run scripts over arm's login, and nothing here checks them; ARM-PRODUCED lines are arm's data read authentically; backup-origin=${V[f.backup-origin]:-none} rests on root and PID 1 evidence only"
-    verdict A2 "${V[verdict]}" "current=$2 tue=$6 inv=${7#inv:} window=$5 day=${V[f.day]:-none} backup-origin=${V[f.backup-origin]:-none} nonce=${V[nonce]} at=${V[at]} boot=${V[boot]} exit=${V[exit]}";;
+    verdict A2 "${V[verdict]}" "current=$2 tue=$6 inv=${7#inv:} window=$5 day=${V[f.day]:-none} backup-origin=${V[f.backup-origin]:-none} nonce=${V[nonce]} at=${V[at]} boot=${V[boot]} exit=${V[exit]} access-epoch=${V[f.access-epoch]:-none}";;
   version)
     [ $# = 0 ] || usage
     VSTOP=0
     # The production line is independent of the off-host qualification.
     if call "$PROD_T" VERSION "$PROD_NAME" version && argfields "role=prod" && { [ "${V[verdict]}" = PASS ] || { V_WHY="the verifier answered VERSION STOP"; false; }; }; then
-      echo "OWNER VERDICT VERSION PASS transport=$TRANSPORT host=$PROD_NAME role=prod nonce=${V[nonce]} $(qf)"
+      echo "OWNER VERDICT VERSION PASS transport=$TRANSPORT host=$PROD_NAME role=prod nonce=${V[nonce]} access-epoch=${V[f.access-epoch]:-none} $(qf)"
     else echo "OWNER VERDICT VERSION STOP transport=$TRANSPORT host=$PROD_NAME role=prod reason=\"$V_WHY\" $(qf)"; VSTOP=1; fi
     if [ "$Q_RC" != 0 ]; then echo "OWNER VERDICT VERSION STOP transport=$TRANSPORT host=none role=offhost reason=\"qualification refused: $Q_WHY\" $(qf)"; VSTOP=1
     elif [ "$Q_KIND" = none ]; then echo "OWNER VERDICT VERSION STOP transport=$TRANSPORT host=none role=offhost reason=\"no qualified off-host endpoint\" $(qf)"; VSTOP=1

@@ -8,8 +8,9 @@
 #                  python3, 2 workers) on 127.0.0.1:3100, arm's checkout/.env/releases/backup state, and the verifier installed by
 #                  THE OWNER INSTALL SCRIPT verify/install-verify.sh --role prod from a root-owned staging copy.
 #   setup-offhost  container "streamanator": real cron (fake fixed-offset Melbourne zone so its 03:10 job fires minutes from now), the
-#                  REAL kits/afldb-offhost-pull-daily.sh with a FIXTURE offhost-pull.sh (copies the dump the harness carried from the
-#                  prod container instead of rsync from production), arm's crontab pair, and install-verify.sh --role offhost.
+#                  REAL kits/afldb-offhost-pull-daily.sh and (r10) the REAL offhost-pull.sh pulling by rsync over ssh from a local
+#                  rrsync -ro source that holds the dump the harness carried from the prod container, arm's crontab pair, and
+#                  install-verify.sh --role offhost.
 #   hostile        as arm: ~/.bashrc, ~/.profile, ~/.bash_login, ~/.bash_profile defining functions/aliases and a PATH of shims,
 #                  ~/bin shims, a replaced ~/.nvm node, edited checkout scripts and .env lines (FIXTURE-ATTACK)
 #   tamper|untamper  root appends one byte to / restores the published dump (FIXTURE damage for the refusal scenario)
@@ -26,6 +27,8 @@
 #   r9-drop-dispatch  r9 scenario l2 (FIXTURE-ATTACK, off-host container, LAST scenario): `journalctl --rotate --vacuum-time=1s`
 #                  removes the journal holding the 03:10 root cron dispatch (the copy and the whole pull log stay); not restorable
 #   status         prints facts for the host driver (labelled HARNESS)
+#   r10: setup-offhost runs the REAL offhost-pull.sh over REAL rsync/ssh from a local rrsync -ro source (was a FIXTURE copy script);
+#   m-stage|m-zone|m-manual  r10 scenario m (receipt cases): stage dumps, move the fake zone so a new 03:10 run fires, retry by hand
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
 CMD=${1:?command}
@@ -194,25 +197,29 @@ setup_offhost() {
   local D=/mnt/ssd/afldb-offhost-prod OPS=/home/arm/afldb-ops
   install -d -m 0755 /mnt/ssd; install -d -o arm -g arm -m 0700 "$D"; install -d -o arm -g arm -m 0755 "$OPS"; install -d -o arm -g arm -m 0700 "$OPS/state"
   cp "$FIX/$KIT/afldb-offhost-pull-daily.sh" "$OPS/afldb-offhost-pull-daily.sh"
-  cat > "$OPS/offhost-pull.sh" <<'EOF'
-#!/usr/bin/env bash
-# FIXTURE offhost-pull.sh (REHEARSAL): instead of rsync from production, copy the dump and sidecar the harness carried from the
-# prod container (/opt/r7v-incoming), re-hash against the sidecar and write the .verified-<dump> marker, like the real script.
-dest=${2:?dest}; dest=${dest%/}
-for f in /opt/r7v-incoming/*.dump; do
-  n=${f##*/}; cp "$f" "$dest/$n" && cp "$f.sha256" "$dest/$n.sha256" || exit 1
-  [ "$(sha256sum < "$dest/$n" | cut -d' ' -f1)" = "$(cut -d' ' -f1 "$dest/$n.sha256")" ] || exit 1
-  : > "$dest/.verified-$n"; echo "pulled $n"
-done
-EOF
+  # r10 (Astra case 1): the REAL tools/maintenance/offhost-pull.sh with REAL rsync over REAL ssh. The rsync source stands in for
+  # production's published directory: /srv/afldb-src (root-owned, world-readable files), served to arm's pull key through rrsync -ro
+  # on this container's own sshd, as production's authorized_keys line serves it. FIXTURE: the source is reached as r7vsrc@r7v-src (its own account: production's arm is another machine's, and this container's arm gets scenario d's hostile login files)
+  # (127.0.0.1 here; production is arm@209.38.87.252, never contacted), set by an AFLDB_PROD_SSH line at the top of arm's crontab.
+  cp "$FIX/tools/maintenance/offhost-pull.sh" "$OPS/offhost-pull.sh"
+  RR=$(command -v rrsync) || { echo "STOP rrsync is not installed"; exit 1; }
+  install -d -m 0755 /srv/afldb-src; install -m 0644 /opt/r7v-incoming/* /srv/afldb-src/
+  as_arm ssh-keygen -q -t ed25519 -N '' -C r7v-pull -f /home/arm/.ssh/afldb_backup_pull || { echo "STOP pull key"; exit 1; }
+  id r7vsrc > /dev/null 2>&1 || useradd -m -s /bin/sh r7vsrc; install -d -o r7vsrc -g r7vsrc -m 0700 /home/r7vsrc/.ssh
+  printf 'command="%s -ro /srv/afldb-src",restrict %s\n' "$RR" "$(cat /home/arm/.ssh/afldb_backup_pull.pub)" > /home/r7vsrc/.ssh/authorized_keys
+  chown r7vsrc:r7vsrc /home/r7vsrc/.ssh/authorized_keys; chmod 0600 /home/r7vsrc/.ssh/authorized_keys
+  printf 'Host r7v-src\n  HostName 127.0.0.1\n  HostKeyAlias r7v-src\n' > /home/arm/.ssh/config
+  echo "r7v-src $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)" > /home/arm/.ssh/known_hosts
+  chown arm:arm /home/arm/.ssh/*; chmod 0600 /home/arm/.ssh/authorized_keys /home/arm/.ssh/config /home/arm/.ssh/known_hosts
+  L FIXTURE "rsync source /srv/afldb-src ($(ls /srv/afldb-src | tr '\n' ' ')) served by $RR -ro to arm's pull key as r7vsrc; $(rsync --version | head -1)"
   printf '#!/bin/sh\ncat > /dev/null\n' > "$OPS/alarm-email.sh"
   chown -R arm:arm "$OPS"; chmod 0755 "$OPS"/*.sh; chmod -R a+rX /opt/r7v-incoming
-  printf '%s\n' '# AFLDB-A2-r3: ISSUE-352 daily off-host pull (owner decision 3, 2026-11-22); installed by a2-cron-install.sh' \
+  printf '%s\n' 'AFLDB_PROD_SSH=r7vsrc@r7v-src' '# AFLDB-A2-r3: ISSUE-352 daily off-host pull (owner decision 3, 2026-11-22); installed by a2-cron-install.sh' \
     '10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh' > /root/arm.crontab
   # FIXTURE (container only): pam_loginuid cannot write /proc/self/loginuid without CAP_AUDIT_CONTROL, which fails every cron job
   sed -i 's/^session[[:space:]]\+required[[:space:]]\+pam_loginuid\.so/#&/' /etc/pam.d/cron
   crontab -u arm /root/arm.crontab; systemctl enable --now cron > /dev/null 2>&1; systemctl restart cron
-  L REAL "cron $(systemctl is-active cron); arm crontab installed; the REAL afldb-offhost-pull-daily.sh ($(sha256sum < "$OPS/afldb-offhost-pull-daily.sh" | cut -c1-16)) with the FIXTURE offhost-pull.sh"
+  L REAL "cron $(systemctl is-active cron); arm crontab installed; the REAL afldb-offhost-pull-daily.sh ($(sha256sum < "$OPS/afldb-offhost-pull-daily.sh" | cut -c1-16)) and the REAL offhost-pull.sh ($(sha256sum < "$OPS/offhost-pull.sh" | cut -c1-16)), source r7vsrc@r7v-src (FIXTURE crontab line AFLDB_PROD_SSH)"
   L FIXTURE "the 03:10 job is due at local $DAY 03:10:00 = real $(date -u -d "@${R7V_DISPATCH:-0}" +%FT%TZ)"
   install_verifier offhost
 }
@@ -320,7 +327,7 @@ SQL
   r9-drop-end)
     PL=/home/arm/afldb-ops/state/offhost-pull.log; cp -p "$PL" /root/r9-pull.log.orig
     grep -v ' END run=' /root/r9-pull.log.orig > /root/r9-pull.log.new; cat /root/r9-pull.log.new > "$PL"; rm -f /root/r9-pull.log.new
-    L FIXTURE-ATTACK "root removed the END line(s) from arm's pull log: $(grep -c ' END run=' /root/r9-pull.log.orig) -> $(grep -c ' END run=' "$PL"); VERIFIED lines kept: $(grep -c ' VERIFIED run=' "$PL"); copy kept: $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
+    L FIXTURE-ATTACK "root removed the END line(s) from arm's pull log: $(grep -c ' END run=' /root/r9-pull.log.orig) -> $(grep -c ' END run=' "$PL"); RECEIVED lines kept: $(grep -c ' RECEIVED run=' "$PL"); copy kept: $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
   r9-restore-end)
     PL=/home/arm/afldb-ops/state/offhost-pull.log; cat /root/r9-pull.log.orig > "$PL"; rm -f /root/r9-pull.log.orig
     L FIXTURE "restored arm's pull log: END lines $(grep -c ' END run=' "$PL"), owner $(stat -c '%U:%G %a' "$PL")";;
@@ -330,5 +337,33 @@ SQL
     n1=$(journalctl -t CRON -q --no-pager 2>/dev/null | grep -c '(arm) CMD (')
     L FIXTURE-ATTACK "journalctl --rotate --vacuum-time=1s exit $rc ($(tail -1 /root/r9-vacuum.log)); arm's cron dispatch lines in the journal: $n0 -> $n1; pull log and copy kept: $(grep -c ' END run=' /home/arm/afldb-ops/state/offhost-pull.log) END, $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
   hostkey) cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub;;
+  m-stage) # r10 scenario m (FIXTURE, off-host container): place dumps from /opt/r7v-m: src:<name> in the rsync source (readable),
+           # deny:<name> in the source unreadable to arm (rsync then fails part-way, exit 23), dest:<name> PRE-PLACED in the destination
+           # with its sidecar before the 03:10 run (possession without receipt), allow:<name> makes a denied source file readable
+    # rm:<name> removes a dump, its sidecar and its verified marker from the destination (so a later run can receive it again)
+    for t in "${@:2}"; do k=${t%%:*}; n=${t#*:}; [[ $n =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ ]] || { echo "STOP bad name $n"; exit 2; }
+      f=/opt/r7v-m; [ -e "$f/$n" ] || f=/opt/r7v-incoming; O=/mnt/ssd/afldb-offhost-prod
+      case $k in
+        src) install -m 0644 "$f/$n" "$f/$n.sha256" /srv/afldb-src/;;
+        deny) install -m 0600 "$f/$n" /srv/afldb-src/; install -m 0644 "$f/$n.sha256" /srv/afldb-src/;;
+        dest) install -o arm -g arm -m 0600 "$f/$n" "$f/$n.sha256" "$O/";;
+        allow) chmod 0644 "/srv/afldb-src/$n";;
+        rm) rm -f "$O/$n" "$O/$n.sha256" "$O/.verified-$n";;
+        *) echo "STOP bad token $t"; exit 2;;
+      esac || { echo "STOP m-stage $t"; exit 1; }
+      L FIXTURE "m-stage $k $n (sha256 $(sha256sum < "$f/$n" | cut -c1-16)...; destination now: $(ls -A "$O" | tr '\n' ' '))"; done;;
+  m-zone)  # r10 scenario m (FIXTURE): move the fake fixed-offset Melbourne zone so that local $DAY 03:10:00 is about 75 s from now,
+           # remove the journal (so the coming dispatch is the day's only 03:10 dispatch) and restart cron
+    # a WHOLE-MINUTE offset (the real offhost-pull.sh reads dump stamps through date +%z, minute precision)
+    TD=$(( $(date +%s) + 75 )); off=$(( $(date -u -d "$DAY 03:10:00" +%s) - TD )); off=$(( off - ((off % 60) + 60) % 60 )); TD=$(( $(date -u -d "$DAY 03:10:00" +%s) - off ))
+    a=$off; sg=; [ $a -lt 0 ] && { sg=-; a=$((-a)); }
+    printf 'Zone Australia/Melbourne %s%d:%02d:%02d - AEDT\n' "$sg" $((a / 3600)) $((a % 3600 / 60)) $((a % 60)) > /tmp/fake.zone
+    zic -d /usr/share/zoneinfo /tmp/fake.zone || { echo "STOP zic"; exit 1; }
+    journalctl --rotate > /dev/null 2>&1; sleep 2; journalctl --vacuum-time=1s > /dev/null 2>&1; systemctl restart cron
+    L FIXTURE "zone moved: local $DAY 03:10:00 = real $(date -u -d "@$TD" +%FT%TZ); now local $(date '+%F %T %Z'); journal CRON lines left: $(journalctl -t CRON -q --no-pager 2>/dev/null | wc -l)"
+    echo "R7V M-OFFSET $off"; echo "R7V M-DISPATCH $TD";;
+  m-manual) # r10 scenario m4 (FIXTURE): the owner retries the pull BY HAND as arm, outside cron
+    runuser -u arm -- env -i HOME=/home/arm PATH=/usr/bin:/bin LC_ALL=C AFLDB_PROD_SSH=r7vsrc@r7v-src AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh \
+      /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh; echo "R7V M-MANUAL exit $?";;
   *) echo "STOP unknown command $CMD"; exit 2;;
 esac

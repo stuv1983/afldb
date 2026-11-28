@@ -1,4 +1,11 @@
-# QUALIFY-OFFHOST: qualifying an independent off-host verifier endpoint (R6 r9, 28 Nov 2026)
+# QUALIFY-OFFHOST: qualifying an independent off-host verifier endpoint (R6 r9, 28 Nov 2026; amended r10, 28 Nov 2026)
+
+**r10 (Astra case 2): no bootstrap loop.** r9's record (§4 step 1) asked for "the `g0` output of the first scheduled night", but `g0`
+STOPs until a pin exists, and the pin needs the record. r10 adds candidate modes to the wrapper (§3a) that collect the same
+evidence for an unpinned machine and can never give a gate verdict, and fixes the order: **candidate evidence → owner review → pin
+commit → acceptance from an export of that commit**. The gate checker takes that commit as `--pin-rev` and refuses an export that
+lacks the pin, a fixture-format pin, or a pin other than the one the calls ran with. r10 also replaces "VERIFIED" by RECEIVED and
+RECEIPT records in §3 (Astra case 1).
 
 **Status: PREPARED, NOT RUN. No machine is qualified today.** The qualification pin `QUALIFIED-ENDPOINT` does not exist in this
 directory, so the workstation wrapper `review-fixes-r7-20261128/verify/afldb-verify-call.sh` treats every off-host endpoint as
@@ -85,10 +92,10 @@ the pull account is called `arm`:
 |---|---|
 | copy directory | `/mnt/ssd/afldb-offhost-prod`, owner `arm`, mode 0700, on M's local storage (Q2) |
 | wrapper script | `/home/arm/afldb-ops/afldb-offhost-pull-daily.sh` = `docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh` at the reviewed revision |
-| pull script | `/home/arm/afldb-ops/offhost-pull.sh` at the pin in `a2-cron-install.sh` (unchanged), with source `<prod>:/var/lib/afldb-backup/published/` (R8 OWNER-PROCEDURE §8, Phase 3) |
+| pull script | `/home/arm/afldb-ops/offhost-pull.sh` = `tools/maintenance/offhost-pull.sh` at the reviewed revision (r10: the receipt change alters both scripts; the historical 24 Nov `a2-cron-install.sh` still pins their r9 bytes `2ebac1c0…`/`a3775aea…` and must not be used to check them: compare each installed file with `git show <rev>:<path> | sha256sum`), with source `<prod>:/var/lib/afldb-backup/published/` (R8 OWNER-PROCEDURE §8, Phase 3) |
 | alarm hook | `/home/arm/afldb-ops/alarm-email.sh` |
 | crontab of `arm` | exactly the r3 pair, the marker line directly above the job: `# AFLDB-A2-r3: …` then `10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh` |
-| pull log | `/home/arm/afldb-ops/state/offhost-pull.log` (written by the wrapper script: BEGIN with lineage, OUTPUT, VERIFIED, END) |
+| pull log | `/home/arm/afldb-ops/state/offhost-pull.log` (written by the wrapper script: BEGIN with lineage, OUTPUT, RECEIVED for each dump this run received, HELD for every copy present (possession only), END, then one RECEIPT per RECEIVED dump after END rc=0) |
 | pull key | `~arm/.ssh/afldb_backup_pull`, generated **on M**. Its public key is added on production under the forced `rrsync -ro /var/lib/afldb-backup/published` command, by the owner over production's admin path. M's key is not streamanator's key |
 | time zone and cron | `Australia/Melbourne`, and the distribution's `cron` with journald receiving its syslog lines. Do not disable `pam_loginuid` (that was a container-only fixture) |
 
@@ -97,25 +104,49 @@ The wrapper accepts a G0B PASS only when the RESULT line carries all five eviden
 * `dispatch-at=`: root cron's journal record of the 03:10 dispatch (`_UID=0`, `_TRANSPORT=syslog`, `SYSLOG_IDENTIFIER=CRON`), inside
   [D 03:10, D 03:11) Melbourne time;
 * `complete-at=`: the END record, with `rc=0`, of the one invocation whose lineage contains that dispatch's PID;
-* `received-at=` and `received-sha256=`: that invocation's VERIFIED record of the dump, with G0a's sha256;
+* `received-at=` and `received-sha256=`: r10: that invocation's RECEIVED record of the dump, with G0a's sha256 (rsync itemised it as
+  a file created by this run, moved at least its size, and the run verified it), and its per-dump RECEIPT written within 60 s after
+  that invocation's END rc=0. r9 took a VERIFIED record here, which was written for every copy held;
 * `rehash-sha256=`: root's re-hash of the copy at check time, equal to G0a's sha256.
 
-The order must be dispatch ≤ received (5 s journal-receipt tolerance) ≤ complete ≤ D 03:10 + 35 min. A copy without the dispatch or
-the completion is reported as **possession only**, and G0 STOPs. So:
+The order must be dispatch ≤ received (5 s journal-receipt tolerance) ≤ complete ≤ D 03:10 + 35 min. A copy without the dispatch,
+the completion or the receipt is reported as **possession only**, and G0 STOPs: a dump that was already in the copy directory
+before 03:10 (rsync `--ignore-existing` moves nothing, the job ends rc=0), a different dump moved by the same job, and a run that
+failed part-way (rsync exit 23, END rc=1; a later retry cannot replace it) all STOP (rehearsed: harness scenario m). So:
 
 * the 03:10 job must actually run from `arm`'s crontab. A manual run, a retry or an `at` job never links;
-* the pull must finish, and VERIFY the dump, within 35 minutes;
+* the pull must transfer the dump itself, finish, and verify it, within 35 minutes: never pre-place the night's dump by hand;
 * the journal on M must keep the night's CRON entries until G0 runs: persistent journald (`/var/log/journal`) with enough
   retention. A vacuumed or rotated-away journal gives "possession only … dispatch-at missing" (rehearsed, harness scenario l2);
 * nothing may edit the pull log between the night and the check. A missing END gives "possession only … complete-at missing"
   (scenario l1).
 
+## 3a. Candidate evidence before any pin (r10)
+
+Run these from the owner's clone on [WS] **before** the pin exists, against the candidate M, once M's off-host role (§2) and the
+pull (§3) are installed and one scheduled night has run:
+
+```text
+bash $R7/verify/afldb-verify-call.sh candidate-version --host <M's host name> --address <address> --hostkey SHA256:<fingerprint>
+bash $R7/verify/afldb-verify-call.sh candidate-g0 <YYYY-MM-DD> --host <M's host name> --address <address> --hostkey SHA256:<fingerprint>
+```
+
+* Each call prints `CANDIDATE MODE: …`, the authenticated RESULT lines, and ends with ONE line
+  `CANDIDATE EVIDENCE <G0|VERSION> COMPLETE|INCOMPLETE … qualification=candidate qual-sha256=none candidate-hostkey=… (NOT a gate
+  verdict …)`. It **never** prints an `OWNER VERDICT` line and **never** exits 0 (COMPLETE exits 3, anything else 1), so no runbook
+  step, and no gate checker, can take it as GO (rehearsed: `r10q` T34–T43, harness scenario n `gate-on-candidate:NO-GO`).
+* The same refusals as a pin apply to the named candidate: streamanator's names, address or host key, production, and a host key not
+  in `known_hosts` for that address.
+* COMPLETE means: the candidate's root-owned verifier answered with this call's nonce and the pinned bundle; for `candidate-g0`, a
+  03:10 root cron dispatch on that date, the linked invocation's END rc=0, its RECEIVED record and RECEIPT of G0a's dump with
+  G0a's sha256, and a root re-hash. Copy both outputs into the record (§4 step 1).
 ## 4. Create and commit the qualification pin
 
 1. **Record.** Write `records/QUALIFICATION-<host>-<YYYY-MM-DD>.md` in this directory. Include Q1–Q7 with their outputs, the host
    key fingerprint read at M's console, the workstation `known_hosts` line added for M (after comparing it with the paper
-   fingerprint), the install and check output of §2, the owner-check output of Q5 with the written acceptance of each group-D id, and the `g0`
-   output of the first scheduled night. Leave out secrets: no passwords and no private keys, only fingerprints. Compute its digest
+   fingerprint), the install and check output of §2, the owner-check output of Q5 with the written acceptance of each group-D id, and the
+   §3a `candidate-version` and `candidate-g0` outputs of the first scheduled night (r10; r9 asked for a `g0` output, which cannot pass
+   before the pin exists). Leave out secrets: no passwords and no private keys, only fingerprints. Compute its digest
    with `sha256sum records/QUALIFICATION-….md`.
 2. **Known hosts.** Add M's host key to the workstation's `~/.ssh/known_hosts` under the exact address you will pin (an IP literal
    is preferred: then no DNS answer can redirect the call). Check `ssh-keygen -F <address> -l` against the paper fingerprint.
@@ -138,6 +169,7 @@ the completion is reported as **possession only**, and G0 STOPs. So:
    production itself.
 4. **Review and commit.** A second reader (the independent reviewer) checks the record against Q1–Q7, and checks the diff, which
    adds the record and the pin and nothing else. The owner commits it. The pin is a deliberate owner act: no script writes it.
+   Write down that commit's full SHA: it is the `--pin-rev` of every later release G0 acceptance (r10).
 5. **Check.** From the committed revision, run `bash afldb-verify-call.sh version`. Both lines must be PASS, and the off-host line
    must be `host=<M> role=offhost … qualification=pinned qual-sha256=<sha256 of the pin>`. Compare that `qual-sha256` with the
    COMMITTED pin, `git show <rev>:$R9/offhost/QUALIFIED-ENDPOINT | sha256sum`, not with the working-tree file.
@@ -145,9 +177,16 @@ the completion is reported as **possession only**, and G0 STOPs. So:
    directory. A release export must therefore keep repository paths and include both directories:
    `git archive --format=tar <rev> $R7/verify $R9/offhost`. An export of `$R7/verify` alone has no pin, and G0 STOPs with
    `qualification=none`. Every G0 and VERSION verdict prints `qualification=` and `qual-sha256=`; the release record copies both.
+   r10: the acceptance step names the commit: `afldb-gate-accept.sh --gate release-g0 … --pin-rev <the pin commit>` (OWNER-PROCEDURE
+   'Saved evidence'). The checker runs in the owner's clone, reads `QUALIFIED-ENDPOINT` from that commit with `git cat-file`, and
+   requires: the commit exists in the clone; it holds the pin (an export of an older commit stays blocked: `failed=pin`); the pin's
+   format is `afldb-offhost-qualification-v1` for production (a fixture never satisfies production acceptance); and its sha256
+   equals the `qual-sha256=` of the 4.6 version check and of the G0 PASS.
 7. **A pin counts only from a committed revision (R9-F-6).** The wrapper reads whatever `QUALIFIED-ENDPOINT` file is on disk, and it
    accepts any record whose bytes hash to `record-sha256`. It cannot tell a reviewed, committed pin from an untracked or edited file in a
-   working clone. Steps 4 and 5 are therefore procedure, not something the wrapper enforces. A `qualification=pinned` verdict is
+   working clone. Steps 4 and 5 are therefore procedure, not something the wrapper enforces. r10: the gate checker's `--pin-rev`
+   check binds the wrapper's `qual-sha256` to the committed pin, so an edited or untracked pin gives `failed=pin`; that the export
+   really is `git archive` of that commit stays procedure. A `qualification=pinned` verdict is
    owner evidence only when the wrapper ran from the `git archive` export of step 6 (RUNBOOK §4.1a step 4 calls it `$V7`) of the committed, reviewed revision `<rev>`
    that the release record names, and when its `qual-sha256` equals `git show <rev>:$R9/offhost/QUALIFIED-ENDPOINT | sha256sum`. A
    verdict from a working clone, or one whose `qual-sha256` differs from the committed pin, is not owner evidence, even if it is PASS.

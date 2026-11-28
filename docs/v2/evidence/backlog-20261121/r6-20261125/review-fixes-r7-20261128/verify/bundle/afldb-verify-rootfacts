@@ -311,7 +311,7 @@ def facts_offhost(day, dump):
     try:
         for l in read_tail(PULL_LOG, 4 << 20).decode('utf-8', 'replace').split('\n'):
             f = l.split(' ')
-            if len(f) >= 2 and f[1] in ('BEGIN', 'END', 'VERIFIED'):
+            if len(f) >= 2 and f[1] in ('BEGIN', 'END', 'RECEIVED', 'RECEIPT', 'HELD'):  # r10: r9's VERIFIED no longer counts
                 emit('pull_log', l)
         emit('pull_log_readable', 'yes')
     except Exception as e:  # noqa: BLE001

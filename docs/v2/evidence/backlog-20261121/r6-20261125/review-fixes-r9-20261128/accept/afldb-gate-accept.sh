@@ -31,14 +31,27 @@
 # transport=rehearsal is NO-GO unless --rehearsal is given; with --rehearsal every input must be rehearsal and the final line
 # begins "GATE ACCEPT REHEARSAL", which no runbook accepts. --now (a test clock) is refused without --rehearsal.
 # An input with a line that begins "[FIXTURE r9]" (the marker of the committed test fixtures) is refused.
+# r10 (Astra cases 2 and 3; 28 Nov 2026):
+#  (f) ACCESS EPOCH: the second line of (a) and of (b) is "ACCESS-EPOCH <32 hex>" (printed by root, like BOOT-ID, from
+#      /var/lib/afldb-access/epoch), and the authenticated production RESULT lines of (c) and (d) end access-epoch=<the same value>.
+#      afldb-phase4.sh writes a NEW epoch before every apply and back-out it performs and on every `invalidate` the owner records for
+#      an access change made outside it. A differing value means an access change after the saved 4.4: 4.4, 4.5, 4.6 and every gate
+#      verdict made before it are VOID, even on the same boot and inside the 3 h window, and only all three steps plus a new gate
+#      call can give GO. A missing line or a value that is not 32 hex is NO-GO;
+#  (g) release-g0, production: --pin-rev <rev> is REQUIRED and names the reviewed, committed revision whose `git archive` export ran
+#      the wrapper; this checker reads the pin `git show <rev>:<R9>/offhost/QUALIFIED-ENDPOINT` from ITS OWN clone and requires its
+#      sha256 to equal the qual-sha256 of (c) and (d). An uncommitted, edited or absent pin, or a revision without one (an "old
+#      export"), is NO-GO. In a rehearsal --pin-rev is optional and checked when given.
 # Final line: GATE ACCEPT [REHEARSAL ]<RELEASE-G0|NG-PRE> GO|NO-GO ...   Exit: 0 GO, 1 NO-GO, 2 usage.
 set -uo pipefail; export LC_ALL=C
-usage() { echo "usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]"; [ -n "${1:-}" ] && echo "refused: $1"; exit 2; }
-OC= RV= VS= VD= VX= GATE= TR=production NOWARG=
+usage() { echo "usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]"; [ -n "${1:-}" ] && echo "refused: $1"; exit 2; }
+OC= RV= VS= VD= VX= GATE= TR=production NOWARG= PINREV= PFULL=
+PINPATH=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/offhost/QUALIFIED-ENDPOINT
 while [ $# -gt 0 ]; do case $1 in
   --owner-checks) OC=${2:-}; shift 2 || usage;;  --reverify) RV=${2:-}; shift 2 || usage;;
   --version) VS=${2:-}; shift 2 || usage;;       --verdict) VD=${2:-}; shift 2 || usage;;
   --verdict-exit) VX=${2:-}; shift 2 || usage;;  --gate) GATE=${2:-}; shift 2 || usage;;
+  --pin-rev) PINREV=${2:-}; shift 2 || usage; [[ $PINREV =~ ^[0-9a-f]{7,40}$ ]] || usage "--pin-rev must be a commit id (hex)";;
   --now) NOWARG=${2:-}; shift 2 || usage;;
   --rehearsal) TR=rehearsal; shift;;             *) usage;; esac; done
 case $GATE in release-g0) G=RELEASE-G0; VMODE=g0; VV=G0;; ng-pre) G=NG-PRE; VMODE=a2; VV=A2;; *) usage;; esac
@@ -57,6 +70,9 @@ MAXEV=10800    # (e) the verdict is at most 3 h after each of (a) and (b): 4.4-4
 MAXCHK=3600    # (e) this check runs at most 1 h after the verdict, by this workstation's clock
 SKEW=300       # (e) a verdict more than 5 min ahead of this workstation's clock is refused
 BID='^BOOT-ID ([0-9a-f]{32})$'
+AER='^ACCESS-EPOCH ([0-9a-f]{32})$'
+aepoch() { local l2; l2=$(sed -n 2p <<< "$1"); [ "$(cnt '^ACCESS-EPOCH ' "$1")" = 1 ] && [[ $l2 =~ $AER ]] && echo "${BASH_REMATCH[1]}"; return 0; }
+A_AE= B_AE= C_AE= D_AE=
 san() { printf '%s' "$*" | tr -c '\40-\176' '?' | tr '"' "'" | cut -c1-200; }
 FAILED=(); WHY=
 bad() { echo "ACCEPT $1 FAIL $(san "$2")"; FAILED+=("$1"); [ -n "$WHY" ] || WHY="$1: $(san "$2")"; }
@@ -91,7 +107,7 @@ else
   elif [ -n "$MISS" ]; then bad owner-checks "no PASS line for:$MISS"
   elif [ "$(lno '^CHECK ' "$A")" -lt "$(lno "$HRE" "$A")" ]; then bad owner-checks "a CHECK line precedes the header"
   elif ! [[ $L1 =~ $BID ]] || [ "$(cnt '^BOOT-ID ' "$A")" != 1 ]; then bad owner-checks "the first line is not the one 'BOOT-ID <32 hex>' line (4.4 is saved with the boot id first): '$L1'"
-  else A_BOOT=${BASH_REMATCH[1]}; good owner-checks "post-Phase-4 PASS at $A_TS, boot $A_BOOT (B1, B2, B3 PASS; every CHECK line PASS)"; fi
+  else A_BOOT=${BASH_REMATCH[1]}; A_AE=$(aepoch "$A"); good owner-checks "post-Phase-4 PASS at $A_TS, boot $A_BOOT (B1, B2, B3 PASS; every CHECK line PASS)"; fi
 fi
 
 # (b) both installs re-verified -------------------------------------------------------------------------------------------
@@ -119,7 +135,7 @@ else
     bad reverify "the --as-arm process still carries an admin group, so this was saved before Phase 4: $ARMID"
   elif [ "$(wc -w <<< "$B_BUNDLE")" != 1 ]; then bad reverify "need exactly one 'PASS bundle: ... bundle digest <sha256>' line"
   elif ! [[ $L1 =~ $BID ]] || [ "$(cnt '^BOOT-ID ' "$B")" != 1 ]; then bad reverify "the first line is not the one 'BOOT-ID <32 hex>' line (4.5 is saved with the boot id first): '$L1'"
-  else B_BOOT=${BASH_REMATCH[1]}; good reverify "root $t1, --as-arm $t2 (arm has no admin group), verify-install $t3, bundle $B_BUNDLE, boot $B_BOOT"; fi
+  else B_BOOT=${BASH_REMATCH[1]}; B_AE=$(aepoch "$B"); good reverify "root $t1, --as-arm $t2 (arm has no admin group), verify-install $t3, bundle $B_BUNDLE, boot $B_BOOT"; fi
 fi
 
 # common to (c) and (d): one wrapper header of the expected mode and EXACTLY the expected transport token ------------------
@@ -146,10 +162,10 @@ if whdr version "$C" version; then
   elif [ "$(cnt "$PL" "$C")" != 1 ] || [ "$(cnt "$PP" "$C")" != 1 ]; then badc "need exactly one production line 'OWNER VERDICT VERSION PASS transport=$TR host=afldb-prod role=prod nonce=...'; production lines: $(grep -E "$PL" <<< "$C" | head -n 1)"
   else
     N=$(grep -E "$PP" <<< "$C" | sed -E "s/$PP.*/\1/")
-    RR="^AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod boot=([0-9a-f]{32}) bundle=([0-9a-f]{64}) at=($TS) exit=0 role=prod$"
+    RR="^AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod boot=([0-9a-f]{32}) bundle=([0-9a-f]{64}) at=($TS) exit=0 role=prod( access-epoch=([^ ]+))?$"
     if [ "$(cnt "$RR" "$C")" != 1 ]; then badc "no authenticated 'AFLDB-VERIFY RESULT VERSION PASS nonce=$N host=afldb-prod ...' line"
     else
-      RL=$(grep -E "$RR" <<< "$C"); [[ $RL =~ $RR ]]; C_BOOT=${BASH_REMATCH[1]}; CB=${BASH_REMATCH[2]}; C_AT=${BASH_REMATCH[3]}
+      RL=$(grep -E "$RR" <<< "$C"); [[ $RL =~ $RR ]]; C_BOOT=${BASH_REMATCH[1]}; CB=${BASH_REMATCH[2]}; C_AT=${BASH_REMATCH[3]}; C_AE=${BASH_REMATCH[5]:-}
       if [ -z "$A_TS" ] || [ -z "$B_TS" ]; then badc "cannot be ordered after (a) and (b), which did not pass"
       elif ! [[ $C_AT > $A_TS && $C_AT > $B_TS ]]; then badc "made at $C_AT, not after the owner checks ($A_TS) and the re-verification ($B_TS): a Phase 3 version check is an installation diagnostic"
       elif [ "$CB" != "$B_BUNDLE" ]; then badc "bundle $CB is not the re-verified bundle $B_BUNDLE"
@@ -187,7 +203,45 @@ if whdr verdict "$D" "$VMODE"; then
     elif DB=$(grep -E "$DR" <<< "$D" | sed -E "s/^.* bundle=([0-9a-f]{64}) .*$/\1/"); [ "$DB" != "$B_BUNDLE" ]; then bad verdict "bundle $DB is not the re-verified bundle ${B_BUNDLE:-none}"
     elif [ "$GATE" = release-g0 ] && ! [[ -n $OH && $L == *" offhost=$OH "* && $L == *" qualification=$QK qual-sha256=$OQ" ]]; then
       bad verdict "the G0 PASS does not name the off-host endpoint and qualification the version check passed (offhost=${OH:-none} qualification=$QK qual-sha256=${OQ:-none})"
-    else good verdict "OWNER VERDICT $VV PASS at=$D_AT boot=$DBOOT, exit 0, after the version check"; fi
+    else D_AE=$(grep -E "$DR" <<< "$D" | sed -nE 's/^.* access-epoch=([^ ]*)$/\1/p')
+      good verdict "OWNER VERDICT $VV PASS at=$D_AT boot=$DBOOT, exit 0, after the version check"; fi
+  fi
+fi
+
+# (f) access epoch (r10): one recorded access state from the saved 4.4 to the gate verdict ----------------------------------
+# Parts that already failed are skipped (the result is NO-GO anyway); every part that passed must carry the SAME 32-hex epoch.
+# r10: the VOID instruction comes FIRST, because san() keeps 200 characters of a reason and the epoch list is long
+VOIDMSG="VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6 and the gate call"
+AEM=; AEV=; AEN=0; AEX=
+for pe in "4.4 owner checks|owner-checks|$A_AE" "4.5 re-verification|reverify|$B_AE" "4.6 version RESULT|version|$C_AE" "gate verdict RESULT|verdict|$D_AE"; do
+  pn=${pe%%|*}; r=${pe#*|}; pk=${r%%|*}; pv=${r#*|}
+  failed "$pk" && continue
+  AEN=$((AEN + 1)); AEV="${AEV:+$AEV, }$pn ${pv:-missing}"
+  if ! [[ $pv =~ ^[0-9a-f]{32}$ ]]; then AEM="${AEM:+$AEM; }$pn carries no 32-hex access epoch (${pv:-missing}; 'none' means no access change was ever recorded on this host, so this is not post-Phase-4 evidence)"
+  elif [ -z "$AEX" ]; then AEX=$pv
+  elif [ "$pv" != "$AEX" ]; then AEM="${AEM:+$AEM; }DIFFERS"; fi
+done
+if [ "$AEN" = 0 ]; then :
+elif [ -n "$AEM" ]; then
+  if [[ $AEM == *DIFFERS* ]]; then bad access "$VOIDMSG (access epochs differ: $AEV)"; else bad access "$AEM"; fi
+elif [ "$AEN" != 4 ]; then echo "INFO access: the passing parts agree on epoch $AEX; the failed parts are not compared"
+else good access "4.4, 4.5, 4.6 and the gate verdict all carry access epoch $AEX: no access change was recorded between them"; fi
+
+# (g) release-g0: the pin of the reviewed revision (r10, Astra case 2) ------------------------------------------------------
+if [ "$GATE" = release-g0 ]; then
+  GD=$(cd "$(dirname "$0")" && pwd -P); PFMT=afldb-offhost-qualification-v1; [ "$TR" = rehearsal ] && PFMT=afldb-offhost-qualification-fixture-v1
+  if [ -z "$PINREV" ]; then
+    if [ "$TR" = production ]; then bad pin "release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>"
+    else echo "INFO pin: --pin-rev not given (rehearsal; the pin is then bound by the wrapper's qual-sha256 only)"; fi
+  elif ! PFULL=$(git -C "$GD" rev-parse --verify -q "$PINREV^{commit}" 2>/dev/null); then bad pin "--pin-rev $PINREV is not a commit in this checker's clone ($GD)"
+  elif ! git -C "$GD" cat-file -e "$PFULL:$PINPATH" 2>/dev/null; then bad pin "revision $PFULL has no $PINPATH: an export of it has no qualified off-host endpoint (an old export stays blocked)"
+  else
+    PSHA=$(git -C "$GD" cat-file blob "$PFULL:$PINPATH" | sha256sum | cut -c1-64)
+    PF=$(git -C "$GD" cat-file blob "$PFULL:$PINPATH" | sed -n 's/^format=//p' | head -n 1)
+    if [ "$PF" != "$PFMT" ]; then bad pin "the pin at $PFULL has format=${PF:-none}; a $TR evaluation needs format=$PFMT (a fixture never satisfies production acceptance)"
+    elif [ -z "$OQ" ]; then bad pin "the pin at $PFULL hashes to $PSHA, but the version check named no qualified off-host endpoint to bind it to"
+    elif [ "$PSHA" != "$OQ" ]; then bad pin "the pin committed at $PFULL hashes to $PSHA, but 4.6 and the G0 call ran with qual-sha256=$OQ: the export that ran them is not that reviewed revision (or its pin was edited)"
+    else good pin "the pin committed at $PFULL (format=$PF) hashes to $PSHA = the qual-sha256 of 4.6 and the G0 PASS"; fi
   fi
 fi
 
@@ -207,6 +261,6 @@ if [ -n "$D_AT" ]; then
 fi
 
 if [ ${#FAILED[@]} = 0 ]; then
-  echo "$PFX $G GO transport=$TR boot=$C_BOOT owner-checks-at=$A_TS reverify-at=$B_TS version-at=$C_AT verdict-at=$D_AT checked-at=$NOW clock=$CLOCK"; exit 0
+  echo "$PFX $G GO transport=$TR boot=$C_BOOT access-epoch=$AEX${PFULL:+ pin-rev=$PFULL} owner-checks-at=$A_TS reverify-at=$B_TS version-at=$C_AT verdict-at=$D_AT checked-at=$NOW clock=$CLOCK"; exit 0
 fi
 echo "$PFX $G NO-GO failed=$(IFS=,; echo "${FAILED[*]}") reason=\"$WHY\""; exit 1

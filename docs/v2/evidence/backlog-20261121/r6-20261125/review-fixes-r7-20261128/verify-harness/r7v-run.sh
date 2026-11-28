@@ -67,7 +67,8 @@ SENT=($(cd "$WT" && find "$R7/verify" "$R7/verify-harness" -type f ! -path "$R7/
       deploy/afldb-backup-failed.service tools/maintenance/backup.sh
       deploy/release.mjs deploy/afldb-settle-failure-status.sh deploy/host-policy/needrestart-afldb-hold.conf
       deploy/host-policy/apt-52-afldb-unattended.conf tools/maintenance/scheduled-backup.sh
-      docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh "$OLDG0" "$OLDA2")
+      docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh tools/maintenance/offhost-pull.sh
+      docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/accept/afldb-gate-accept.sh "$OLDG0" "$OLDA2")
 HDR=$LOGS/$RID-inputs.log
 { echo "== r7v-run $RID $(date -u +%FT%TZ) workstation $(hostname) user $(id -un); worktree HEAD $(git -C "$WT" rev-parse HEAD)"
   echo "[HARNESS] inputs sent (sha256, worktree):"; for f in "${SENT[@]}"; do echo "   $(sha256sum < "$WT/$f" | cut -c1-64)  $f"; done
@@ -372,6 +373,63 @@ if [ "$K4" = 1 ] && [[ $K4V == *"step=G0b"*"is not among the owner's known_hosts
 else KL+="unknown-host-key:UNEXPECTED($K4) "; KOK=0; fi
 [ "$KOK" = 1 ] && res k "PASS offhost-qualification: $KL" || res k "FAIL offhost-qualification: $KL"
 
+# ---- n (r10, Astra case 2): the qualification sequence from an UNCONFIGURED checkout. Candidate evidence before any pin (never a
+# verdict), the owner's pin commit, then the reviewed export containing that pin. A scratch repository stands in for the owner's
+# clone: C0 holds the wrapper and the gate checker exactly as this worktree has them and no pin; C1 adds the owner's pin. Each export
+# is `git archive <rev>` into its own directory, as the procedure stages bytes.
+LN=$LOGS/$RID-n-candidate-sequence.log; hdr n "$LN"
+NOK=1; NL=
+GACC=$WT/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/accept/afldb-gate-accept.sh
+sleep 4; wcall "$LN" candidate-g0 "$DAY" --host r7v-offhost --address r7v-offhost --hostkey "$OFP" --utc-offset "$OFFOFF"; N1=$WRC; printf '%s\n' "$WOUT" > "$KD/n-cand-g0.txt"
+if [ "$N1" = 3 ] && grep -q '^CANDIDATE EVIDENCE G0 COMPLETE transport=rehearsal .* qualification=candidate qual-sha256=none candidate-hostkey=' <<< "$WOUT" \
+   && ! grep -q '^OWNER VERDICT' <<< "$WOUT" && grep -q 'AFLDB-VERIFY RESULT G0B PASS ' <<< "$WOUT" && grep -q '^CANDIDATE MODE: ' <<< "$WOUT"; then NL+="candidate-g0:exit3,no-verdict "
+else NL+="candidate-g0:UNEXPECTED($N1) "; NOK=0; fi
+sleep 4; wcall "$LN" candidate-version --host r7v-offhost --address r7v-offhost --hostkey "$OFP" --utc-offset "$OFFOFF"; N2=$WRC; printf '%s\n' "$WOUT" > "$KD/n-cand-ver.txt"
+if [ "$N2" = 3 ] && grep -q '^CANDIDATE EVIDENCE VERSION COMPLETE transport=rehearsal .*host=r7v-offhost role=offhost' <<< "$WOUT" && ! grep -q '^OWNER VERDICT' <<< "$WOUT"; then NL+="candidate-version:exit3,no-verdict "
+else NL+="candidate-version:UNEXPECTED($N2) "; NOK=0; fi
+out=$(bash "$GACC" --rehearsal --gate release-g0 --owner-checks "$KD/n-cand-g0.txt" --reverify "$KD/n-cand-g0.txt" --version "$KD/n-cand-ver.txt" --verdict "$KD/n-cand-g0.txt" --verdict-exit 3 2>&1); N3=$?
+{ echo "\$ bash afldb-gate-accept.sh --rehearsal --gate release-g0 ... --version <candidate-version> --verdict <candidate-g0> --verdict-exit 3"; printf '%s\n' "$out"; echo "[HARNESS] exit $N3"; } >> "$LN"
+if [ "$N3" = 1 ] && grep -qE '^GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=.*verdict' <<< "$out" && grep -q '^ACCEPT verdict FAIL ' <<< "$out" && ! grep -qE '^GATE ACCEPT .* GO( |$)' <<< "$out"; then NL+="gate-on-candidate:NO-GO "
+else NL+="gate-on-candidate:UNEXPECTED($N3) "; NOK=0; fi
+# the owner's clone (scratch): C0 unconfigured, C1 with the pin and its record
+SR=$KD/owner-clone; R9P=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128
+mkdir -p "$SR/$R7" "$SR/$R9P/accept" "$SR/$R9P/offhost/records"
+cp -r "$WT/$R7/verify" "$SR/$R7/"; cp "$GACC" "$SR/$R9P/accept/"
+sg() { git -C "$SR" -c user.name=r7v-owner-clone -c user.email=r7v-owner-clone@invalid -c commit.gpgsign=false -c core.autocrlf=false "$@" > /dev/null; }
+sg init -q; sg add -A; sg commit -q -m 'C0: unconfigured (no qualification pin)'; NC0=$(git -C "$SR" rev-parse HEAD)
+cp "$KD/qual/records/r7v-fixture.txt" "$SR/$R9P/offhost/records/"; cp "$KD/qual/Q-ok" "$SR/$R9P/offhost/QUALIFIED-ENDPOINT"
+sg add -A; sg commit -q -m 'C1: owner pin (FIXTURE format: rehearsal)'; NC1=$(git -C "$SR" rev-parse HEAD); NPS=$(git -C "$SR" cat-file blob "$NC1:$R9P/offhost/QUALIFIED-ENDPOINT" | sha256sum | cut -c1-64)
+for c in 0 1; do r=$NC0; [ $c = 1 ] && r=$NC1; mkdir -p "$KD/exp$c"; git -C "$SR" -c core.autocrlf=false -c core.eol=lf archive --format=tar "$r" | tar -x -C "$KD/exp$c"; done
+echo "[HARNESS] owner clone (scratch): C0 $NC0 (no pin), C1 $NC1 (pin sha256 $NPS); exports exp0 and exp1 by git archive" >> "$LN"
+ecall() { # export log args...: the wrapper of that export, rehearsal transport, no --qualification-fixture
+  local e=$1 log=$2; shift 2
+  WOUT=$(bash "$KD/$e/$R7/verify/afldb-verify-call.sh" --rehearsal "$CFG" --key "$KV" "$@" 2>&1); WRC=$?
+  { echo "\$ bash <$e>/afldb-verify-call.sh --rehearsal <cfg> --key <fresh verify key> $*"; printf '%s\n' "$WOUT"; echo "[HARNESS] wrapper exit $WRC"; } >> "$log"; }
+sleep 4; ecall exp0 "$LN" g0 "$DAY"; N4=$WRC; N4V=$(vline "$WOUT")
+if [ "$N4" = 1 ] && [[ $N4V == "OWNER VERDICT G0 STOP transport=rehearsal"*"no qualified off-host endpoint"*" qualification=none qual-sha256=none" ]]; then NL+="old-export:STOP(qualification=none) "
+else NL+="old-export:UNEXPECTED($N4) "; NOK=0; fi
+sleep 4; ecall exp1 "$LN" version; N5=$WRC; printf '%s\n' "$WOUT" > "$KD/n-ver-exp1.txt"
+sleep 4; ecall exp1 "$LN" g0 "$DAY"; N6=$WRC; N6V=$(vline "$WOUT"); printf '%s\n' "$WOUT" > "$KD/n-g0-exp1.txt"
+if [ "$N5" = 0 ] && [ "$N6" = 0 ] && [[ $N6V == "OWNER VERDICT G0 PASS transport=rehearsal"*" qualification=FIXTURE qual-sha256=$NPS" ]]; then NL+="pinned-export:G0-PASS(qual-sha256=pin) "
+else NL+="pinned-export:UNEXPECTED($N5/$N6) "; NOK=0; fi
+gpin() { # rev transport-flag...: the gate checker IN THE OWNER CLONE on exp1's transcripts (4.4/4.5 absent here: only (g) is judged)
+  local r=$1; shift
+  out=$(bash "$SR/$R9P/accept/afldb-gate-accept.sh" "$@" --gate release-g0 --owner-checks "$KD/n-cand-g0.txt" --reverify "$KD/n-cand-g0.txt" \
+    --version "$KD/n-ver-exp1.txt" --verdict "$KD/n-g0-exp1.txt" --verdict-exit 0 --pin-rev "$r" 2>&1)
+  { echo "\$ bash <owner clone>/afldb-gate-accept.sh $* --gate release-g0 ... --pin-rev $r"; printf '%s\n' "$out"; } >> "$LN"; GP=$(grep '^ACCEPT pin ' <<< "$out"); }
+gpin "$NC1" --rehearsal; [[ $GP == "ACCEPT pin PASS the pin committed at $NC1 (format=afldb-offhost-qualification-fixture-v1) hashes to $NPS"* ]] && NL+="checker-pin-C1:PASS " || { NL+="checker-pin-C1:UNEXPECTED "; NOK=0; }
+gpin "$NC0" --rehearsal; [[ $GP == "ACCEPT pin FAIL revision $NC0 has no $R9P/offhost/QUALIFIED-ENDPOINT"* ]] && NL+="checker-pin-C0:FAIL " || { NL+="checker-pin-C0:UNEXPECTED "; NOK=0; }
+gpin "$NC1"; [[ $GP == "ACCEPT pin FAIL the pin at $NC1 has format=afldb-offhost-qualification-fixture-v1; a production evaluation needs format=afldb-offhost-qualification-v1"* ]] && NL+="checker-production-fixture-pin:FAIL " || { NL+="checker-production-fixture-pin:UNEXPECTED "; NOK=0; }
+# the stub answers only `-G <alias>` (configuration lookup: ssh -G resolves, it never connects) with a TEST-NET address, and logs
+# and refuses every other invocation, so any connection attempt is counted
+printf '#!/bin/sh\nif [ "$1" = -G ]; then echo "hostname 192.0.2.1"; exit 0; fi\necho "NEVER $*" >> "%s"\nexit 255\n' "$KDM/n-never.log" > "$KD/n-never"; chmod 755 "$KD/n-never"; : > "$KD/n-never.log"
+mkdir -p "$KD/nhome/.ssh"; cp "$KD/verify" "$KD/nhome/.ssh/afldb_verify"   # production transport reads the key from \$HOME only
+out=$(HOME="$KDM/nhome" AFLDB_VERIFY_SSH="$KD/n-never" bash "$KD/exp1/$R7/verify/afldb-verify-call.sh" g0 "$DAY" 2>&1); N7=$?
+{ echo "\$ AFLDB_VERIFY_SSH=<never: logs and exits 255> bash <exp1>/afldb-verify-call.sh g0 $DAY   (production transport, fixture-format pin)"; printf '%s\n' "$out"; echo "[HARNESS] exit $N7; ssh client invocations: $(wc -l < "$KD/n-never.log")"; } >> "$LN"
+if [ "$N7" = 1 ] && grep -q '^OWNER VERDICT G0 STOP transport=production-stub .*step=qualification .*qualification=refused' <<< "$out" && [ "$(wc -l < "$KD/n-never.log")" = 0 ]; then NL+="production-on-fixture-pin:refused(no-ssh) "
+else NL+="production-on-fixture-pin:UNEXPECTED($N7) "; NOK=0; fi
+[ "$NOK" = 1 ] && res n "PASS candidate-sequence: $NL" || res n "FAIL candidate-sequence: $NL"
+
 # ---- l1 (r9): the copy is present and qualified (FIXTURE), but the pull log's END is missing: possession only
 LL=$LOGS/$RID-l-possession-only.log; hdr l "$LL"
 sleep 4; "${DEVSSH[@]}" "$HOSTSH r9-drop-end" >> "$LL" 2>&1
@@ -379,7 +437,7 @@ sleep 4; wcall "$LL" "${QF[@]}" g0 "$DAY"; L1=$WRC; L1V=$(vline "$WOUT"); L1O=$W
 sleep 4; "${DEVSSH[@]}" "$HOSTSH r9-restore-end" >> "$LL" 2>&1
 L1OK=0
 [ "$L1" = 1 ] && [[ $L1V == *"step=G0b"*"reason=\"the off-host verifier answered STOP; possession only: "*"complete-at missing"*"qualification=FIXTURE"* ]] \
-  && grep -q '^AFLDB-VERIFY RESULT G0B STOP .* rehash-sha256=[0-9a-f]\{64\}$' <<< "$L1O" && grep -q '^FAIL scheduled pull: scheduled invocation .* has no unique completion record' <<< "$L1O" && L1OK=1
+  && grep -q '^AFLDB-VERIFY RESULT G0B STOP .* rehash-sha256=[0-9a-f]\{64\} access-epoch=none$' <<< "$L1O" && grep -q '^FAIL scheduled pull: scheduled invocation .* has no unique completion record' <<< "$L1O" && L1OK=1
 
 # ---- b: refusal when a required check fails (root damages the published dump)
 LB=$LOGS/$RID-b-g0-refusal.log; hdr b "$LB"
@@ -400,6 +458,56 @@ L2OK=0
 { echo "[HARNESS] l1 (END removed): exit $L1; $L1V"; echo "[HARNESS] l2 (dispatch journal removed): exit $L2; $L2V"; } >> "$LL"
 [ "$L1OK$L2OK" = 11 ] && res l "PASS possession-only: END removed -> G0 STOP exit $L1 '...possession only ... complete-at missing'; dispatch journal removed -> G0 STOP exit $L2 '...possession only ... dispatch-at missing'; both qualification=FIXTURE" \
   || res l "FAIL possession-only: l1 ok=$L1OK exit $L1; l2 ok=$L2OK exit $L2 ($(cut -c1-200 <<< "$L2V"))"
+
+# ---- m (r10, Astra case 1, LAST): receipt by the identified 03:10 invocation, never possession. Each sub-case stages the rsync
+# source and the destination, moves the fake zone so that a NEW 03:10 cron run of the REAL wrapper and REAL offhost-pull.sh fires
+# (real rsync over ssh, --ignore-existing), and then makes the documented G0 call. The G0a half is production's real answer for the
+# published dump MD; the G0b half judges the new 03:10 invocation.
+LM=$LOGS/$RID-m-receipt.log; hdr m "$LM"
+MOK=1; ML=
+MD=$(grep -o ' dump=afldb_prod-[0-9]*-[0-9]*\.dump' <<< "$A_V" | head -1 | cut -d= -f2); MS=$(grep -o ' sha256=[0-9a-f]\{64\}' <<< "$A_V" | head -1 | cut -d= -f2)
+MX=afldb_prod-${DAY//-/}-022700.dump; MY=afldb_prod-${DAY//-/}-022800.dump
+echo "[HARNESS] m: published dump $MD sha256 $MS; other dumps $MX (m3), $MY (m4)" >> "$LM"
+mrun() { # case token...: stage, fire a new 03:10 run, wait for its END, then the documented G0 call; sets MP (this run's pull log), MRC, MV, MO
+  local c=$1; shift
+  MP=$("${DEVSSH[@]}" "$HOSTSH m-prep $c $*" 2>&1); { echo "== m-prep $c $*"; printf '%s\n' "$MP"; } >> "$LM"
+  # the fake zone moved, so the FIXTURE qualification's rehearsal-utc-offset is renewed to the container's new offset (Q-m)
+  OFFOFF=$(sed -n 's/^R7V M-OFFSET //p' <<< "$MP" | tail -1); mkq Q-m r7v-offhost "$OFP"; MQ=(--qualification-fixture "$KDM/qual/Q-m")
+  echo "[HARNESS] m $c: Q-m rehearsal-utc-offset=$OFFOFF (sha256 $(sha256sum < "$KD/qual/Q-m" | cut -c1-64))" >> "$LM"
+  sleep 4; wcall "$LM" "${MQ[@]}" g0 "$DAY"; MRC=$WRC; MV=$(vline "$WOUT"); MO=$WOUT; }
+pl() { grep -c "^   pull-log | [0-9TZ:-]* $1" <<< "$MP"; }
+# m2 (the decisive negative): the right dump and its sidecar are PRE-PLACED; the normal pull runs with --ignore-existing, moves
+# nothing and ends rc=0
+mrun m2 "rm:$MD" "dest:$MD"
+if [ "$MRC" = 1 ] && [ "$(pl 'END run=[^ ]* rc=0')" = 1 ] && [ "$(pl RECEIVED)" = 0 ] && [ "$(pl RECEIPT)" = 0 ] && [ "$(pl "HELD run=[^ ]* dump=$MD sha256=$MS")" = 1 ] \
+   && grep -q "^UNPROVEN scheduled origin: possession only: the scheduled invocation did not receive $MD .*HELD a copy: 1 time(s); it received: nothing" <<< "$MO" \
+   && [[ $MV == "OWNER VERDICT G0 STOP "*"possession only"* ]] && ! grep -q '^OWNER VERDICT G0 PASS' <<< "$MO"; then ML+="m2-preplaced:END-rc0,HELD,no-RECEIVED->STOP "
+else ML+="m2-preplaced:UNEXPECTED($MRC) "; MOK=0; fi
+# m3: the same job transfers a DIFFERENT dump; the published one is only held
+mrun m3 "src:$MX"
+if [ "$MRC" = 1 ] && [ "$(pl "RECEIVED run=[^ ]* dump=$MX ")" = 1 ] && [ "$(pl "RECEIPT run=[^ ]* dump=$MX ")" = 1 ] && [ "$(pl "RECEIVED run=[^ ]* dump=$MD ")" = 0 ] \
+   && grep -q "^UNPROVEN scheduled origin: possession only: the scheduled invocation did not receive $MD .*it received: $MX" <<< "$MO" && [[ $MV == "OWNER VERDICT G0 STOP "*"possession only"* ]]; then
+  ML+="m3-other-dump:RECEIPT-for-$MX-only->STOP "
+else ML+="m3-other-dump:UNEXPECTED($MRC) "; MOK=0; fi
+# m4: partial failure: the job receives the published dump but a later source file is unreadable (rsync exit 23); then the owner
+# retries by hand, which cannot replace the failed 03:10 invocation
+mrun m4 "rm:$MD" "deny:$MY"
+M4A=$MRC; M4V=$MV
+if [ "$MRC" = 1 ] && [ "$(pl 'END run=[^ ]* rc=1')" = 1 ] && [ "$(pl RECEIPT)" = 0 ] && grep -q 'rsync failed (exit 23); no receipt is issued' <<< "$MP" \
+   && grep -q '^FAIL scheduled pull: ' <<< "$MO" && ! grep -q '^OWNER VERDICT G0 PASS' <<< "$MO"; then ML+="m4-partial:END-rc1,no-RECEIPT->STOP($(grep -o '^FAIL scheduled pull: [^(;]*' <<< "$MO" | head -1 | cut -c21-70)) "
+else ML+="m4-partial:UNEXPECTED($MRC) "; MOK=0; fi
+MP=$("${DEVSSH[@]}" "$HOSTSH m-manual $MY" 2>&1); { echo "== m-manual $MY"; printf '%s\n' "$MP"; } >> "$LM"
+sleep 4; wcall "$LM" "${MQ[@]}" g0 "$DAY"; MRC=$WRC; MO=$WOUT
+if [ "$MRC" = 1 ] && grep -q '^R7V M-MANUAL exit 0' <<< "$MP" && grep -q "^FAIL scheduled pull: scheduled invocation failed (rc=1); a later retry cannot replace it" <<< "$MO" && ! grep -q '^OWNER VERDICT G0 PASS' <<< "$MO"; then
+  ML+="m4-retry:manual-exit0,G0-STOP(failed-0310-run) "
+else ML+="m4-retry:UNEXPECTED($MRC) "; MOK=0; fi
+# m1: the genuine case: the 03:10 run transfers the published dump in full, verifies it and writes its RECEIPT after END rc=0
+mrun m1 "rm:$MD"
+if [ "$MRC" = 0 ] && [ "$(pl "RECEIVED run=[^ ]* dump=$MD sha256=$MS bytes=")" = 1 ] && [ "$(pl "RECEIPT run=[^ ]* dump=$MD sha256=$MS bytes=[0-9]* end=")" = 1 ] \
+   && grep -q "^RECEIPT dump=$MD sha256=$MS " <<< "$MO" && [[ $MV == "OWNER VERDICT G0 PASS transport=rehearsal"*" received-at=20"*"Z complete-at=20"*"Z received-sha256=$MS"* ]]; then
+  ML+="m1-genuine:RECEIVED+RECEIPT->PASS($(grep -o 'received-at=[^ ]*' <<< "$MV")) "
+else ML+="m1-genuine:UNEXPECTED($MRC) "; MOK=0; fi
+[ "$MOK" = 1 ] && res m "PASS receipt: $ML" || res m "FAIL receipt: $ML"
 
 say "logs: $(cd "$LOGS" && ls "$RID"-*.log | tr '\n' ' ')"
 [ "$BAD" = 0 ] && say "R7 VERIFY HARNESS RESULT PASS" || say "R7 VERIFY HARNESS RESULT FAIL ($BAD scenario(s))"

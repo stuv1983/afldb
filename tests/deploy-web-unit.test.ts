@@ -567,6 +567,31 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(held()).toEqual([...genuine.slice(1), 'afldb_prod-20261104-022000.dump']);
     expect(existsSync(join(dest, `${genuine[0]}.sha256`))).toBe(false);
     expect(existsSync(join(dest, `.verified-${genuine[0]}`))).toBe(false);
+
+    // R6 r10 (Astra case 1): a RECEIVED line only for a dump THIS run transferred in full and verified, never for possession.
+    const rcv = (out: string) => [...out.matchAll(/offhost-pull: RECEIVED (afldb_prod-\d{8}-\d{6}\.dump) sha256=[0-9a-f]{64} bytes=\d+ size=\d+/g)].map((m) => m[1]);
+    expect(rcv(seed.stdout)).toEqual(genuine);
+    expect(rcv(daily.stdout)).toEqual(['afldb_prod-20261104-022000.dump']);
+    expect(rcv(released.stdout)).toEqual([]); // nothing new crossed the wire
+    // Pre-placed: the right dump and sidecar are already in the destination; --ignore-existing moves nothing; verified, not received.
+    put('afldb_prod-20261105-022000.dump');
+    for (const f of ['afldb_prod-20261105-022000.dump', 'afldb_prod-20261105-022000.dump.sha256']) writeFileSync(join(dest, f), readFileSync(join(src, f)));
+    const preplaced = pull();
+    expect(preplaced.status, `${preplaced.stdout}${preplaced.stderr}`).toBe(0);
+    expect(preplaced.stdout).toMatch(/verified afldb_prod-20261105-022000\.dump/);
+    expect(rcv(preplaced.stdout)).toEqual([]);
+    // Partial failure: a later source file is unreadable, rsync fails part-way: no receipt for any file of that run; the retry
+    // receives the file it moves.
+    put('afldb_prod-20261106-022000.dump');
+    chmodSync(join(src, 'afldb_prod-20261106-022000.dump'), 0o000);
+    const partial = pull();
+    expect(partial.status).toBe(1);
+    expect(partial.stdout).toMatch(/rsync failed \(exit 23\); no receipt is issued for any file of this run/);
+    expect(rcv(partial.stdout)).toEqual([]);
+    chmodSync(join(src, 'afldb_prod-20261106-022000.dump'), 0o644);
+    const retry = pull();
+    expect(retry.status, `${retry.stdout}${retry.stderr}`).toBe(0);
+    expect(rcv(retry.stdout)).toEqual(['afldb_prod-20261106-022000.dump']);
   });
 
   it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {

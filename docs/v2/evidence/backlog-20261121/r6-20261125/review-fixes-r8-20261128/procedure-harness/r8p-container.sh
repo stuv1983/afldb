@@ -17,8 +17,9 @@
 #                      admin-key-option, admin-extra-key, c3-gw-other (a root-run unit's argument in a root:<group arm is
 #                      not in> 0775 directory: C3 reports it, does not fail), c3-gw-arm (the same directory group arm: C3 FAIL,
 #                      R8-F-14), then control; each mutation is reverted afterwards                                     [FIXTURE]
-#   phase4-backout     (r9) the documented Phase 4 back-out at the console stand-in: the staged afldb-phase4.sh, pin-checked, runs
-#                      `backout --state /root/afldb-phase4-state`; run after every other scenario that needs the post-Phase-4 state
+#   phase4-backout     (r9; r10) the documented Phase 4 back-out at the console stand-in, from a FRESH session: it reads ONE line on
+#                      stdin, the back-out command that 4.1 (apply) printed, carrying the attempt's state directory and seal, and
+#                      runs it as printed (no fixed state path); run after every other scenario that needs the post-Phase-4 state
 #   final              (stdin: every log of the run) `id` of every identity, then the count of fixture-password occurrences
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -178,12 +179,16 @@ fc)
   [ -f "$CHECKS" ] || { echo "STOP the owner checks were not staged by the admin session"; exit 1; }
   for c in pg-superuser pg-nologin-super group-writable no-admin admin-key-option admin-extra-key c3-gw-other c3-gw-arm control; do fc_case "$c" "$FP"; done;;
 phase4-backout) # r9: the documented back-out at the console stand-in, after the main flow (OWNER-PROCEDURE Phase 4 back-out)
-  P4=/root/afldb-r9-phase4
+  P4=/root/afldb-r10-phase4
   [ -f $P4/afldb-phase4.sh ] || { echo "STOP the Phase 4 script was not staged by the admin session"; exit 1; }
-  echo "---- [CON] (console stand-in) pin check, then afldb-phase4.sh backout"
-  (cd $P4 && sha256sum -c --strict SHA256SUMS) || { echo "STOP the staged Phase 4 script does not match its pin"; exit 1; }
-  env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $P4/afldb-phase4.sh backout --state /root/afldb-phase4-state < /dev/null
+  IFS= read -r BC || { echo "STOP no back-out command on stdin"; exit 2; }
+  [[ $BC == "(cd $P4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $P4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-"*" --seal "* ]] \
+    || { echo "STOP the line on stdin is not a printed afldb-phase4.sh back-out command: $BC"; exit 2; }
+  echo "---- [CON] (console stand-in, a fresh session) the back-out command 4.1 printed, run as printed: $BC"
+  echo "   access epoch before: $(cat /var/lib/afldb-access/epoch 2>/dev/null || echo none)"
+  env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc -c "$BC" < /dev/null
   echo "R8P P4-BACKOUT exit $?"
+  echo "   access epoch after: $(cat /var/lib/afldb-access/epoch 2>/dev/null || echo none)"
   echo "   id arm: $(id arm)"; echo "   sudo -l -U arm: $(sudo -n -l -U arm 2>&1 | tail -1)";;
 final)
   for u in root arm afldb-admin afldb-backup afldb-verify postgres; do echo "   id $u: $(id "$u" 2>&1)"; done

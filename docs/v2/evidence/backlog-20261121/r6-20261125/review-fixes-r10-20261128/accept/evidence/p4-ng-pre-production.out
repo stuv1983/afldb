@@ -1,0 +1,15 @@
+== case p4-ng-pre-production: bash afldb-gate-accept.sh --gate ng-pre --owner-checks unmarked/p4/fx-oc-4.4-bootid.txt --reverify unmarked/p4/fx-reverify-4.5-bootid.txt --version unmarked/p4/fx-version-post-offhost-unqualified-prod.txt --verdict unmarked/p4/fx-a2-pass-post-prod.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T10:53:19Z gate=ng-pre transport=production (read-only; inputs by sha256)
+   3c90ccfb812da59e1b924da75ed1b36b914f3db58ceda6037ddda0e7f8863119  unmarked/p4/fx-oc-4.4-bootid.txt
+   eaaee15f711255952dcd447baf85613336aaff2d8716e37fa5095c671cae2a3d  unmarked/p4/fx-reverify-4.5-bootid.txt
+   65efce285e2a81b57cb69c0bb2ec8b53c21055e38450584d0aa5da45f7ad2aa2  unmarked/p4/fx-version-post-offhost-unqualified-prod.txt
+   8dcc2dce0e8f94464b09a311739d43751e33b5d79d4c2201ebb515282a6bb241  unmarked/p4/fx-a2-pass-post-prod.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T10:47:31Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T10:47:25Z, --as-arm 2026-11-28T10:47:27Z (arm has no admin group), verify-install 2026-11-28T10:47:30Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=production host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T10:49:39Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T10:51:18Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT access PASS 4.4, 4.5, 4.6 and the gate verdict all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded between them
+ACCEPT fresh PASS verdict 2026-11-28T10:51:18Z is 3 min after the older Phase 4 evidence (2026-11-28T10:47:25Z); checked 2 min later at 2026-11-28T10:53:19Z (workstation clock)
+GATE ACCEPT NG-PRE GO transport=production boot=c3524e4759ab4e0f8050875471b56b12 access-epoch=5d1e0c2b9a8f7e6d5c4b3a2918070605 owner-checks-at=2026-11-28T10:47:31Z reverify-at=2026-11-28T10:47:30Z version-at=2026-11-28T10:49:39Z verdict-at=2026-11-28T10:51:18Z checked-at=2026-11-28T10:53:19Z clock=workstation
+== exit 0

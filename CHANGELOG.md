@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### R6 r10: Astra's four acceptance cases (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `@REV@`; nothing installed or deployed; R6 NO-GO)
+
+- **Receipt, not possession.** `offhost-pull.sh` prints `RECEIVED` only for a dump the run itself transferred in full (rsync itemisation) and verified; the daily wrapper logs `RECEIVED`, `HELD` (possession only) and, after `END rc=0`, a per-dump `RECEIPT`; `g0b-core.sh` takes the G0b receipt only from the identified 03:10 invocation's own `RECEIVED` and `RECEIPT`. A pre-placed copy, a different dump moved by the same job, and a failed run are possession only.
+- **Off-host qualification without a bootstrap loop.** `afldb-verify-call.sh candidate-g0|candidate-version` collect evidence for an unpinned candidate and never print an owner verdict or exit 0; `afldb-gate-accept.sh --pin-rev <commit>` binds release G0 to the pin committed there (an export without it, a fixture pin, or another pin is `failed=pin`).
+- **Access changes void saved evidence.** `afldb-phase4.sh apply`, `backout` and `invalidate` write a new access epoch before any change; the verifier prints it on every RESULT line, OWNER-PROCEDURE 4.4/4.5 save it, and the gate checker requires one epoch from 4.4 to the gate verdict (`failed=access`).
+- **Phase 4 bound to the exact change.** `--dispose` is replaced by per-grant `--remove-grant` tokens bound to the captured bytes; entry creates its own attempt directory and prints its state, seal and the exact apply, verify and back-out commands; apply and back-out refuse another or an altered attempt before any change.
+- Validation: @VALIDATION@ ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r10-20261128/README.md)).
+
 ### R6 r9: Astra's three merge blockers (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `0c8de418`; nothing installed or deployed; R6 NO-GO)
 
 - **Off-host G0b evidence must be independent.** The workstation wrapper accepts a G0B PASS only from an owner-qualified endpoint (pin `QUALIFIED-ENDPOINT`, absent by default; streamanator refused) carrying scheduled-transfer evidence (`dispatch-at`, `received-at`, `complete-at`, `received-sha256`, `rehash-sha256`, emitted by `g0b-core.sh`); otherwise G0 STOPs. The arm-attested option is withdrawn from the owner procedure, the release runbook and the R6 plan. A stubbed ssh client is labelled `transport=production-stub`. Owner qualification procedure: [QUALIFY-OFFHOST.md](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/offhost/QUALIFY-OFFHOST.md).

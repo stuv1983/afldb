@@ -1,0 +1,4 @@
+== case g9-pin-rev-not-hex: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-g0-pass-post.txt --verdict-exit 0 --pin-rev HEAD
+usage: afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks F --reverify F --version F --verdict F --verdict-exit N [--pin-rev <rev>] [--rehearsal [--now <YYYY-MM-DDTHH:MM:SSZ>]]
+refused: --pin-rev must be a commit id (hex)
+== exit 2

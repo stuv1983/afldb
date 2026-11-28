@@ -1,0 +1,15 @@
+== case n28-fixture-marked-all: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks inputs/fx-oc-4.4-bootid.txt --reverify inputs/fx-reverify-4.5-bootid.txt --version inputs/fx-version-post.txt --verdict inputs/fx-g0-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T10:54:46Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   1b0b09e9d916ebff150c5e3ab0a13b70105d3c9c8b235c81422b5332ef9f6768  inputs/fx-oc-4.4-bootid.txt
+   d21c1beacdc65640a0af1fdf02d539e9b96e5db4a442a03b148ae0fc21dceeaf  inputs/fx-reverify-4.5-bootid.txt
+   70d671bcdd0fc8e70f4e5bc23bd0f1724eda7725cadf4f7c2705da3780086217  inputs/fx-version-post.txt
+   c6b6eed98f8356745042b00186d5bd95e11e1b6dada3d7812a8a383d819617ac  inputs/fx-g0-pass-post.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT reverify FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT version FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+ACCEPT verdict FAIL the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence
+INFO pin: --pin-rev not given (rehearsal; the pin is then bound by the wrapper's qual-sha256 only)
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=owner-checks,reverify,version,verdict reason="owner-checks: the input is a committed test fixture (a line begins '[FIXTURE r9]'); fixtures are never evidence"
+== exit 1
