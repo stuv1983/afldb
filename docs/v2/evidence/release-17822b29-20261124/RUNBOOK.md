@@ -284,7 +284,7 @@ The qualifying backup is the 02:20 run of the gate date. Complete these before i
   host-account change that needs the owner's approval, and production `sudoers` has not been checked. Every later root action (the
   `sudo -u postgres` steps, every root step of this runbook and of the plan) must use the same path. Until then MED-2 and MED-3
   stay OPEN;
-* from root-owned staging directories outside `/home` that hold a `git archive` of the pinned revision.
+* from root-owned staging directories outside `/home` that hold a `git archive` of the R7 tested revision `7d69302007568d3141a567c8eba89e4ee473c9a6` (review round 1).
 
 None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are unchanged. Production's checkout keeps
 `scheduled-backup.sh` `234fca6a…`: the verifier ports `status` itself, and the repository's opt-in `7e2b470a…` is not needed there.
@@ -292,7 +292,7 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
 1. **Production, sealed backup** ([R7 backup README](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md) §5).
    * Preconditions: the base `afldb-backup.service` and `.timer` are root-owned copies, not links into the checkout; the r6 attest
      drop-in is not installed; `/usr/share/zoneinfo/Australia/Melbourne` is a root-owned regular file.
-   * Check `backup/SHA256SUMS` = `4a9d437f…`, then run `sha256sum -c`.
+   * Check `backup/SHA256SUMS` = `d0023d10…`, then run `sha256sum -c`.
    * Run `install-backup.sh <staging>` as root.
    * Add the `pg_ident.conf` line `afldbbackup afldb-backup afldb_backup` and the `pg_hba.conf` line
      `local afldb_prod afldb_backup peer map=afldbbackup` before any broader `local` line, then run `SELECT pg_reload_conf()`.
@@ -301,7 +301,7 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * Preconditions: step 1 is done, because the verifier joins `afldb-backup-read`. The host has `/usr/bin/python3.12`, group
      `systemd-journal` and `/usr/lib/postgresql/16/bin/psql`, and `sshd_config` starts with `Include /etc/ssh/sshd_config.d/*.conf`.
      Stu's workstation has a NEW key pair `~/.ssh/afldb_verify`, never arm's key.
-   * Check `verify/SHA256SUMS` = `237dee30…`.
+   * Check `verify/SHA256SUMS` = `221b254a…`.
    * Run `install-verify.sh --role prod --key <staging>/afldb_verify.pub`.
    * As postgres, apply `verifier-db.sql`, add the two `pg-auth-lines.txt` lines above the first other `local` line, and reload.
    * Run `verify-verify-install.sh --role prod` as root.
@@ -309,8 +309,8 @@ None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are
    * Run `install-verify.sh --role offhost --key …`, then `verify-verify-install.sh --role offhost`.
    * The off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged).
 4. **Workstation.** `V7` is a fresh `git archive` export of
-   `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at the pinned revision.
-   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `f75ba83d…`.
+   `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at `7d69302007568d3141a567c8eba89e4ee473c9a6`.
+   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `df3457cc…`.
    * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
      `streamanator` (role offhost).
 
