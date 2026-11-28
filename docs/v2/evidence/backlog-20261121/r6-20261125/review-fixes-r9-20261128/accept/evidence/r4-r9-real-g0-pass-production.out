@@ -1,5 +1,5 @@
 == case r4-r9-real-g0-pass-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version inputs/real-r9-version-fixture-qualified.txt --verdict inputs/real-r9-g0-pass-fixture-qualified.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:04:52Z gate=release-g0 transport=production (read-only; inputs by sha256)
+== afldb-gate-accept 2026-11-28T08:32:26Z gate=release-g0 transport=production (read-only; inputs by sha256)
    938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
    f111b9e19c834f813d0f2ad7832272526700fa69dd5774f01dec2daa8ae213f2  unmarked/fx-reverify-4.5-bootid.txt
    c2e036b710148164361bb8e373c6b9dbffac61971df8fd1ed61fb90be1a4d650  inputs/real-r9-version-fixture-qualified.txt

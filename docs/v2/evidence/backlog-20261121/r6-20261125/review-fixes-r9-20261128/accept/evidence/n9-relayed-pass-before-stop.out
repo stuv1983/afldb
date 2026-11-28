@@ -1,5 +1,5 @@
 == case n9-relayed-pass-before-stop: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate ng-pre --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-a2-relayed-pass-before-stop.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:03:47Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+== afldb-gate-accept 2026-11-28T08:31:14Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
    938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
    f111b9e19c834f813d0f2ad7832272526700fa69dd5774f01dec2daa8ae213f2  unmarked/fx-reverify-4.5-bootid.txt
    644074318fb0b49c0bde30f9297a5dcfc8162539d3b49c37f7bfb3122065ebaa  unmarked/fx-version-post.txt

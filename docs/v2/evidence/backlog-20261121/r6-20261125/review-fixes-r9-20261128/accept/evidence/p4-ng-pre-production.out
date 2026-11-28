@@ -1,14 +1,14 @@
 == case p4-ng-pre-production: bash afldb-gate-accept.sh --gate ng-pre --owner-checks unmarked/p4/fx-oc-4.4-bootid.txt --reverify unmarked/p4/fx-reverify-4.5-bootid.txt --version unmarked/p4/fx-version-post-offhost-unqualified-prod.txt --verdict unmarked/p4/fx-a2-pass-post-prod.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:03:22Z gate=ng-pre transport=production (read-only; inputs by sha256)
-   bcf8f35e9552da32b7ddb66daa9bea527aaa9742a4e966b8e8dded09a8c3b97f  unmarked/p4/fx-oc-4.4-bootid.txt
-   15b647d7a7af8b37b733c5798bee87be296d0fa846c516281ceef8ee6b678979  unmarked/p4/fx-reverify-4.5-bootid.txt
-   2eed15f852b3046a6458fb793d542165e3e89f90796273849538e9c4924f386d  unmarked/p4/fx-version-post-offhost-unqualified-prod.txt
-   bd9bda8aa79add982e8d572e88f92c6d1e2519356bbf81b93a7519495fd808fe  unmarked/p4/fx-a2-pass-post-prod.txt
-ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T07:57:34Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
-ACCEPT reverify PASS root 2026-11-28T07:57:28Z, --as-arm 2026-11-28T07:57:30Z (arm has no admin group), verify-install 2026-11-28T07:57:33Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+== afldb-gate-accept 2026-11-28T08:30:49Z gate=ng-pre transport=production (read-only; inputs by sha256)
+   6bf71f797c501d71a87b62d2014039bb3681770bd620857c5f92229d531f8eb4  unmarked/p4/fx-oc-4.4-bootid.txt
+   a0da962c9cd926eb6ef887649ae4191612a2c80d34c37729d6abc3b7d0e061f7  unmarked/p4/fx-reverify-4.5-bootid.txt
+   9602d8b3141cc058c85acc652c70551b292fa6c3bb578fdee48430df3501840c  unmarked/p4/fx-version-post-offhost-unqualified-prod.txt
+   911b7cf0d6e325472dfb547978d12cb89818a4991736c722c4501c1a7ebb89ce  unmarked/p4/fx-a2-pass-post-prod.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T08:25:02Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T08:24:56Z, --as-arm 2026-11-28T08:24:58Z (arm has no admin group), verify-install 2026-11-28T08:25:01Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
 INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=production host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
-ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T07:59:42Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
-ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T08:01:21Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
-ACCEPT fresh PASS verdict 2026-11-28T08:01:21Z is 3 min after the Phase 4 evidence (2026-11-28T07:57:34Z); checked 2 min later at 2026-11-28T08:03:22Z (workstation clock)
-GATE ACCEPT NG-PRE GO transport=production boot=c3524e4759ab4e0f8050875471b56b12 owner-checks-at=2026-11-28T07:57:34Z reverify-at=2026-11-28T07:57:33Z version-at=2026-11-28T07:59:42Z verdict-at=2026-11-28T08:01:21Z checked-at=2026-11-28T08:03:22Z clock=workstation
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T08:27:10Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T08:28:49Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT fresh PASS verdict 2026-11-28T08:28:49Z is 3 min after the older Phase 4 evidence (2026-11-28T08:24:56Z); checked 2 min later at 2026-11-28T08:30:49Z (workstation clock)
+GATE ACCEPT NG-PRE GO transport=production boot=c3524e4759ab4e0f8050875471b56b12 owner-checks-at=2026-11-28T08:25:02Z reverify-at=2026-11-28T08:25:01Z version-at=2026-11-28T08:27:10Z verdict-at=2026-11-28T08:28:49Z checked-at=2026-11-28T08:30:49Z clock=workstation
 == exit 0

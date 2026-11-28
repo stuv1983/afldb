@@ -1,11 +1,11 @@
 == case n30-production-stub: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/n30/fx-oc-4.4-bootid.txt --reverify unmarked/n30/fx-reverify-4.5-bootid.txt --version unmarked/n30/fx-version-post-stub.txt --verdict unmarked/n30/fx-g0-pass-post-stub.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:04:42Z gate=release-g0 transport=production (read-only; inputs by sha256)
-   d353bb22601c7ccf52f379dc417a51813b791df1a3cef54806955973fc242401  unmarked/n30/fx-oc-4.4-bootid.txt
-   15715669df8f3a9ca4f8e83e209507782a45a008829241ab6f7ec852303ec15e  unmarked/n30/fx-reverify-4.5-bootid.txt
-   c275c49fd87859d1770022f399d2a1d83252272d6554372fe8fd1c9c68b2bf2e  unmarked/n30/fx-version-post-stub.txt
-   0a7bc41ec6f53e42c65e723cd82d6d3146faae09641e5ed0c004d7a3b0dace53  unmarked/n30/fx-g0-pass-post-stub.txt
-ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T07:59:05Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
-ACCEPT reverify PASS root 2026-11-28T07:58:59Z, --as-arm 2026-11-28T07:59:01Z (arm has no admin group), verify-install 2026-11-28T07:59:04Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+== afldb-gate-accept 2026-11-28T08:32:09Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   b24fa901bf13ab86f94de4bbc2b4f67923e75534435a10080f2f2a2e06119991  unmarked/n30/fx-oc-4.4-bootid.txt
+   ad03117831e5ef786232a0bdcf478e6731114fbc5a2d935e9946914b25b5d3ae  unmarked/n30/fx-reverify-4.5-bootid.txt
+   0a5e7a2729001af1d04e216ac61702bcd102346bce31d667e47c1750985f5ec0  unmarked/n30/fx-version-post-stub.txt
+   f75dc04f8a5167d546a349691f468465787ad554b2fb98ed8130d6102ac97b86  unmarked/n30/fx-g0-pass-post-stub.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T08:26:33Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T08:26:27Z, --as-arm 2026-11-28T08:26:29Z (arm has no admin group), verify-install 2026-11-28T08:26:32Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
 ACCEPT version FAIL transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate
 ACCEPT verdict FAIL transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate
 GATE ACCEPT RELEASE-G0 NO-GO failed=version,verdict reason="version: transport=production-stub, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate"

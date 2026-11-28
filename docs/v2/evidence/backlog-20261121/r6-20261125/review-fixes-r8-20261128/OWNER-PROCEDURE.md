@@ -397,8 +397,8 @@ bash $R9/accept/afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks ~/a
 ```
 
 prints `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production` (exit 0). Run 4.4–4.6
-immediately before the gate call, on the gate day: the gate verdict must come after 4.6 and at most 3 h after the newer of 4.4 and
-4.5, and the checker must run at most 1 h after the verdict (workstation clock). The `BOOT-ID` lines of 4.4 and 4.5 must equal the
+immediately before the gate call, on the gate day: the gate verdict must come after 4.6 and at most 3 h after the OLDER of 4.4 and
+4.5 (each of them fresh; a 4.4 left over from an earlier day is NO-GO, R9-F-11), and the checker must run at most 1 h after the verdict (workstation clock). The `BOOT-ID` lines of 4.4 and 4.5 must equal the
 `boot=` of the authenticated production RESULT lines of 4.6 and of the verdict, so a reboot between 4.4 and the gate, or evidence from
 another host, is NO-GO: repeat 4.4–4.6 (no further access change). Only the exact token `transport=production` counts; a stubbed ssh
 client prints `transport=production-stub` (R9-F-3), and committed test fixtures (`[FIXTURE r9]`) are refused.

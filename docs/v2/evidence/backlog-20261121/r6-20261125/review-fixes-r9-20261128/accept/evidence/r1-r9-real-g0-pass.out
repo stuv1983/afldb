@@ -1,5 +1,5 @@
 == case r1-r9-real-g0-pass: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T07:30:00Z --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version inputs/real-r9-version-fixture-qualified.txt --verdict inputs/real-r9-g0-pass-fixture-qualified.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:04:44Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+== afldb-gate-accept 2026-11-28T08:32:18Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
    938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
    f111b9e19c834f813d0f2ad7832272526700fa69dd5774f01dec2daa8ae213f2  unmarked/fx-reverify-4.5-bootid.txt
    c2e036b710148164361bb8e373c6b9dbffac61971df8fd1ed61fb90be1a4d650  inputs/real-r9-version-fixture-qualified.txt
@@ -10,6 +10,6 @@ ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4
 ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
 ACCEPT version FAIL bundle 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95 is not the re-verified bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
 ACCEPT verdict FAIL made at 2026-11-28T07:16:16Z, not after the version check (2026-11-28T07:18:01Z)
-ACCEPT fresh PASS verdict 2026-11-28T07:16:16Z is 114 min after the Phase 4 evidence (2026-11-28T05:21:46Z); checked 13 min later at 2026-11-28T07:30:00Z (test clock)
+ACCEPT fresh PASS verdict 2026-11-28T07:16:16Z is 114 min after the older Phase 4 evidence (2026-11-28T05:21:40Z); checked 13 min later at 2026-11-28T07:30:00Z (test clock)
 GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=version,verdict reason="version: bundle 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95 is not the re-verified bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8"
 == exit 1

@@ -1,5 +1,5 @@
 == case ce3-isolated-release-g0: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks inputs/real-oc-3.12-blocked.txt --reverify inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-g0-pass-post.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:03:06Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+== afldb-gate-accept 2026-11-28T08:30:34Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
    eff7599bd6446f20654aa5cc219431d45115890bb1e3a6064ad847b6f2782915  inputs/real-oc-3.12-blocked.txt
    4e55fcc338c3c35cf91821ec4e65e2b87c1d9105e55bbec69f6a7651d5063f57  inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt
    644074318fb0b49c0bde30f9297a5dcfc8162539d3b49c37f7bfb3122065ebaa  unmarked/fx-version-post.txt
@@ -10,6 +10,6 @@ ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 e
 ACCEPT reverify FAIL the --as-arm process still carries an admin group, so this was saved before Phase 4: BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997
 ACCEPT version FAIL [after FAILED owner-checks,reverify] its own lines pass (nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T05:23:54Z boot=c3524e4759ab4e0f8050875471b56b12), but it is not accepted: (a) or (b) faile
 ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T05:25:16Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
-ACCEPT fresh PASS verdict 2026-11-28T05:25:16Z is 4 min after the Phase 4 evidence (2026-11-28T05:21:00Z); checked 14 min later at 2026-11-28T05:40:00Z (test clock)
+ACCEPT fresh PASS verdict 2026-11-28T05:25:16Z is 4 min after the older Phase 4 evidence (2026-11-28T05:20:46Z); checked 14 min later at 2026-11-28T05:40:00Z (test clock)
 GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=owner-checks,reverify,version reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
 == exit 1

@@ -230,12 +230,12 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 That GO requires all of: (a) the OWNER-PROCEDURE 4.4 owner checks, `OWNER CHECKS RESULT PASS` with B1, B2 and B3 PASS; (b) the 4.5
 re-verification of both installs, with arm out of `sudo`; (c) a 4.6 version check made after them, with production and the
 qualified off-host endpoint PASS; (d) the wrapper's `OWNER VERDICT G0 PASS transport=production` with exit 0, made after (c), naming
-the same off-host endpoint and qualification, at most 3 h after (a) and (b), from the same production boot, and checked at most 1 h
+the same off-host endpoint and qualification, at most 3 h after each of (a) and (b) (the older counts), from the same production boot, and checked at most 1 h
 later. *(r7 text, now the wrapper's half:)* G0 passes only on
 `OWNER VERDICT G0 PASS transport=production` with wrapper exit 0. The wrapper accepts a
 verifier answer only when it meets every condition below. Anything else is `OWNER VERDICT G0 STOP … step=G0a|G0b reason=…`:
 * the answer has exactly one `AFLDB-VERIFY RESULT` line, and it is the last line;
-* the RESULT line carries this call's nonce, the pinned bundle digest and the expected host (`afldb-prod` for G0a, `streamanator` for G0b);
+* the RESULT line carries this call's nonce, the pinned bundle digest and the expected host (`afldb-prod` for G0a; for G0b, r9: the pinned qualified endpoint's `host=`, never `streamanator`, R9-F-12);
 * its `at=` is within 300 s of the workstation's clock;
 * its `exit=` equals the ssh exit status, and PASS ⇔ 0;
 * every argument field equals the request.

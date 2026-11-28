@@ -94,6 +94,10 @@ BT=c3524e4759ab4e0f8050875471b56b12; BX=0123456789abcdef0123456789abcdef
   sed 1d "$IN/fx-g0-pass-post.txt" | sed 's/T05:25:/T08:25:/g'; } > "$IN/fx-g0-pass-post-late.txt"
 { fx "fx-g0-pass-post.txt with boot $BX on the G0a RESULT line and as g0a-boot= on the verdict (a G0 from another production boot)"
   sed 1d "$IN/fx-g0-pass-post.txt" | sed -E '/^AFLDB-VERIFY RESULT G0 PASS /s/ boot=[0-9a-f]{32} / boot='$BX' /; /^OWNER VERDICT G0 PASS /s/ g0a-boot=[0-9a-f]{32} / g0a-boot='$BX' /'; } > "$IN/fx-g0-pass-post-other-boot.txt"
+{ fx "fx-oc-4.4-bootid.txt with its header time moved 4 h back, to 2026-11-28T01:21:46Z (stale owner checks, fresh 4.5 and verdict)"
+  sed 1d "$IN/fx-oc-4.4-bootid.txt" | sed -E 's/^(== afldb-owner-checks \(R6 r8\) )[^ ]+/\12026-11-28T01:21:46Z/'; } > "$IN/fx-oc-4.4-stale.txt"
+{ fx "fx-reverify-4.5-bootid.txt with every 2026-11-28T05:21: time moved 4 h back, to 2026-11-28T01:21: (stale 4.5, fresh owner checks and verdict)"
+  sed 1d "$IN/fx-reverify-4.5-bootid.txt" | sed 's/2026-11-28T05:21:/2026-11-28T01:21:/g'; } > "$IN/fx-reverify-4.5-stale.txt"
 # r9: A's REAL r9oq2 transcripts with ONLY the two facts that block GO edited: the bundle, and the version call's time
 AB=3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95; TB=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
 { fx "real-r9-version-fixture-qualified.txt with bundle $AB replaced by the 4.5 re-verified $TB and every 2026-11-28T07: time moved to 2026-11-28T06: (after 4.4/4.5, before A's G0); no other change"
@@ -212,6 +216,11 @@ case_ n30-production-stub "GATE ACCEPT RELEASE-G0 NO-GO" "version,verdict" --gat
   --owner-checks $U/n30/fx-oc-4.4-bootid.txt --reverify $U/n30/fx-reverify-4.5-bootid.txt --version $U/n30/fx-version-post-stub.txt --verdict $U/n30/fx-g0-pass-post-stub.txt --verdict-exit 0
 case_ n31-now-without-rehearsal USAGE "" --gate release-g0 --now 2026-11-28T05:40:00Z \
   --owner-checks $U/p3/fx-oc-4.4-bootid.txt --reverify $U/p3/fx-reverify-4.5-bootid.txt --version $U/p3/fx-version-post-prod.txt --verdict $U/p3/fx-g0-pass-post-prod.txt --verdict-exit 0
+# R9-F-11: each of (a) and (b) must be within 3 h before the verdict, so the OLDER decides
+case_ n32-stale-owner-checks-fresh-reverify "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh" --rehearsal $N5 --gate release-g0 \
+  --owner-checks $U/fx-oc-4.4-stale.txt --reverify $U/fx-reverify-4.5-bootid.txt --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
+case_ n33-stale-reverify-fresh-owner-checks "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "fresh" --rehearsal $N5 --gate release-g0 \
+  --owner-checks $U/fx-oc-4.4-bootid.txt --reverify $U/fx-reverify-4.5-stale.txt --version $U/fx-version-post.txt --verdict $U/fx-g0-pass-post.txt --verdict-exit 0
 # r9 wrapper transcripts (agent A, r9oq2): r1-r4 verbatim, r5-r8 with only the bundle and version time edited
 case_ r1-r9-real-g0-pass "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "version,verdict" --rehearsal $N7 --gate release-g0 $OK4 --version $I/real-r9-version-fixture-qualified.txt --verdict $I/real-r9-g0-pass-fixture-qualified.txt --verdict-exit 0
 case_ r2-r9-real-g0-unqualified "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO" "version,verdict" --rehearsal $N7 --gate release-g0 $OK4 --version $I/real-r9-version-unqualified.txt --verdict $I/real-r9-g0-stop-unqualified.txt --verdict-exit 1

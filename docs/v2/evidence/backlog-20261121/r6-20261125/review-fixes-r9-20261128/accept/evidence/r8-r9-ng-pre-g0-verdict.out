@@ -1,5 +1,5 @@
 == case r8-r9-ng-pre-g0-verdict: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T07:30:00Z --gate ng-pre --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-r9-version-unqualified.txt --verdict unmarked/fx-r9-g0-pass.txt --verdict-exit 0
-== afldb-gate-accept 2026-11-28T08:05:03Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+== afldb-gate-accept 2026-11-28T08:32:37Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
    938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
    f111b9e19c834f813d0f2ad7832272526700fa69dd5774f01dec2daa8ae213f2  unmarked/fx-reverify-4.5-bootid.txt
    f74a7c49e09d57837b2177f0d40e2e1e756f36eb011f29ac394cedbd8a43ba22  unmarked/fx-r9-version-unqualified.txt

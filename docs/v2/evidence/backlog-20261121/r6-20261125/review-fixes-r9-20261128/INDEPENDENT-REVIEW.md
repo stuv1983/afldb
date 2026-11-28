@@ -192,3 +192,67 @@ See the Q1 residual. The control is the qualification record and its review (QUA
 ## Files written
 
 Only this file: `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/INDEPENDENT-REVIEW.md`.
+
+---
+
+# Round 2 (T2 89e09ba4ef26605641f5e66c0ef8764547ee828a)
+
+Date: 28 Nov 2026. Same reviewer, same limits: no shell, nothing run, hashed or diffed. I re-read from disk the checker, the
+Phase 4 script, the wrapper's transport section, OWNER-PROCEDURE 4.0-4.6 and the back-out, the RUNBOOK and PLAN pin lines,
+QUALIFY-OFFHOST §4.7, and the new evidence summaries. The logs are development runs at worktree bytes, which the coordinator states
+equal T2; the reruns at T2 were in progress and are not judged. The checker digest in `accept/evidence/summary.txt:48` (`0e6db5ae…`)
+equals `accept/SHA256SUMS:1`.
+
+## Result
+
+No CRIT and no HIGH. F-2, F-3, F-4 and F-5 are closed. F-1 is closed in three of its four parts; the freshness rule measures
+against the **newer** of (a) and (b), which leaves one stale input accepted (new R9-F-11, MED, a one-token fix).
+
+| Finding | Status at T2 | Evidence |
+|---|---|---|
+| R9-F-1 stale evidence | **partly closed**: see R9-F-11 | `afldb-gate-accept.sh:193-202`; `summary.txt:28-31` (n20-n23) |
+| R9-F-1 non-production (a)/(b) | closed: `BOOT-ID` first line in 4.4 and 4.5, bound to the `boot=` of the authenticated VERSION and verdict RESULT lines | `afldb-gate-accept.sh:92`, `:120`, `:155-156`, `:181-185`; OWNER-PROCEDURE.md:359-360, `:401-403`; `summary.txt:32-35` (n24-n27) |
+| R9-F-1 committed fixtures | closed: any input with a `[FIXTURE r9]` line is refused; `--now` only with `--rehearsal` | `afldb-gate-accept.sh:47-48`, `:68`, `:79`, `:103`, `:127`; `summary.txt:36-37`, `:39` |
+| R9-F-2 `%sudo` in a disposed file | closed: `%sudo` is classified first; a file whose only match is `%sudo` cannot be disposed; a `%sudo` line sharing a line with a disposed match is refused; the change line names only disposed lines and prints KEEP; verify requires every other line byte-identical and `sudo -l -U afldb-admin` unchanged | `afldb-phase4.sh:238`, `:230-231`, `:248-252`, `:277`, `:316-341`; `dev-p4h-summary.txt:21-24` |
+| R9-F-3 stub labelled production | closed: `transport=production-stub` with a warning line; the checker takes only the exact token | `afldb-verify-call.sh:84-87`; `afldb-gate-accept.sh:126-130`; `local-r9q-r9f3.log:157`, `:528`, `:539`; `summary.txt:38` |
+| R9-F-4 r8 pins in RUNBOOK and PLAN | closed: r8 values struck, r9 placeholders added, "never use the r8 wrapper" stated; the `streamanator` VERSION PASS line is gone from the PLAN | `RUNBOOK:315-317`, `:358`; `PLAN:957-958`, `:1005-1006` |
+| R9-F-5 escaped alias member | closed | `afldb-phase4.sh:144-145`; `dev-p4h-summary.txt:25` |
+| R9-F-6, R9-F-7 (LOW) | documented, not enforced | QUALIFY-OFFHOST.md:44, `:148-153` |
+
+## New findings
+
+### R9-F-11 (MED): freshness is measured from the newer of (a) and (b), so one of them may be arbitrarily old
+
+`$R9/accept/afldb-gate-accept.sh:195`, `:198`; documented the same way at OWNER-PROCEDURE.md:400, RUNBOOK:233.
+
+Line 195 picks the later of the two times. The T version picked the older one. Scenario: 4.4 is saved on day 1 with PASS. On day 2
+arm gains a route that 4.5 does not test (an explicit `arm ALL=` rule without the `sudo` group, the `docker` group, a superuser
+role), with no reboot. On day 3 the owner runs 4.5, 4.5a and 4.6 but not 4.4. The day-1 4.4 file is still in `/root` and is copied
+again by 4.5. Its `BOOT-ID` matches, the version call is later than both, and (e) compares the verdict only with the fresh 4.5 time.
+Result: `GATE ACCEPT NG-PRE GO transport=production` while the owner checks would be BLOCKED. No case covers one stale input:
+n20 and n21 age both together (`summary.txt:28-29`).
+
+Smallest fix: at `:195` take the older time (`$B_TS < $E`), and say "older" in the three documents. Acceptance: a new case with a
+4.4 header four hours before a fresh 4.5 and verdict, expecting `NO-GO failed=fresh`.
+
+### R9-F-12 (LOW): RUNBOOK still names streamanator as the expected G0b host
+
+`RUNBOOK:238` ("`afldb-prod` for G0a, `streamanator` for G0b"), under the r7 text kept at `:234`. The wrapper can no longer accept
+that host, so it fails closed. Replace it with "the pinned endpoint's `host=`".
+
+### R9-F-13 (INFO): a change hunk in a disposed file may add lines
+
+`afldb-phase4.sh:329-334` checks only the old line range of a `c` hunk. Replacing a disposed line with several new lines passes
+this check. The rescan (`:344`) and `sudo -l -U arm` (`:347`) still catch anything that names arm, so no arm grant survives.
+
+## Final answers at T2
+
+| Question | Answer |
+|---|---|
+| Q1. Can a matching PASS from streamanator authorise G0? | **NO.** Unchanged from round 1; the stub route now also carries a non-production label. The disguise residual (R9-F-10) and the uncommitted-pin residual (R9-F-6) remain procedural controls |
+| Q2. Can Phase 3 success authorise release or reboot while the owner checks are BLOCKED? | **NO** for Phase 3 outputs, rehearsal or fixture inputs, a stub, another host or another boot. **YES** on one remaining path: a stale 4.4 from the same boot with a fresh 4.5 (R9-F-11) |
+| Q3. Can an unrelated grant pass entry, or the back-out lose a rule? | **NO** for every form I could construct, the escaped alias included. Back-out: **NO**. `%#gid`, `%:`, netgroup, LDAP, sssd and Plugin refusals remain code-only, without a scenario |
+
+## Files written in round 2
+
+Only this section, appended to this file.

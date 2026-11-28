@@ -23,7 +23,8 @@
 #      the authenticated RESULT line of the same nonce (G0a for G0) has host=afldb-prod, the same at=, boot=K and the (b) bundle.
 #      A G0 PASS must name the same off-host endpoint and qualification (offhost=<H> ... qualification=pinned qual-sha256=<Q>).
 #      An A2 STOP is NO-GO whatever its backup-origin= says;
-#  (e) fresh: the verdict's at= (g0a-at= for G0) is at most 3 h after the newer of (a) and (b), and this check runs at most 1 h
+#  (e) fresh: the verdict's at= (g0a-at= for G0) is at most 3 h after EACH of (a) and (b) (the owner-checks header; the first
+#      re-verification header), so the older of the two decides, and this check runs at most 1 h
 #      after that at=, by this workstation's clock (date -u; a verdict more than 5 min in its future is refused as clock skew).
 # Only lines that BEGIN with the expected text count: the wrapper prefixes relayed text "[relayed, neutralised] ". Only the exact
 # token "transport=production" (then a space or the end of the line) is production; "production-stub" and the like are refused.
@@ -52,7 +53,7 @@ else NOW=$(date -u +%FT%TZ); CLOCK=workstation; fi
 PFX="GATE ACCEPT"; [ "$TR" = rehearsal ] && PFX="GATE ACCEPT REHEARSAL"
 # the r9 wrapper names the QUALIFIED off-host endpoint and its qualification: pinned in production, FIXTURE in a rehearsal
 QK=pinned; [ "$TR" = rehearsal ] && QK=FIXTURE; OH=; OQ=
-MAXEV=10800    # (e) the verdict is at most 3 h after the newer of (a) and (b): 4.4-4.6 immediately before the gate call
+MAXEV=10800    # (e) the verdict is at most 3 h after each of (a) and (b): 4.4-4.6 immediately before the gate call
 MAXCHK=3600    # (e) this check runs at most 1 h after the verdict, by this workstation's clock
 SKEW=300       # (e) a verdict more than 5 min ahead of this workstation's clock is refused
 BID='^BOOT-ID ([0-9a-f]{32})$'
@@ -94,7 +95,7 @@ else
 fi
 
 # (b) both installs re-verified -------------------------------------------------------------------------------------------
-B=$(rd "$RV"); B_TS=; B_BUNDLE=; B_BOOT=
+B=$(rd "$RV"); B_TS=; B_T0=; B_BUNDLE=; B_BOOT=
 H1="^== verify-backup-install ($TS) as uid=0\(root\) "; H2="^== verify-backup-install --as-arm ($TS) as uid=0\(root\) "
 H3="^== verify-verify-install ($TS) host=afldb-prod role=prod as root$"
 R1='^BACKUP INSTALL RESULT PASS$'; R2='^BACKUP INSTALL RESULT PASS \(as arm via setpriv, no login: [^()]*(\([^()]*\)[^()]*)*\)$'
@@ -108,7 +109,7 @@ elif [ "$n" != 2 ] || [ "$m" != 1 ] || [ "$(cnt "$R1" "$B")" != 1 ] || [ "$(cnt 
 else
   l1=$(lno "$H1" "$B"); l2=$(lno "$R1" "$B"); l3=$(lno "$H2" "$B"); l4=$(lno "$R2" "$B"); l5=$(lno "$H3" "$B"); l6=$(lno "$R3" "$B")
   t1=$(grep -E "$H1" <<< "$B" | sed -E "s/$H1.*/\1/"); t2=$(grep -E "$H2" <<< "$B" | sed -E "s/$H2.*/\1/"); t3=$(grep -E "$H3" <<< "$B" | sed -E "s/$H3/\1/")
-  ARMID=$(grep -E "$R2" <<< "$B"); B_TS=$t3     # the order of (c) is judged against these times even when (b) fails
+  ARMID=$(grep -E "$R2" <<< "$B"); B_TS=$t3; B_T0=$t1    # the order of (c) is judged against these times even when (b) fails
   B_BUNDLE=$(grep -E '^PASS bundle: [0-9]+ files match SHA256SUMS; bundle digest [0-9a-f]{64}$' <<< "$B" | sed -E 's/.* //')
   L1=$(head -n 1 <<< "$B")
   if ! { [ "$l1" -lt "$l2" ] && [ "$l2" -lt "$l3" ] && [ "$l3" -lt "$l4" ] && [ "$l4" -lt "$l5" ] && [ "$l5" -lt "$l6" ]; }; then
@@ -191,14 +192,18 @@ if whdr verdict "$D" "$VMODE"; then
 fi
 
 # (e) fresh: the verdict close to (a)/(b), and this check close to the verdict ------------------------------------------------
+# EACH of (a) and (b) must be at most 3 h before the verdict, so the OLDER decides ((c) already had to follow both). A part with
+# no time has already failed above and is skipped here, so the result stays NO-GO.
 if [ -n "$D_AT" ]; then
-  E=$A_TS; [[ -n $B_TS && ( -z $E || $B_TS > $E ) ]] && E=$B_TS
-  DS=$(secs "$D_AT"); NS=$(secs "$NOW")
+  DS=$(secs "$D_AT"); NS=$(secs "$NOW"); E=; ST=
+  for pe in "owner checks 4.4|$A_TS" "re-verification 4.5|$B_T0"; do pn=${pe%%|*}; pt=${pe#*|}; [ -n "$pt" ] || continue
+    { [ -z "$E" ] || [[ $pt < $E ]]; } && E=$pt
+    (( DS - $(secs "$pt") > MAXEV )) && ST="${ST:+$ST and }$pn ($pt, $(( (DS - $(secs "$pt")) / 60 )) min before)"; done
   if [ -z "$E" ]; then bad fresh "no (a) or (b) time to measure the verdict against"
-  elif (( DS - $(secs "$E") > MAXEV )); then bad fresh "the verdict at $D_AT is more than $((MAXEV / 3600)) h after the newer Phase 4 evidence ($E): repeat 4.4-4.6 immediately before the gate call"
+  elif [ -n "$ST" ]; then bad fresh "stale $ST: more than $((MAXEV / 3600)) h before the verdict at $D_AT; repeat 4.4-4.6 immediately before the gate call"
   elif (( NS - DS > MAXCHK )); then bad fresh "checked at $NOW ($CLOCK clock), more than $((MAXCHK / 3600)) h after the verdict at $D_AT: repeat 4.4-4.6 and the gate call"
   elif (( DS - NS > SKEW )); then bad fresh "the verdict at $D_AT is more than $((SKEW / 60)) min ahead of the $CLOCK clock ($NOW): check this workstation's clock"
-  else good fresh "verdict $D_AT is $(( (DS - $(secs "$E")) / 60 )) min after the Phase 4 evidence ($E); checked $(( (NS - DS) / 60 )) min later at $NOW ($CLOCK clock)"; fi
+  else good fresh "verdict $D_AT is $(( (DS - $(secs "$E")) / 60 )) min after the older Phase 4 evidence ($E); checked $(( (NS - DS) / 60 )) min later at $NOW ($CLOCK clock)"; fi
 fi
 
 if [ ${#FAILED[@]} = 0 ]; then
