@@ -1,0 +1,12 @@
+== case p3-release-g0-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/real-reverify-4.5-post-phase4.txt --version inputs/fx-version-post-prod.txt --verdict inputs/fx-g0-pass-post-prod.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:41:21Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   1f866b1f6479e6df3aae0666e2584e4e6876a177a7e77f53727313aa0b1139ce  inputs/real-reverify-4.5-post-phase4.txt
+   ec9cf02f824eac092071f5515f2600a93366e9cadcc03bf5f5cab136c95cb6a5  inputs/fx-version-post-prod.txt
+   435a1a4e4c7c4ec720fa0c8e4e22b785e615dd1d4a62a3717a43eb0bc482fa27  inputs/fx-g0-pass-post-prod.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T05:23:54Z, after (a) and (b); off-host VERSION PASS from r9-fixture-offhost, qual-sha256 b17d8c78273a34ad1a2a41a3845404b4f4
+ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T05:25:16Z, exit 0, after the version check
+GATE ACCEPT RELEASE-G0 GO transport=production owner-checks-at=2026-11-28T05:21:46Z reverify-at=2026-11-28T05:21:45Z version-at=2026-11-28T05:23:54Z verdict-at=2026-11-28T05:25:16Z
+== exit 0

@@ -44,7 +44,7 @@ else echo "FAIL arm's backup state cannot be read: $RF_WHY"; F=1; fi
 echo "INFO afldb-backup-verify.service last: $(systemctl show afldb-backup-verify.service -p Result -p ExecMainStatus -p ExecMainStartTimestamp --value 2>/dev/null | tr '\n' ' ')(record; not a G0 criterion)"
 if [ "$F" = 0 ]; then
   field dump "$SO_DUMP"; field sha256 "$SO_SHA"
-  echo "G0 PROD RESULT PASS: the wrapper now runs g0b on streamanator with the dump and sha256 of this RESULT line"
+  echo "G0 PROD RESULT PASS: the wrapper now runs g0b on the qualified off-host endpoint (if one is pinned) with the dump and sha256 of this RESULT line"
   exit 0
 fi
 echo "G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged"; exit 1

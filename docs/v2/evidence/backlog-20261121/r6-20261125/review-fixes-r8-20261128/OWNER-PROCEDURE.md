@@ -1,4 +1,24 @@
-# OWNER-PROCEDURE: an independent root path for production (R6 r8, 28 Nov 2026)
+# OWNER-PROCEDURE: an independent root path for production (R6 r8, 28 Nov 2026; amended r9, 28 Nov 2026)
+
+**r9 amendment (Astra's three merge blockers on draft PR 5; PREPARED, NOT RUN).** Record: [../review-fixes-r9-20261128/README.md](../review-fixes-r9-20261128/README.md).
+
+1. **Off-host evidence must be independent (§8).** G0b counts only from an off-host endpoint the owner has qualified by
+   `$R9/offhost/QUALIFY-OFFHOST.md` and pinned in `$R9/offhost/QUALIFIED-ENDPOINT`. The option to accept an arm-attested G0b is
+   **withdrawn**, and the workstation wrapper enforces it: with no pin, or a pin naming streamanator, `g0` ends in a nonzero
+   `OWNER VERDICT G0 STOP`, even when streamanator answers an authenticated PASS with the right dump and sha256. A qualified
+   endpoint must also link the scheduled 03:10 dispatch to transfer completion and a rehash of the received file; a matching file
+   at check time is possession only. **No endpoint is qualified today**, so G0 STOPs, the release stops before P2, and R6
+   NG-OFFHOST/NG-DATA stay NO-GO.
+2. **Phase 3 authorises nothing (3.13, Phase 4 'Saved evidence').** Phase 3's VERSION PASS is an installation diagnostic and
+   Phase 3 ends in STOP. Release G0 and R6 NG-PRE are GO only on `GATE ACCEPT RELEASE-G0 GO` / `GATE ACCEPT NG-PRE GO` from
+   `$R9/accept/afldb-gate-accept.sh`, which requires the saved post-change `OWNER CHECKS RESULT PASS` (4.4), the re-verification of
+   both installed bundles (4.5), a later workstation version check (4.6), and then the gate's own wrapper verdict with exit 0
+   (NG-PRE: `OWNER VERDICT A2 PASS`; A-2 backup attribution alone never satisfies it).
+3. **Phase 4 entry and back-out are exact (Phase 4).** Step 4.0 (`$R9/phase4/afldb-phase4.sh entry`) admits a B3 match only when it
+   is the `%sudo` membership being removed, or a rule the owner disposes of explicitly; any other grant is REFUSED and needs its own
+   disposition first. It records the pre-change state and the exact back-out of each approved change, and `backout` restores and
+   validates it (a changed rule is restored byte-identically and checked with `visudo -c`).
+
 
 **Status: PREPARED, NOT RUN.** Claude never contacted production (209.38.87.252, alias `afldb`) and did not change any account on
 streamanator. The procedure was rehearsed only in a disposable container on streamanator (`procedure-harness/`, §9). It closes
@@ -59,20 +79,24 @@ file, in a log or in evidence.
 * wait at least a minute between new connections;
 * if a connection is refused or times out, wait 10 minutes and do not retry in a loop.
 
-**Pins** that agent B's r8 edits change. They are filled when the coordinator commits:
+**Pins** (r9: the revision, the verify packet, the bundle digest, and the two new r9 rows changed; the backup bundle and the owner
+checks did not). They are filled when the coordinator commits:
 
 | Placeholder | What it pins | Expected `[WS]` command |
 |---|---|---|
-| `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3` | the revision whose bytes are installed | `git rev-parse 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3^{commit}` |
-| `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` | `$R7/backup/SHA256SUMS` | `git show 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3:$R7/backup/SHA256SUMS \| sha256sum` |
-| `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` | `$R7/verify/SHA256SUMS` | `git show 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3:$R7/verify/SHA256SUMS \| sha256sum` |
-| `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` | `$R8/owner-checks/SHA256SUMS` | `git show 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3:$R8/owner-checks/SHA256SUMS \| sha256sum` |
-| `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8` | the wrapper's pinned `BUNDLE_SHA` (verify README §1) | `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` at the tested revision |
+| `@@R9_REV@@` | the revision whose bytes are installed | `git rev-parse @@R9_REV@@^{commit}` |
+| `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` | `$R7/backup/SHA256SUMS` | `git show @@R9_REV@@:$R7/backup/SHA256SUMS \| sha256sum` |
+| `@@VERIFY_SUMS@@` | `$R7/verify/SHA256SUMS` | `git show @@R9_REV@@:$R7/verify/SHA256SUMS \| sha256sum` |
+| `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` | `$R8/owner-checks/SHA256SUMS` | `git show @@R9_REV@@:$R8/owner-checks/SHA256SUMS \| sha256sum` |
+| `@@BUNDLE_SHA@@` | the wrapper's pinned `BUNDLE_SHA` (verify README §1) | `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` at the tested revision |
+| `@@PHASE4_SUMS@@` | `$R9/phase4/SHA256SUMS` (r9, the Phase 4 entry/verify/back-out script) | `git show @@R9_REV@@:$R9/phase4/SHA256SUMS \| sha256sum` |
+| `@@ACCEPT_SUMS@@` | `$R9/accept/SHA256SUMS` (r9, the workstation gate acceptance checker) | `git show @@R9_REV@@:$R9/accept/SHA256SUMS \| sha256sum` |
 
 Paths used below:
 
 * `R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128`
 * `R8=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128`
+* `R9=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128`
 
 **Historical gates are unchanged.** A-2 is dated 2026-11-25, g0 accepts 2026-11-24..29, and the P4 cutoff was 24 Nov 11:30. The
 owner's "before P4" ruling remains unresolved.
@@ -146,6 +170,8 @@ Each new [ADM-ROOT] session also starts by setting every variable the later step
 
 * `R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128`
 * `R8=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128`
+* `R9=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128`
+* `P4=/root/afldb-r9-phase4; P4S=/root/afldb-phase4-state`
 * `T=/home/afldb-admin/afldb-r8-stage.tar; X=/root/afldb-r8-extract; OC=/root/afldb-r8-owner-checks; BK=/root/afldb-r8-backup; VF=/root/afldb-r8-verify`
 
 Setting a variable whose directory does not exist yet is harmless. A step run in a session that has not set them fails closed: it
@@ -160,13 +186,14 @@ Phase 2. Its authentication uses a key and a password arm never held.
 
 | # | Where | Command | Proves | Stop condition |
 |---|---|---|---|---|
-| 2.1.1 | [WS] | `git fetch; git rev-parse 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3^{commit}` | the pinned revision is present in the owner's own clone | unknown revision: STOP |
-| 2.1.2 | [WS] | `git archive --format=tar -o ~/afldb-r8-stage.tar 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3 $R7/backup $R7/verify $R8/owner-checks tools/maintenance/backup.sh` | the only acceptable source of bundle bytes | none |
-| 2.1.3 | [WS] | `sha256sum ~/afldb-r8-stage.tar`, plus the three `git show … \| sha256sum` commands of §0 | the TAR value is written down; the three SHA256SUMS values equal the pins | any pin differs: STOP |
+| 2.1.1 | [WS] | `git fetch; git rev-parse @@R9_REV@@^{commit}` | the pinned revision is present in the owner's own clone | unknown revision: STOP |
+| 2.1.2 | [WS] | `git archive --format=tar -o ~/afldb-r8-stage.tar @@R9_REV@@ $R7/backup $R7/verify $R8/owner-checks $R9/phase4/afldb-phase4.sh $R9/phase4/SHA256SUMS tools/maintenance/backup.sh` | the only acceptable source of bundle bytes | none |
+| 2.1.3 | [WS] | `sha256sum ~/afldb-r8-stage.tar`, plus the four `git show … \| sha256sum` commands of §0 for backup, verify, owner checks and phase4 (r9) | the TAR value is written down; the four SHA256SUMS values equal the pins | any pin differs: STOP |
 | 2.1.4 | [WS]→[ADM] | `ADM 'umask 077; set -C; cat > ~/afldb-r8-stage.tar' < ~/afldb-r8-stage.tar` | the bytes travel over the admin path, never through arm | `set -C` refusal (a file already there): remove it in [ADM-ROOT] and resend |
 | 2.1.5 | [ADM-ROOT] | `T=/home/afldb-admin/afldb-r8-stage.tar; stat -c '%U %a %s' $T; sha256sum $T` | owner `afldb-admin 600`, and **the TAR value of 2.1.3** (compared by eye) | different: STOP |
 | 2.1.6 | [ADM-ROOT] | `X=/root/afldb-r8-extract; rm -rf $X; install -d -m 0700 $X; tar -x --no-same-owner --no-same-permissions -f $T -C $X; chown -R root:root $X; chmod -R go-w $X` | root-owned extracted bytes, outside `/home` | tar error: STOP |
 | 2.1.7 | [ADM-ROOT] | `OC=/root/afldb-r8-owner-checks; install -d -m 0755 $OC; install -m 0644 $X/$R8/owner-checks/afldb-owner-checks.sh $X/$R8/owner-checks/SHA256SUMS $OC/; sha256sum $OC/SHA256SUMS; (cd $OC && sha256sum -c --strict SHA256SUMS)` | `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` and `OK` | different: STOP |
+| 2.1.8 | [ADM-ROOT] | `P4=/root/afldb-r9-phase4; install -d -m 0755 $P4; install -m 0644 $X/$R9/phase4/afldb-phase4.sh $X/$R9/phase4/SHA256SUMS $P4/; sha256sum $P4/SHA256SUMS; (cd $P4 && sha256sum -c --strict SHA256SUMS)` | `@@PHASE4_SUMS@@` and `OK` (r9) | different: STOP |
 
 ### 2.2 Run
 
@@ -202,7 +229,8 @@ Every such arm-side probe is **fail-closed** (r8 review R8-F-1, R8-F-2). These a
 
 **Expected results:**
 
-* **Before Phase 4:** `BLOCKED`, with at least B1, B2 and B3 failing: arm can sudo, and `%sudo` names a group of arm. That is the state rehearsed as `checks-pre` and
+* **Before Phase 4:** `BLOCKED`, with at least B1, B2 and B3 failing: arm can sudo, and `%sudo` names a group of arm. r9: B3 is
+  acceptable only on matches that step 4.0 classifies as group-only (`%sudo`) or disposed. That is the state rehearsed as `checks-pre` and
   `checks-post-install`.
 * **After Phase 4:** `PASS`.
 * **Any other FAIL or UNKNOWN** has to be resolved, or accepted by the owner in writing, before Phase 4. An UNKNOWN is never read as
@@ -225,7 +253,7 @@ All checks run from the single command in 2.2. "Blocks" says what stays blocked 
 | A3 | `SUDO_USER` of this process is not arm | PASS | everything |
 | B1 | **(b)** arm's effective sudo, `sudo -n -l -U arm` as root | before Phase 4 **FAIL** (arm may run commands); after **PASS** ("not allowed") | G1/G2 until Phase 4 |
 | B2 | arm is in group `sudo`, `admin` or `wheel` (`id -nG arm`) | before FAIL, after PASS | G1/G2 until Phase 4 |
-| B3 | no non-comment line of `/etc/sudoers` or of a file directly in `/etc/sudoers.d/` names `arm` or `%<g>` for any group `g` arm is in (`id -Gn arm`). Include directives are listed, not followed: B5 judges their targets, and a rule in a file outside those two places is not searched | before Phase 4 **FAIL** (`%sudo`); after PASS | G1/G2 and sudo removal. Production sudoers is **UNKNOWN**: a rule naming arm directly survives `gpasswd` |
+| B3 | no non-comment line of `/etc/sudoers` or of a file directly in `/etc/sudoers.d/` names `arm` or `%<g>` for any group `g` arm is in (`id -Gn arm`). Include directives are listed, not followed: B5 judges their targets, and a rule in a file outside those two places is not searched | before Phase 4 **FAIL** (`%sudo`); after PASS | G1/G2, and sudo removal, except for matches that step 4.0 classifies as group-only (`%sudo`) or disposed (`--dispose`) (r9). Production sudoers is **UNKNOWN**: a rule naming arm directly survives `gpasswd`. B3 itself does not see a rule by uid (`#1000`, which its comment filter drops), by gid (`%#…`), for an `ALL` or negated user or a netgroup, on a continuation line, or from nsswitch, LDAP or sssd. Step 4.0 is deliberately stricter and refuses each of these, naming file:line (rehearsed: residual-uid, residual-all, refuse-uid-alias, refuse-continued, refuse-negated, refuse-nsswitch). Step 4.2 and B1 catch anything added later through `sudo -l -U arm` and the file inventory (rehearsed: late-grant) |
 | B4 | report: sudo's `timestamp_type` and timeout (`sudo -V`) | report | nothing. Production's value is **UNKNOWN** and recorded |
 | B5 | every `@include`/`#include`/`#includedir` target named in those files is a trusted path (no component arm-owned, group/other-writable, ACL-bearing or a symlink; an absent target passes if its parents do). It prints one PASS line listing the targets, or FAIL naming each. The sudoers files themselves are judged by E1/E2 | PASS | G1/G2, sudo removal |
 | B6 | `passwd -S` of root, arm and the admin; none is `NP` (no password) | PASS (report L/P) | G1/G2 if arm or root is `NP` |
@@ -285,45 +313,91 @@ Phase 2 are that proof.
 | 3.5 | [ADM-ROOT] | `bash $BK/verify-backup-install.sh` | `BACKUP INSTALL RESULT PASS` (root checks) | FAIL: STOP |
 | 3.6 | [ADM-ROOT] | `bash $BK/verify-backup-install.sh --as-arm` | `BACKUP INSTALL RESULT PASS` for arm's checks. Root drops to arm with `setpriv --reuid=arm --regid=arm --init-groups --reset-env`, `/usr/bin/bash --noprofile --norc` and stdin `/dev/null`, so the fresh process carries `afldb-backup-read` without any arm login | FAIL: STOP. (This replaces "as arm in a new login".) |
 | 3.7 | [WS]→[ADM] | `ADM 'umask 077; set -C; cat > ~/afldb_verify.pub' < ~/.ssh/afldb_verify.pub`; on [WS] `ssh-keygen -lf ~/.ssh/afldb_verify.pub` (paper) | the verify public key travels over the admin path | none |
-| 3.8 | [ADM-ROOT] | `VF=/root/afldb-r8-verify; rm -rf $VF; cp -r $X/$R7/verify $VF; install -m 0644 /home/afldb-admin/afldb_verify.pub $VF/afldb_verify.pub; chown -R root:root $VF; chmod -R go-w $VF; ssh-keygen -lf $VF/afldb_verify.pub; sha256sum $VF/SHA256SUMS; (cd $VF && sha256sum -c --strict --quiet SHA256SUMS)` | the paper fingerprint (one ed25519 line), `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`, no mismatch | different: STOP |
+| 3.8 | [ADM-ROOT] | `VF=/root/afldb-r8-verify; rm -rf $VF; cp -r $X/$R7/verify $VF; install -m 0644 /home/afldb-admin/afldb_verify.pub $VF/afldb_verify.pub; chown -R root:root $VF; chmod -R go-w $VF; ssh-keygen -lf $VF/afldb_verify.pub; sha256sum $VF/SHA256SUMS; (cd $VF && sha256sum -c --strict --quiet SHA256SUMS)` | the paper fingerprint (one ed25519 line), `@@VERIFY_SUMS@@`, no mismatch | different: STOP |
 | 3.9 | [ADM-ROOT] | verify README §10 prerequisites, then `bash $VF/install-verify.sh --role prod --key $VF/afldb_verify.pub` | `INSTALL-VERIFY RESULT PASS`: the verifier account, forced command, facts socket and units are installed | `REFUSED …`: not [ADM-ROOT]. Other failure: STOP |
 | 3.10 | [ADM-ROOT] | `runuser -u postgres -- psql -X -v ON_ERROR_STOP=1 -d afldb_prod < $VF/verifier-db.sql`; add the `pg-auth-lines.txt` lines (ident map; the hba line directly after the `afldb_backup` line, both before any broader `local`); `runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'` | the verifier's read-only DB role and peer map | error: STOP |
 | 3.11 | [ADM-ROOT] | `bash $VF/verify-verify-install.sh --role prod` | `VERIFY-INSTALL RESULT PASS` | FAIL: STOP |
 | 3.12 | [ADM-ROOT] | the Phase 2 command again | still `BLOCKED` on B1, B2 and B3 (arm can sudo): the installs alone do not close F1 (rehearsed: `checks-post-install`) | any **new** FAIL: STOP |
-| 3.13 | [WS] | in the owner's clone at `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`: `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` (= `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`), then `bash $R7/verify/afldb-verify-call.sh version` | `OWNER VERDICT VERSION PASS` for production; the off-host line follows the streamanator variant (§8) | a production VERSION STOP: STOP |
+| 3.13 | [WS] | in the owner's clone at `@@R9_REV@@`: `grep '^BUNDLE_SHA=' $R7/verify/afldb-verify-call.sh` (= `@@BUNDLE_SHA@@`), then `bash $R7/verify/afldb-verify-call.sh version` | **an installation diagnostic only** (r9): `OWNER VERDICT VERSION PASS … host=afldb-prod role=prod` shows that the installed verifier answers the verify key with the pinned bundle. The off-host line is `OWNER VERDICT VERSION STOP … reason="no qualified off-host endpoint"` (exit 1) until an endpoint is qualified (§8). While 3.12 is BLOCKED, arm can still reach root, so this is **not** an authentic verdict and authorises nothing: no release G0, no NG-PRE, no reboot. `afldb-gate-accept.sh` rejects any Phase 3 output (rehearsed: `ce1`–`ce4`, `n4`) | a production VERSION STOP: STOP and investigate in [ADM-ROOT] |
 
-**STOP.** The owner decides separately on Phase 4. Installs made while arm still has sudo are re-verified after Phase 4 (step 4.6).
+**STOP. Phase 3 ends here, and no Phase 3 output is GO evidence (r9).** After 3.5, 3.6, 3.11 and 3.13 pass, the owner checks are
+still BLOCKED on B1, B2 and B3 (3.12): both installs and the VERSION call pass while arm can still reach root. Neither release G0,
+R6 NG-PRE nor the reboot may rely on any of them (Astra's counterexample; rehearsed `ce1`–`ce4` in `$R9/accept/evidence/` and
+`accept-counterexample` in the procedure harness). The owner decides separately on Phase 4. The installs made while arm still had
+sudo are re-verified after Phase 4 (4.5). A gate becomes GO only through `$R9/accept/afldb-gate-accept.sh` on the saved Phase 4
+outputs and that gate's verdict (Phase 4, 'Saved evidence').
 
 ## Phase 4 (proposed; owner approval required; not part of the install). Change existing access
 
 Preconditions:
 
-* Phase 1 verified twice (1.13).
-* The [CON] root session open throughout.
-* Every Phase 2 FAIL other than B1/B2 resolved, and every UNKNOWN resolved or accepted.
+* Phase 1 verified twice (1.13): two independently authenticated admin logins.
+* The [CON] root session open throughout, until 4.7.
+* Every Phase 2 FAIL other than B1, B2 and B3 resolved, and every UNKNOWN resolved or accepted. B1 and B2 are the sudo membership
+  that Phase 4 removes. B3 is exempt **only** for matches that step 4.0 classifies as `group-only` (`%sudo`, removed by
+  `gpasswd -d arm sudo`) or `disposed` (a rule the owner has decided to edit in 4.1 and names with `--dispose`). Step 4.0 is stricter
+  than B3. Any other grant needs its own disposition before Phase 4, and 4.0 refuses it, naming file:line and token: a line naming
+  `arm`; a `User_Alias` containing arm or `#<arm uid>`; `%<another group arm is in>` or `%#<gid>`; a `#<arm uid>` rule; an `ALL` or
+  `!`-negated user; a netgroup or `%:` group; arm in `admin` or `wheel`; an include of any target other than `/etc/sudoers.d`; a sudo
+  rule source other than files (nsswitch `sudoers:`, LDAP, sssd, a `sudo.conf` Plugin line).
 * The owner has accepted the residual of §0.
 * Every routine that used `sudo` from arm has an [ADM-ROOT] replacement. In the repository, `deploy/release.mjs` and
-  `deploy/post-install-check.sh` print `sudo systemctl restart afldb` and `sudo journalctl …` hints, and the RUNBOOK P6 restart and
-  journal reads, the R6 plan's grub/systemd steps and `docs/deployment.md` all use `sudo`. They move to [ADM-ROOT]. The settle
-  trigger uses polkit, not sudo, and is unaffected.
+  `deploy/post-install-check.sh` now print [ADM-ROOT] hints (r9), and `docs/deployment.md` §3a shows the restart in [ADM-ROOT]. The
+  RUNBOOK P6 restart and journal reads, the R6 plan's grub/systemd steps and the other `docs/deployment.md` sections still say
+  `sudo`; they move to [ADM-ROOT]. The settle trigger uses polkit, not sudo, and is unaffected.
+* The owner's **separate approval of the privilege removal**, given after reading the 4.0 output, which shows each change and its
+  exact back-out.
 
 | # | Where | Command | Proves | Stop condition |
 |---|---|---|---|---|
-| 4.1 | [ADM-ROOT] | `gpasswd -d arm sudo` (and remove any sudoers rule naming arm that B3 reported, with `visudo -f`) | arm loses sudo | error: STOP |
-| 4.2 | [ADM-ROOT] | `id arm; sudo -l -U arm` | no `sudo` group; "User arm is not allowed to run sudo" | otherwise: back to 4.1 |
+| 4.0 | [ADM-ROOT] | `(cd $P4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $P4/afldb-phase4.sh entry --state $P4S [--dispose <file>]...` | the pre-change record in the new root-only `$P4S`: arm's groups, the sudo group line, a copy, sha256, owner and mode of `/etc/sudoers` and every file in `/etc/sudoers.d`, and every match (file:line, token), each classified group-only, disposed or unrelated. It prints, for each change, the exact back-out and ends `PHASE4 ENTRY RESULT PASS change=group-only\|group-and-disposed`, with the state seal sha256 (write it down). It writes nothing outside `$P4S` (rehearsed: group-only, disposed, refuse-*) | `REFUSED`: STOP. Each reason names file:line and token: dispose of it separately, re-run Phase 2, then 4.0 again with a NEW `--state` directory. Use `--dispose` only for a file whose matched rule the owner decided to edit in 4.1 |
+| 4.1 | [ADM-ROOT] | `gpasswd -d arm sudo`; and, only for each file 4.0 listed as disposed, `visudo -f <file>`, changing exactly the lines 4.0 named, then `visudo -c`. `visudo` refuses to write an empty file: leave a comment line, or remove the file with `rm`. Make no other edit | arm loses sudo, exactly as approved | any error: back-out (below), then STOP |
+| 4.2 | [ADM-ROOT] | `env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $P4/afldb-phase4.sh verify --state $P4S` | `PHASE4 VERIFY RESULT PASS`: arm is no longer in sudo and its other groups are unchanged; every sudoers file other than the disposed ones has its recorded sha256, owner and mode, and nothing was added; includes are still only `/etc/sudoers.d`; `visudo -c` passes; the rescan finds nothing; `sudo -l -U arm` reports "not allowed" (rehearsed: group-only, disposed, disposed-removed) | STOP: back-out (below) at once, then dispose of the residual grant separately (Phase 2, then a new 4.0). Never "back to 4.1". A STOP means arm still has a grant 4.0 did not plan for, a grant was added after 4.0, or something changed outside the plan (rehearsed: late-grant, unplanned-edit, state-tamper). If backout then FAILs naming a file added after entry, review that file in [CON], remove it by hand, and run backout again until `PHASE4 BACKOUT RESULT PASS` (rehearsed: late-grant) |
 | 4.3 | [ADM] | `exit` the admin session; from [WS] open a **new** `ADM`, run `sudo -k; sudo -v`, then enter [ADM-ROOT] | the admin path still reaches root after the change (rehearsed: `admin-login-2`) | fails: **back-out** (below) |
-| 4.4 | [ADM-ROOT] | Phase 2 command | `OWNER CHECKS RESULT PASS` (rehearsed: `checks-post-access`) | BLOCKED: resolve; F1 stays open until PASS |
-| 4.5 | [ADM-ROOT] | a **new** [ADM-ROOT] session: first set `R7`, `R8`, `T`, `X`, `OC`, `BK`, `VF` as in Phase 1, then `bash $BK/verify-backup-install.sh; bash $BK/verify-backup-install.sh --as-arm; bash $VF/verify-verify-install.sh --role prod` | the installs made while arm still had sudo are intact (rehearsed: `reverify`) | FAIL: STOP; treat the install as untrusted and reinstall from 3.1 |
-| 4.6 | [WS] | `bash $R7/verify/afldb-verify-call.sh version` | an authentic verdict path after the change | STOP: investigate in [ADM-ROOT] |
+| 4.4 | [ADM-ROOT] | `env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r8-owner-checks/afldb-owner-checks.sh --admin afldb-admin --admin-fp SHA256:<the paper fingerprint> 2>&1 \| tee /root/afldb-r9-4.4.txt` | last line `OWNER CHECKS RESULT PASS`, with B1, B2 and B3 PASS (rehearsed: `checks-post-access`). The file is the saved 4.4 evidence | BLOCKED: resolve; F1 stays open until PASS |
+| 4.5 | [ADM-ROOT] | a **new** [ADM-ROOT] session: first set `R7`, `R8`, `R9`, `T`, `X`, `OC`, `BK`, `VF` as in Phase 1, then `{ bash $BK/verify-backup-install.sh; bash $BK/verify-backup-install.sh --as-arm; bash $VF/verify-verify-install.sh --role prod; } 2>&1 \| tee /root/afldb-r9-4.5.txt`; then `install -m 0644 -o afldb-admin -g afldb-admin /root/afldb-r9-4.4.txt /root/afldb-r9-4.5.txt /home/afldb-admin/` | in this order: `BACKUP INSTALL RESULT PASS`; `BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: …)` with no `sudo` group; `VERIFY-INSTALL RESULT PASS` (rehearsed: `reverify`) | FAIL: STOP; treat the install as untrusted and reinstall from 3.1 |
+| 4.5a | [WS] | at least a minute after the last connection: `mkdir -p ~/afldb-r9-accept && ADM 'tar -cf - afldb-r9-4.4.txt afldb-r9-4.5.txt' \| tar -xf - -C ~/afldb-r9-accept` | 4.4 and 4.5 are saved on the workstation, over the admin path | a file is missing: repeat 4.5a |
+| 4.6 | [WS] | `bash $R7/verify/afldb-verify-call.sh version 2>&1 \| tee ~/afldb-r9-accept/afldb-r9-4.6.txt` | `OWNER VERDICT VERSION PASS … host=afldb-prod role=prod`, made after 4.4 and 4.5. The off-host line must be PASS (`qualification=pinned`) for release G0 only; until §8's qualification it is `STOP … no qualified off-host endpoint` | production STOP: investigate in [ADM-ROOT] |
 | 4.7 | [CON] | `exit` | the console is closed only after 4.3–4.6 | none |
 
-**Back-out** (if 4.3 fails, the admin path is broken). In the still-open [CON] root session, run `gpasswd -a arm sudo`, which
-restores the previous state exactly. Then repair the admin account in [CON] (Phase 1 steps 1.9–1.12) before trying Phase 4 again.
-Never repair the admin account through arm's sudo, which would type a password into an arm session. If [CON] has been closed and the
-admin path fails, the recovery is Phase 0 again.
+**Back-out** (r9; if 4.1 errs, 4.2 STOPs or 4.3 fails). In the still-open [CON] root session, run
+`(cd /root/afldb-r9-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r9-phase4/afldb-phase4.sh backout --state /root/afldb-phase4-state`.
+
+* It prints the state seal: compare it by eye with the value 4.0 printed.
+* It restores each disposed file from its saved copy with its original owner, group and mode, runs `gpasswd -a arm sudo` if arm is
+  not in sudo, and then `visudo -c`.
+* It then proves the pre-change state: every sudoers file's sha256, owner and mode, the `/etc/sudoers.d` directory, arm's group list
+  and `sudo -l -U arm` all equal the 4.0 record. It ends `PHASE4 BACKOUT RESULT PASS` (rehearsed: group-only-backout, disposed,
+  disposed-removed).
+* Its manual equivalent is the per-change back-out that 4.0 printed: `gpasswd -a arm sudo` for the group-only change, and for each
+  disposed file `install -o U -g G -m 0MODE <state>/copy.N <file> && visudo -c && sha256sum <file>` (it must print the recorded value).
+* `gpasswd -a arm sudo` alone restores the previous state only when no sudoers file was changed. After a disposed edit it loses the
+  rule (rehearsed: old-r8-backout, the r8 text's contrast). The sudo group line's member order may differ afterwards; membership is
+  what is compared.
+* `FAIL` means a file changed outside the plan, or the record was altered; the result names it. Review it in [CON], restore it by
+  hand from the named copy, and do not continue Phase 4.
+* If 4.3 failed, repair the admin account in [CON] (Phase 1 steps 1.9–1.12) before trying Phase 4 again from 4.0 with a new state
+  directory. Never repair the admin account through arm's sudo, which would type a password into an arm session. If [CON] has been
+  closed and the admin path fails, the recovery is Phase 0 again.
 
 After Phase 4 PASS, G1 and G2 hold against a hostile arm, subject to the §0 residual: arm can no longer reach root by any route the
-checks know, and every root action uses [ADM-ROOT]. F1 can be closed on that evidence: the 4.4 and 4.5 output, saved on [WS].
+checks know, and every root action uses [ADM-ROOT].
+
+**Saved evidence (r9).** F1 can be closed on the saved, unedited outputs `~/afldb-r9-accept/afldb-r9-4.4.txt` and
+`afldb-r9-4.5.txt`. Closing F1 authorises no gate. A gate is GO only when, on [WS] in the owner's clone,
+`(cd $R9/accept && sha256sum -c --strict SHA256SUMS)` passes, `sha256sum $R9/accept/SHA256SUMS` equals `@@ACCEPT_SUMS@@`, and
+
+```
+bash $R9/accept/afldb-gate-accept.sh --gate release-g0|ng-pre --owner-checks ~/afldb-r9-accept/afldb-r9-4.4.txt \
+  --reverify ~/afldb-r9-accept/afldb-r9-4.5.txt --version ~/afldb-r9-accept/afldb-r9-4.6.txt \
+  --verdict <saved gate output> --verdict-exit <its exit status>
+```
+
+prints `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production` (exit 0). The gate verdict
+must come after 4.6 and within 24 h of 4.4/4.5. On a later gate day, repeat 4.4–4.6 (no further access change) before the gate call.
+Save a gate call as `bash $R7/verify/afldb-verify-call.sh <g0 …|a2 …> > ~/afldb-r9-accept/<g0|a2>.txt 2>&1; echo $? >
+~/afldb-r9-accept/<g0|a2>.exit; cat ~/afldb-r9-accept/<g0|a2>.txt`. Any other final line, `GATE ACCEPT REHEARSAL …` included, is
+NO-GO: no release and no reboot.
 
 ## 8. streamanator variant (G0b handoff: off-host verifier install, pull-source change)
 
@@ -346,13 +420,21 @@ Consequences:
 |---|---|---|
 | 0 | a root login at streamanator's own console (physical/IPMI) at the `login:` prompt; not `sudo` in an arm session | **UNKNOWN** whether available |
 | 1 | the same as production: `afldb-admin` with its own key and password, created from that console | none, if done |
-| 2 | the same command; expected **BLOCKED** on B1/B2 (sudo) **and C1 (`docker`, `lxd`)** | while C1 fails, G0B is not independent of streamanator's arm |
+| 2 | the same command; expected **BLOCKED** on B1/B2 (sudo) **and C1 (`docker`, `lxd`)** | r9: streamanator's G0B is never GO evidence, whatever this shows (below) |
 | 3 | [ADM-ROOT] on streamanator: stage `$R7/verify` from the same workstation tar; `install-verify.sh --role offhost --key …`; `verify-verify-install.sh --role offhost`. The pull-source change is an **unprivileged** edit of arm's own files with no root step: on production, arm's `authorized_keys` forced command `rrsync -ro /home/arm/backups/afldb-scheduled` becomes `rrsync -ro /var/lib/afldb-backup/published`; on streamanator, the pull source is `<prod>:/var/lib/afldb-backup/published/`. Status probes add `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state` | G0B gives no assurance about the pull itself; that is by design, because G0B checks the copy |
-| 4 | removing streamanator's arm from `sudo`, `docker` and `lxd` | **an owner decision with a cost**: it ends the DEV rehearsals that run as arm with docker, these harnesses included. Without it, `G0B PASS` is "attested by a host arm controls" and the owner's G0 must say so |
+| 4 | none, for G0b. r9: streamanator is not qualifiable. The wrapper refuses a pin naming it (`$R9/offhost/QUALIFY-OFFHOST.md` §0). Removing its arm from `sudo`, `docker` and `lxd` remains an owner decision about DEV; it is not a route to G0B independence | a G0B answer from streamanator is information only, never GO evidence |
 
-**What stays unproven until the owner decides:** the authenticity of `G0B PASS` against a hostile streamanator arm. The
-alternatives are a separate off-host verifier host or account that has neither docker nor sudo, or accepting and labelling
-G0B as arm-attested.
+**r9: the arm-attested option is withdrawn.** The workstation wrapper accepts an off-host G0B PASS only from an endpoint the owner
+has qualified by `$R9/offhost/QUALIFY-OFFHOST.md`: one whose administration, hypervisor and storage are outside streamanator arm's
+control, named in the pin `$R9/offhost/QUALIFIED-ENDPOINT` (absent in the repository; the default is unconfigured and fails closed).
+Its host key must be in the owner's known_hosts and equal the pin, and its RESULT must carry the scheduled-transfer evidence
+(`dispatch-at`, `received-at`, `complete-at`, `received-sha256`, `rehash-sha256`), linking the 03:10 dispatch to transfer completion
+and a rehash of the received file. A matching file at check time without that link is possession only, and G0 STOPs. A pin naming
+streamanator or 10.0.40.100, or carrying streamanator's known host key, is refused, because its arm is root-equivalent (recorded
+28 Nov 2026). **No machine is qualified today**, and none is nominated: G0 prints `OWNER VERDICT G0 STOP … qualification=none`
+(exit 1), the release stops before P2, and R6 NG-OFFHOST and NG-DATA stay NO-GO. Phases 0–3 above apply to the endpoint being
+qualified (QUALIFY-OFFHOST §2), not to streamanator. Installing the offhost role on streamanator gives information only. Live
+qualification is the owner's (rehearsed only with a fixture endpoint labelled `qualification=FIXTURE`: `$R9/offhost/evidence/`).
 
 ## 9. Rehearsal (`procedure-harness/`, development evidence)
 
@@ -408,14 +490,22 @@ These runs are not evidence for a committed revision either.
 Not exercised: an arm process killing, stopping or injecting into a probe, and the probe's 60-second timeout. The code paths
 exist, but no scenario drives them.
 
-Re-run with `--verify-rev 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3` after the commit.
+r9 additions (see `$R9/README.md` for the runs): the Phase 4 steps run through `afldb-phase4.sh` (4.0 entry, 4.1, 4.2 verify), the
+4.4/4.5 outputs are saved, a post-Phase-4 `version` (4.6) is made, and the acceptance checker runs in `--rehearsal` mode on the
+harness's own real outputs: `accept-counterexample` (Phase 3 outputs: NO-GO) and `accept-post-phase4` (4.4–4.6 accepted; NO-GO
+only on the verdict, which STOPs in a container). Phase 4's own fixtures (group-only, unrelated grants refused, disposed rule,
+back-out) are `$R9/phase4/p4-run.sh`. The base image `sha256:d71c0b28…` is tagged `grafana/alloy:latest`: an Ubuntu 24.04.4
+userland whose entrypoint the harnesses override (r9 note; earlier text called it plain Ubuntu 24.04).
+
+Re-run with `--verify-rev @@R9_REV@@` after the commit.
 
 The rehearsal does **not** exercise:
 
 * the DigitalOcean console;
 * production's sshd configuration, sudoers, host key or firewall;
 * interactive `passwd` and `sudo` prompts (the harness feeds the admin password to `chpasswd` and `sudo -S` on stdin);
-* the off-host verifier role (the wrapper's off-host line STOPs, as expected);
+* the off-host verifier role (the wrapper's off-host line STOPs with "no qualified off-host endpoint", as expected; r9's off-host
+  qualification is rehearsed by the verify harness, `$R9/offhost/evidence/dev/`);
 * a real nightly timer run.
 
 ## 10. Consolidated owner checklist
@@ -429,16 +519,20 @@ The rehearsal does **not** exercise:
 | 1.4–1.5b | `K=…; setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/cat /home/arm/afldb_admin.pub < /dev/null > $K`; the 1.5a shape test (one trailing CR stripped, then `KEY-SHAPE-OK`) and the 1.5b fingerprint test (`KEY-FP-MATCH`) | [CON] | the carried key is one bare ed25519 line and is the workstation's | no `KEY-SHAPE-OK` or no `KEY-FP-MATCH`: **STOP**, the carried key is malformed or not the workstation key |
 | 1.6–1.10 | `useradd -m -U -s /bin/bash afldb-admin`; `passwd afldb-admin`; `usermod -a -G sudo afldb-admin`; `chmod 0750 /home/afldb-admin`; `install … $K.line …/authorized_keys` (the type and key fields only); checks | [CON] | the admin account with its own key and password | any unexpected value |
 | 1.11–1.13 | `ADM`; `id; sudo -k; sudo -v; sudo -l`; twice, in new connections | [WS], [ADM] | the admin path reaches root, twice | host key mismatch or failure |
-| 2.1.1–2.1.3 | `git rev-parse 12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3^{commit}`; `git archive … -o ~/afldb-r8-stage.tar`; `sha256sum` | [WS] | workstation bytes and expected digests | a pin differs |
+| 2.1.1–2.1.3 | `git rev-parse @@R9_REV@@^{commit}`; `git archive … -o ~/afldb-r8-stage.tar`; `sha256sum` | [WS] | workstation bytes and expected digests | a pin differs |
 | 2.1.4 | `ADM 'umask 077; set -C; cat > ~/afldb-r8-stage.tar' < ~/afldb-r8-stage.tar` | [WS]→[ADM] | bytes over the admin path | none |
-| 2.1.5–2.1.7 | `sha256sum $T`; extract; stage owner checks; `sha256sum -c` | [ADM-ROOT] | the same bytes on production | TAR or pin differs |
-| 2.2 | `env -i … afldb-owner-checks.sh --admin afldb-admin --admin-fp SHA256:…` | [ADM-ROOT] | the Phase 2 facts | expected BLOCKED (B1, B2, B3) only; any other FAIL/UNKNOWN: resolve |
+| 2.1.5–2.1.8 | `sha256sum $T`; extract; stage owner checks and the Phase 4 script; `sha256sum -c` | [ADM-ROOT] | the same bytes on production | TAR or pin differs |
+| 2.2 | `env -i … afldb-owner-checks.sh --admin afldb-admin --admin-fp SHA256:…` | [ADM-ROOT] | the Phase 2 facts | expected BLOCKED (B1, B2, B3; B3 classified at 4.0) only; any other FAIL/UNKNOWN: resolve |
 | 3.1–3.6 | stage `$BK`; `sha256sum -c`; `install-backup.sh $BK`; pg lines; reload; `verify-backup-install.sh`; `verify-backup-install.sh --as-arm` | [ADM-ROOT] | sealed backup installed and checked | FAIL or `REFUSED` |
 | 3.7–3.11 | verify key over [ADM]; stage `$VF`; `install-verify.sh --role prod --key …`; `verifier-db.sql`; pg lines; `verify-verify-install.sh --role prod` | [ADM-ROOT] | verifier installed and checked | FAIL or `REFUSED` |
 | 3.12 | Phase 2 again | [ADM-ROOT] | installs do not close F1 | any new FAIL |
-| 3.13 | `bash $R7/verify/afldb-verify-call.sh version` | [WS] | an authentic production verdict | not PASS: **STOP** |
-| 4.1–4.2 | `gpasswd -d arm sudo`; `id arm; sudo -l -U arm` | [ADM-ROOT], console open | arm has no sudo | — |
-| 4.3 | new `ADM`; `sudo -k; sudo -v` | [WS], [ADM] | admin path survives | fails: back-out `gpasswd -a arm sudo` in [CON] |
-| 4.4–4.6 | Phase 2; both install checks; wrapper `version` | [ADM-ROOT], [WS] | `OWNER CHECKS RESULT PASS`; installs intact | BLOCKED or FAIL: F1 stays open |
+| 3.13 | `bash $R7/verify/afldb-verify-call.sh version` | [WS] | installation diagnostic only: the verifier answers. **Not** GO evidence while 3.12 is BLOCKED | production VERSION STOP: **STOP** |
+| 3.end | — | — | **Phase 3 ends in STOP**: the owner checks are BLOCKED (B1, B2, B3). No release, NG-PRE or reboot on Phase 3 outputs | — |
+| 4.0 | `env -i … $P4/afldb-phase4.sh entry --state $P4S [--dispose FILE]…` | [ADM-ROOT], console open | pre-change record, classification, exact back-out; `RESULT PASS change=…`; seal written down | `REFUSED`: STOP; dispose of each named grant separately |
+| 4.1 | `gpasswd -d arm sudo`; `visudo -f` only for each disposed file 4.0 listed | [ADM-ROOT], console open | only the approved change | error: back-out |
+| 4.2 | `env -i … $P4/afldb-phase4.sh verify --state $P4S` | [ADM-ROOT] | realised change = plan; arm not allowed to sudo | STOP: back-out, then dispose of the residual separately; never back to 4.1 |
+| 4.3 | new `ADM`; `sudo -k; sudo -v` | [WS], [ADM] | admin path survives | fails: back-out in [CON]: `afldb-phase4.sh backout --state /root/afldb-phase4-state` → `PHASE4 BACKOUT RESULT PASS` |
+| 4.4–4.6 | Phase 2 command `\| tee /root/afldb-r9-4.4.txt`; a new [ADM-ROOT] with both install checks and `verify-verify-install.sh --role prod` `\| tee /root/afldb-r9-4.5.txt`; copy both to [WS] (4.5a); wrapper `version \| tee ~/afldb-r9-accept/afldb-r9-4.6.txt` | [ADM-ROOT], [WS] | `OWNER CHECKS RESULT PASS`; both installs intact with arm out of `sudo`; VERSION PASS after both; all three saved on [WS] | BLOCKED or FAIL: F1 stays open |
+| G | the gate call saved with its exit status, then `bash $R9/accept/afldb-gate-accept.sh --gate release-g0\|ng-pre …` | [WS] | `GATE ACCEPT RELEASE-G0 GO transport=production` or `GATE ACCEPT NG-PRE GO transport=production`, exit 0 | any other final line: **NO-GO** (no release, no reboot) |
 | 4.7 | close [CON] | [CON] | — | only after 4.3–4.6 |
-| S | streamanator Phases 0–3 (§8); decision on arm's `docker`/`lxd`/`sudo` | streamanator console / [ADM-ROOT] | G0B independence | while C1 fails: G0B is arm-attested |
+| S | Qualify an independent off-host endpoint by `$R9/offhost/QUALIFY-OFFHOST.md` (Q1–Q7, record, pin, second reader, commit). streamanator is refused | the endpoint's console / its [ADM-ROOT] / [WS] | G0B independent of streamanator's arm | no committed pin, or the off-host `version` line is not PASS with `qualification=pinned`: G0 STOPs and the release stops before P2. There is no arm-attested alternative |

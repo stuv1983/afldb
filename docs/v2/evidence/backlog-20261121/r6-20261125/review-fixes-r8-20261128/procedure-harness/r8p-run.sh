@@ -11,6 +11,12 @@
 #                     harness file sent equals its blob at REV; otherwise the worktree bytes are used (development evidence only).
 #   --bundles-rev REV (development only, without --verify-rev) the R7 backup/verify bundles and tools/maintenance/backup.sh come
 #                     from `git archive REV` and the owner checks from the worktree; for a run while another agent edits R7.
+# r9: the stage tar also carries $R9/phase4 (afldb-phase4.sh + SHA256SUMS), staged and pin-checked in the admin root session (2.1.8);
+# Phase 4 runs through it (4.0 entry, 4.1 gpasswd -d arm sudo, 4.2 verify); 4.4 and 4.5 are tee'd in the admin root session and
+# copied back over the admin path, as are the Phase 3 outputs 3.5/3.6/3.11/3.12; 4.6 is the wrapper `version` after them; real
+# wrapper a2 (and, after 4.6, g0) calls give the gate verdicts; the workstation acceptance checker $R9/accept/afldb-gate-accept.sh
+# (from the same bytes: --verify-rev blob, else worktree, checked against its SHA256SUMS line) judges them in --rehearsal mode; the
+# Phase 4 back-out runs last at the console stand-in. Every saved owner input is $LOGS/<RID>-in-<step>.log.
 # Scenarios print `SCENARIO <name> PASS|FAIL|PENDING expect=... got=...`; the run ends `R8 PROCEDURE HARNESS RESULT PASS|FAIL`.
 # A PENDING scenario (an interface agent B owns that is not in the bytes under test) makes the result FAIL, never PASS.
 set -uo pipefail; export LC_ALL=C
@@ -20,6 +26,7 @@ RID=${1:?rid}; [[ $RID =~ ^[A-Za-z0-9-]{1,24}$ ]] || { echo "STOP bad RID"; exit
 WT=/d/dev/afldb-closeout-20261127
 R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128
 R8=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128
+R9=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128
 HD=$WT/$R8/procedure-harness; LOGS=$HD/logs; mkdir -p "$LOGS"
 DEVSSH=(ssh -o BatchMode=yes -i "$HOME/.ssh/afldb_dev" arm@10.0.40.100)
 WSSH=C:/Windows/System32/OpenSSH/ssh.exe; WKEYGEN=C:/Windows/System32/OpenSSH/ssh-keygen.exe
@@ -31,9 +38,10 @@ res() { local n=$1 s=$2; shift 2; say "SCENARIO $n $s $*"; case $s in PASS) ;; P
 pace() { sleep 4; }   # the owner's home firewall IPS blocks bursts of SSH connections: keep them few and spaced
 
 # ------------------------------------------------------------------------------------------ inputs and their verification
-STAGE_PATHS=("$R7/backup" "$R7/verify" "$R8/owner-checks" tools/maintenance/backup.sh)
+STAGE_PATHS=("$R7/backup" "$R7/verify" "$R8/owner-checks" "$R9/phase4/afldb-phase4.sh" "$R9/phase4/SHA256SUMS" tools/maintenance/backup.sh)
 SENT=("$R8/procedure-harness/r8p-host.sh" "$R8/procedure-harness/r8p-container.sh" "$R8/procedure-harness/r8p-admin.sh"
       deploy/afldb-backup.service deploy/afldb-backup.timer deploy/afldb-backup-failed.service)
+WSIDE=("$R9/accept/afldb-gate-accept.sh" "$R9/accept/SHA256SUMS")   # run on the workstation only, from the same revision's bytes
 KD=$(mktemp -d); KDM=$(cygpath -m "$KD"); chmod 700 "$KD"
 WS=
 cleanup() {
@@ -43,22 +51,25 @@ cleanup() {
 trap cleanup EXIT
 { echo "== r8p-run $RID $(date -u +%FT%TZ) workstation $(hostname) id=[$(id)]; worktree HEAD $(git -C "$WT" rev-parse HEAD)"
   echo "[HARNESS] client $WSSH ($("$WSSH" -V 2>&1 | tr -d '\r'))"; } | tee -a "$LOG"
-for f in "${SENT[@]}" "$R8/owner-checks/afldb-owner-checks.sh"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done
+for f in "${SENT[@]}" "${WSIDE[@]}" "$R8/owner-checks/afldb-owner-checks.sh" "$R9/phase4/afldb-phase4.sh"; do grep -q $'\r' "$WT/$f" && { echo "STOP $f contains CR bytes"; exit 2; }; done
+mkdir -p "$KD/accept"
 if [ -n "$VREV" ]; then
   REV=$(git -C "$WT" rev-parse --verify "$VREV^{commit}") || { echo "STOP unknown revision $VREV"; exit 2; }
   bad=0; log "[TRANSPORT] pre-send verification against $REV:"
   for f in "${SENT[@]}"; do w=$(sha256sum < "$WT/$f" | cut -c1-64); g=$(git -C "$WT" show "$REV:$f" 2>/dev/null | sha256sum | cut -c1-64)
     [ "$w" = "$g" ] && log "   EQUAL $w  $f" || { log "   DIFFERS worktree $w blob $g  $f"; bad=1; }; done
   [ $bad = 0 ] || { echo "STOP the harness files differ from $REV"; exit 2; }
+  for f in "${WSIDE[@]}"; do git -C "$WT" show "$REV:$f" > "$KD/accept/${f##*/}" || { echo "STOP $f is not in $REV"; exit 2; }; log "   BLOB $(sha256sum < "$KD/accept/${f##*/}" | cut -c1-64)  $f (workstation side)"; done
   git -C "$WT" archive --format=tar --output="$KDM/stage.tar" "$REV" "${STAGE_PATHS[@]}" || { echo "STOP git archive"; exit 2; }
   log "[TRANSPORT] stage tar = git archive $REV ${STAGE_PATHS[*]} (+ keys/afldb_verify.pub below)"
   BYTES="git archive $REV"
 else
   for f in "${SENT[@]}"; do log "   WORKTREE $(sha256sum < "$WT/$f" | cut -c1-64)  $f"; done
+  for f in "${WSIDE[@]}"; do cp "$WT/$f" "$KD/accept/"; log "   WORKTREE $(sha256sum < "$WT/$f" | cut -c1-64)  $f (workstation side)"; done
   if [ -n "$BREV" ]; then
     BR=$(git -C "$WT" rev-parse --verify "$BREV^{commit}") || { echo "STOP unknown revision $BREV"; exit 2; }
     git -C "$WT" archive --format=tar --output="$KDM/stage.tar" "$BR" "$R7/backup" "$R7/verify" tools/maintenance/backup.sh || { echo "STOP git archive"; exit 2; }
-    tar -C "$WT" -rf "$KD/stage.tar" "$R8/owner-checks" || { echo "STOP tar"; exit 2; }
+    tar -C "$WT" -rf "$KD/stage.tar" "$R8/owner-checks" "$R9/phase4/afldb-phase4.sh" "$R9/phase4/SHA256SUMS" || { echo "STOP tar"; exit 2; }
     log "[TRANSPORT] --bundles-rev: the R7 bundles and backup.sh are git archive $BR; the owner checks are WORKTREE bytes (development evidence, not a committed revision)"
     BYTES="bundles $BR + worktree owner checks"
   else
@@ -71,6 +82,10 @@ fi
 BSUMS=$(tar -xOf "$KD/stage.tar" "$R7/backup/SHA256SUMS" | sha256sum | cut -c1-64)
 VSUMS=$(tar -xOf "$KD/stage.tar" "$R7/verify/SHA256SUMS" | sha256sum | cut -c1-64)
 CSUMS=$(tar -xOf "$KD/stage.tar" "$R8/owner-checks/SHA256SUMS" | sha256sum | cut -c1-64)
+P4SUMS=$(tar -xOf "$KD/stage.tar" "$R9/phase4/SHA256SUMS" | sha256sum | cut -c1-64)
+# the acceptance checker: its SHA256SUMS line must hold for the bytes the workstation will run
+ACCSUMS=$(sha256sum < "$KD/accept/SHA256SUMS" | cut -c1-64)
+(cd "$KD/accept" && grep ' afldb-gate-accept.sh$' SHA256SUMS | sha256sum -c --strict --quiet) || { echo "STOP the acceptance checker does not match its SHA256SUMS line"; exit 2; }
 GUARD_B=0; GUARD_V=0; ASARM=0
 tar -xOf "$KD/stage.tar" "$R7/backup/install-backup.sh" | grep -q 'REFUSED: root session descends from arm' && GUARD_B=1
 tar -xOf "$KD/stage.tar" "$R7/verify/install-verify.sh" | grep -q 'REFUSED: root session descends from arm' && GUARD_V=1
@@ -91,7 +106,7 @@ mkdir -p "$KD/fix/keys" "$KD/fix/deploy"
 cp "$WT/$R8/procedure-harness/r8p-host.sh" "$WT/$R8/procedure-harness/r8p-container.sh" "$KD/fix/"
 for u in afldb-backup.service afldb-backup.timer afldb-backup-failed.service; do cp "$WT/deploy/$u" "$KD/fix/deploy/"; done
 cp "$KD/arm.pub.lf" "$KD/fix/keys/arm.pub"; cp "$KD/swap.pub.lf" "$KD/fix/keys/swap.pub"
-{ echo "[HARNESS] workstation values: stage tar ($BYTES) $TAR_SHA; backup SHA256SUMS $BSUMS; verify SHA256SUMS $VSUMS; owner-checks SHA256SUMS $CSUMS"
+{ echo "[HARNESS] workstation values: stage tar ($BYTES) $TAR_SHA; backup SHA256SUMS $BSUMS; verify SHA256SUMS $VSUMS; owner-checks SHA256SUMS $CSUMS; phase4 SHA256SUMS $P4SUMS; accept SHA256SUMS $ACCSUMS (workstation side)"
   echo "[HARNESS] fresh test keys: admin $AFP, verify $VFP, arm $(fpw arm), swap (arm's substitute) $(fpw swap); admin and arm passwords random, never printed"; } | tee -a "$LOG"
 
 # ------------------------------------------------------------------------------------------ streamanator workspace, container (console stand-in)
@@ -137,6 +152,27 @@ S() { local key=$1 host=$2; shift 2; "$WSSH" -F "$KDM/cfg" -o "IdentityFile=$KDM
 # admin root step: the password line, then r8p-admin.sh, into sudo -S in the admin session
 AS() { { cat "$KD/apw"; cat "$HD/r8p-admin.sh"; } | S admin r8p-admin "sudo -S -p '' -k /usr/bin/bash --noprofile --norc -s -- $*" 2>&1 | tr -d '\r'; }
 L() { local f=$LOGS/$RID-$1.log; shift; { echo "== $RID $(date -u +%FT%TZ) $*"; cat; } > "$f"; cat "$f" >> "$LOG"; }
+IN() { printf '%s' "$LOGS/$RID-in-$1.log"; }   # a saved owner input (the file the owner keeps), byte for byte as received
+# r9: copy the admin's handed-over files back over the admin path; each <name>.txt becomes $(IN <name>)
+fetch() {
+  local o; o=$(S admin r8p-admin 'cd ~/afldb-r9-evidence && for f in *.txt; do printf "=== R8P FILE %s\n" "$f"; cat -- "$f"; done' 2>&1 | tr -d '\r')
+  awk -v p="$LOGS/$RID-in-" '/^=== R8P FILE [A-Za-z0-9._-]+\.txt$/ {if (f) close(f); f = p $4; sub(/\.txt$/, ".log", f); printf "" > f; next} f {print >> f}' <<< "$o"
+  printf '%s\n' "$o" | grep '^=== R8P FILE' | L "fetch-$1" "workstation: saved outputs copied back over the admin path ($1)"
+}
+# r9: one rehearsal wrapper call; raw output to $(IN <name>), exit status in WRC
+WCALL() {
+  local n=$1; shift
+  WO=$(bash "$KD/afldb-verify-call.sh" --rehearsal "$KDM/cfg" --key "$KDM/verify" "$@" 2>&1); WRC=$?
+  WO=$(tr -d '\r' <<< "$WO"); printf '%s\n' "$WO" > "$(IN "$n")"
+  printf '%s\nexit %s\n' "$WO" "$WRC" | L "wrapper-$n" "workstation: afldb-verify-call.sh $*"
+}
+# r9: the acceptance checker (bytes under test) in --rehearsal mode; AF = its last line, ARC = its exit, AFAIL = its failed= list
+ACC() {
+  local n=$1 g=$2
+  AO=$(bash "$KD/accept/afldb-gate-accept.sh" --gate "$g" --owner-checks "$3" --reverify "$4" --version "$5" --verdict "$6" --verdict-exit "$7" --rehearsal 2>&1); ARC=$?
+  printf '%s\nexit %s\n' "$AO" "$ARC" | L "accept-$n-$g" "workstation: afldb-gate-accept.sh --gate $g --rehearsal ($n): inputs ${3##*/} ${4##*/} ${5##*/} ${6##*/} exit $7"
+  AF=$(tail -n 1 <<< "$AO"); AFAIL=$(sed -n 's/.* NO-GO failed=\([^ ]*\) .*/\1/p' <<< "$AF")
+}
 
 # ------------------------------------------------------------------------------------------ Phase 0 and 1 at the console stand-in
 pace
@@ -171,7 +207,7 @@ grep -q 'Permission denied' <<< "$O" && ! grep -q 'uid=' <<< "$O" && res admin-k
 pace
 O=$(S admin r8p-admin 'umask 077; set -C; cat > ~/afldb-r8-stage.tar && echo "received $(wc -c < ~/afldb-r8-stage.tar) bytes"' < "$KD/stage.tar" 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L stage-transfer "stage tar over the admin path"
 pace
-O=$(AS stage "$TAR_SHA" "$BSUMS" "$VSUMS" "$CSUMS" "$VFP" "$AFP"); printf '%s\n' "$O" | L stage-and-checks-pre "admin root session: re-verify the tar, stage, Phase 2 checks before any change"
+O=$(AS stage "$TAR_SHA" "$BSUMS" "$VSUMS" "$CSUMS" "$VFP" "$AFP" "$P4SUMS"); printf '%s\n' "$O" | L stage-and-checks-pre "admin root session: re-verify the tar, stage, Phase 2 checks before any change"
 grep -q 'R8P STAGE OK' <<< "$O" && res stage PASS "expect=workstation-digests-match got=tar $TAR_SHA, three SHA256SUMS and the verify key equal the workstation values" || res stage FAIL "expect=workstation-digests-match got=$(grep 'STOP' <<< "$O" | head -2 | tr '\n' ' ')"
 V=$(grep '^OWNER CHECKS RESULT' <<< "$O"); A2=$(grep '^CHECK A2 ' <<< "$O" | cut -c1-14)
 [[ $V == "OWNER CHECKS RESULT BLOCKED"* ]] && grep -q '^CHECK B1 FAIL' <<< "$O" && grep -q '^CHECK B2 FAIL' <<< "$O" && [ "$A2" = "CHECK A2 PASS " ] \
@@ -207,21 +243,86 @@ V=$(grep '^OWNER CHECKS RESULT' <<< "$O" | tail -1)
 [[ $V == "OWNER CHECKS RESULT BLOCKED"* ]] && grep -q '^CHECK B2 FAIL' <<< "$O" && res checks-post-install PASS "expect=BLOCKED(installs-alone-do-not-close-F1) got=$V" || res checks-post-install FAIL "expect=BLOCKED got=$V"
 
 pace
-O=$(bash "$KD/afldb-verify-call.sh" --rehearsal "$KDM/cfg" --key "$KDM/verify" version 2>&1 | tr -d '\r'); printf '%s\n' "$O" | L wrapper-version "workstation: afldb-verify-call.sh version (verify key; one host in this harness)"
-grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod' <<< "$O" \
-  && res wrapper-version PASS "expect=VERSION-PASS(afldb-prod) got=$(grep -m1 '^OWNER VERDICT VERSION PASS' <<< "$O" | cut -c1-120); offhost: STOP (no off-host container in this harness, expected)" \
-  || res wrapper-version FAIL "expect=VERSION-PASS(afldb-prod) got=$(grep '^OWNER VERDICT' <<< "$O" | tr '\n' ' ' | cut -c1-240)"
+fetch phase3   # 3.5, 3.6, 3.11, 3.12 as the owner saves them
+cat "$(IN 3.5-verify-backup-install)" "$(IN 3.6-verify-backup-install-as-arm)" "$(IN 3.11-verify-verify-install)" > "$(IN 3-reverify)" 2>/dev/null
+pace
+WCALL 3.13-version version
+grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod' <<< "$WO" \
+  && res wrapper-version PASS "expect=VERSION-PASS(afldb-prod) got=$(grep -m1 '^OWNER VERDICT VERSION PASS' <<< "$WO" | cut -c1-120); offhost: $(grep -m1 'role=offhost' <<< "$WO" | cut -c1-110)" \
+  || res wrapper-version FAIL "expect=VERSION-PASS(afldb-prod) got=$(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-240)"
+# a real gate verdict at this point (before Phase 4), for the acceptance counterexample: grammatical a2 arguments of a fixture
+A2ARGS=(a2 accepted 000000000000-r8p-fixture r3:yes r4:yes 10:00 tue:deferred "inv:$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')")
+pace
+WCALL 3.13a-a2 "${A2ARGS[@]}"; A2X_PRE=$WRC
+[ "$WRC" != 0 ] && [[ $(sed '/^[[:space:]]*$/d' <<< "$WO" | tail -n 1) == "OWNER VERDICT A2 STOP"* ]] \
+  && res wrapper-a2-phase3 PASS "expect=A2-STOP(container) got=exit $WRC; $(grep -m1 '^OWNER VERDICT A2' <<< "$WO" | cut -c1-160)" \
+  || res wrapper-a2-phase3 FAIL "expect=A2-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
 
 # ------------------------------------------------------------------------------------------ Phase 4 (proposed; owner approval): change existing access
 pace
-O=$(AS phase4); printf '%s\n' "$O" | L phase4 "admin root session: Phase 4, arm removed from sudo"
-grep -q 'R8P PHASE4 done' <<< "$O" && grep -q 'not allowed to run sudo' <<< "$O" && res phase4 PASS "expect=arm-not-allowed-sudo got=$(grep 'sudo -l -U arm' <<< "$O" | cut -c1-120)" || res phase4 FAIL "expect=arm-not-allowed got=$(tr '\n' ' ' <<< "$O" | cut -c1-200)"
+O=$(AS phase4); printf '%s\n' "$O" | L phase4 "admin root session: Phase 4 through afldb-phase4.sh (4.0 entry, 4.1 gpasswd -d arm sudo, 4.2 verify)"
+grep -q '^PHASE4 ENTRY RESULT PASS change=group-only ' <<< "$O" && [ "$(ex P4-ENTRY)" = 0 ] \
+  && res phase4-entry PASS "expect=ENTRY-PASS(group-only) got=$(grep -m1 '^PHASE4 ENTRY RESULT' <<< "$O" | cut -c1-140); $(grep -m1 '^PHASE4 ENTRY match' <<< "$O" | cut -c1-90)" \
+  || res phase4-entry FAIL "expect=ENTRY-PASS(group-only) got=$(grep -E '^PHASE4 ENTRY (RESULT|REFUSED)|R8P P' <<< "$O" | tr '\n' '|' | cut -c1-300)"
+[ "$(ex GPASSWD)" = 0 ] && grep -q '^   id arm: ' <<< "$O" && ! grep '^   id arm: ' <<< "$O" | grep -q '(sudo)' \
+  && res phase4 PASS "expect=arm-removed-from-sudo got=$(grep -m1 '^   id arm: ' <<< "$O" | cut -c1-140)" || res phase4 FAIL "expect=arm-removed-from-sudo got=gpasswd $(ex GPASSWD); $(grep -m1 '^   id arm: ' <<< "$O")"
+grep -q '^PHASE4 VERIFY RESULT PASS' <<< "$O" && [ "$(ex P4-VERIFY)" = 0 ] \
+  && res phase4-verify PASS "expect=VERIFY-PASS got=$(grep -m1 'check sudo-l' <<< "$O" | cut -c1-120)" \
+  || res phase4-verify FAIL "expect=VERIFY-PASS got=$(grep -E '^PHASE4 VERIFY (RESULT|STOP)' <<< "$O" | tr '\n' '|' | cut -c1-300)"
 pace
-O=$(AS reverify "$AFP"); printf '%s\n' "$O" | L login-2-reverify "admin login 2 (new connection) after Phase 4: both install checks again, owner checks"
-grep -q '^== admin root session step reverify' <<< "$O" && grep -q 'SUDO_USER=afldb-admin' <<< "$O" && res admin-login-2 PASS "expect=admin-login+sudo-after-phase4 got=$(grep -m1 'SUDO_USER' <<< "$O" | cut -c1-120)" || res admin-login-2 FAIL "expect=admin-login got=$(head -3 <<< "$O" | tr '\n' ' ')"
-[ "$(ex VBI-ROOT)" = 0 ] && [ "$(ex VBI-ARM)" = 0 ] && [ "$(ex VVI)" = 0 ] && res reverify PASS "expect=both-install-checks-PASS got=vbi-root 0, vbi-arm 0, vvi 0" || res reverify FAIL "expect=PASS got=vbi-root $(ex VBI-ROOT) vbi-arm $(ex VBI-ARM) vvi $(ex VVI)"
+O=$(AS checks44 "$AFP"); printf '%s\n' "$O" | L login-2-checks44 "admin login 2 (new connection) after Phase 4: 4.4 owner checks, tee'd and handed over"
+grep -q '^== admin root session step checks44' <<< "$O" && grep -q 'SUDO_USER=afldb-admin' <<< "$O" && res admin-login-2 PASS "expect=admin-login+sudo-after-phase4 got=$(grep -m1 'SUDO_USER' <<< "$O" | cut -c1-120)" || res admin-login-2 FAIL "expect=admin-login got=$(head -3 <<< "$O" | tr '\n' ' ')"
 V=$(grep '^OWNER CHECKS RESULT' <<< "$O" | tail -1)
 [ "$V" = "OWNER CHECKS RESULT PASS" ] && res checks-post-access PASS "expect=PASS got=$V" || res checks-post-access FAIL "expect=PASS got=$V; $(grep -E '^CHECK [A-Z0-9]+ (FAIL|UNKNOWN)' <<< "$O" | cut -c1-200 | tr '\n' '|')"
+pace
+O=$(AS reverify45); printf '%s\n' "$O" | L reverify45 "admin root session (new connection): 4.5 both installs re-verified, tee'd and handed over"
+[ "$(ex VBI-ROOT)" = 0 ] && [ "$(ex VBI-ARM)" = 0 ] && [ "$(ex VVI)" = 0 ] && res reverify PASS "expect=both-install-checks-PASS got=vbi-root 0, vbi-arm 0, vvi 0" || res reverify FAIL "expect=PASS got=vbi-root $(ex VBI-ROOT) vbi-arm $(ex VBI-ARM) vvi $(ex VVI)"
+pace
+fetch phase4   # 4.4 and 4.5 as the owner saves them (the Phase 3 files again, unchanged)
+[ -s "$(IN 4.4-owner-checks)" ] && [ -s "$(IN 4.5-reverify)" ] && [ "$(sed '/^[[:space:]]*$/d' "$(IN 4.4-owner-checks)" | tail -n 1)" = "OWNER CHECKS RESULT PASS" ] \
+  && res saved-4.4-4.5 PASS "expect=saved-files-copied-back got=4.4 $(sha256sum < "$(IN 4.4-owner-checks)" | cut -c1-16), 4.5 $(sha256sum < "$(IN 4.5-reverify)" | cut -c1-16) (last line of 4.4: OWNER CHECKS RESULT PASS)" \
+  || res saved-4.4-4.5 FAIL "expect=saved-files got=4.4 $(wc -c < "$(IN 4.4-owner-checks)" 2>&1) bytes, 4.5 $(wc -c < "$(IN 4.5-reverify)" 2>&1) bytes"
+pace
+WCALL 4.6-version version
+grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod' <<< "$WO" \
+  && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint"' <<< "$WO" \
+  && res wrapper-version-post PASS "expect=prod-PASS+offhost-STOP(no-qualified-endpoint) got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | cut -c1-110 | tr '\n' '|')" \
+  || res wrapper-version-post FAIL "expect=prod-PASS+offhost-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' '|' | cut -c1-300)"
+pace
+WCALL 4.6a-a2 "${A2ARGS[@]}"; A2X_POST=$WRC
+[ "$WRC" != 0 ] && [[ $(sed '/^[[:space:]]*$/d' <<< "$WO" | tail -n 1) == "OWNER VERDICT A2 STOP"* ]] \
+  && res wrapper-a2-post PASS "expect=A2-STOP(container) got=exit $WRC; $(grep -m1 '^OWNER VERDICT A2' <<< "$WO" | cut -c1-160)" \
+  || res wrapper-a2-post FAIL "expect=A2-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
+pace
+WCALL 4.6b-g0 g0 2026-11-28; G0X_POST=$WRC
+[ "$WRC" != 0 ] && [[ $(sed '/^[[:space:]]*$/d' <<< "$WO" | tail -n 1) == "OWNER VERDICT G0 STOP"* ]] \
+  && res wrapper-g0-post PASS "expect=G0-STOP got=exit $WRC; $(grep -m1 '^OWNER VERDICT G0' <<< "$WO" | cut -c1-200)" \
+  || res wrapper-g0-post FAIL "expect=G0-STOP got=exit $WRC; $(grep '^OWNER VERDICT' <<< "$WO" | tr '\n' ' ' | cut -c1-200)"
+
+# ------------------------------------------------------------------------------------------ r9 acceptance checker (workstation, --rehearsal)
+# has <list> <part>: the comma-separated failed= list names <part>
+has() { [[ ",$1," == *",$2,"* ]]; }
+# (a) accept-counterexample: the real Phase 3 outputs (3.12 BLOCKED, 3.5/3.6/3.11 PASS, 3.13 version PASS) and the real a2 verdict then
+for g in release-g0 ng-pre; do
+  ACC counterexample "$g" "$(IN 3.12-owner-checks)" "$(IN 3-reverify)" "$(IN 3.13-version)" "$(IN 3.13a-a2)" "$A2X_PRE"
+  [ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL ${g^^} NO-GO "* ]] && has "$AFAIL" owner-checks && has "$AFAIL" reverify \
+    && res "accept-counterexample-$g" PASS "expect=NO-GO(owner-checks,reverify among failed) got=exit $ARC failed=$AFAIL" \
+    || res "accept-counterexample-$g" FAIL "expect=NO-GO(owner-checks,reverify) got=exit $ARC $(cut -c1-240 <<< "$AF")"
+done
+# (b) accept-post-phase4: the real 4.4, 4.5, 4.6 outputs and the real a2 verdict made after 4.6
+ACC post-phase4 ng-pre "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST"
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL NG-PRE NO-GO "* ]] && [ "$AFAIL" = verdict ] \
+  && res accept-post-phase4-ng-pre PASS "expect=NO-GO(failed=verdict only: A2 STOPs in a container) got=exit $ARC failed=$AFAIL; parts a-c: $(grep -E '^ACCEPT (owner-checks|reverify|version) ' <<< "$AO" | cut -d' ' -f2,3 | tr '\n' ',')" \
+  || res accept-post-phase4-ng-pre FAIL "expect=NO-GO(failed=verdict only) got=exit $ARC $(cut -c1-240 <<< "$AF"); $(grep -E '^ACCEPT [a-z-]+ FAIL' <<< "$AO" | cut -c1-200 | tr '\n' '|')"
+ACC post-phase4 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6a-a2)" "$A2X_POST"
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && has "$AFAIL" version && ! has "$AFAIL" owner-checks && ! has "$AFAIL" reverify \
+  && res accept-post-phase4-release-g0 PASS "expect=NO-GO(version: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
+  || res accept-post-phase4-release-g0 FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
+# the same with the release gate's own verdict, the real g0 call after 4.6 (it STOPs: no qualified off-host endpoint)
+ACC post-phase4-g0 release-g0 "$(IN 4.4-owner-checks)" "$(IN 4.5-reverify)" "$(IN 4.6-version)" "$(IN 4.6b-g0)" "$G0X_POST"
+[ "$ARC" = 1 ] && [[ $AF == "GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO "* ]] && has "$AFAIL" version && ! has "$AFAIL" owner-checks && ! has "$AFAIL" reverify \
+  && res accept-post-phase4-release-g0-g0verdict PASS "expect=NO-GO(version: off-host unqualified; owner-checks,reverify PASS) got=exit $ARC failed=$AFAIL" \
+  || res accept-post-phase4-release-g0-g0verdict FAIL "expect=NO-GO(version) got=exit $ARC $(cut -c1-240 <<< "$AF")"
 
 # ------------------------------------------------------------------------------------------ fail-closed cases (console stand-in)
 pace
@@ -253,6 +354,13 @@ grep -q '^OWNER CHECKS RESULT BLOCKED' <<< "$B" && grep -q '^CHECK C3 FAIL.*/opt
   && res fc-c3-gw-arm PASS "expect=BLOCKED(C3 /opt/r8p-gw group-writable by arm's group) got=$(grep '^OWNER CHECKS RESULT' <<< "$B")" || res fc-c3-gw-arm FAIL "expect=BLOCKED(C3) got=$(grep -E '^CHECK C3 |^OWNER CHECKS' <<< "$B" | cut -c1-300 | tr '\n' '|')"
 B=$(blk control)
 grep -qx 'OWNER CHECKS RESULT PASS' <<< "$B" && res control-after-revert PASS "expect=PASS got=OWNER CHECKS RESULT PASS (console session; every mutation reverted)" || res control-after-revert FAIL "expect=PASS got=$(grep -E '^CHECK [A-Z0-9]+ (FAIL|UNKNOWN)|^OWNER CHECKS' <<< "$B" | cut -c1-160 | tr '\n' '|')"
+
+# ------------------------------------------------------------------------------------------ r9 Phase 4 back-out (console stand-in), after every scenario above
+pace
+O=$(HX exec phase4-backout 2>&1); printf '%s\n' "$O" | L phase4-backout "console: afldb-phase4.sh backout (the documented Phase 4 back-out)"
+grep -q '^PHASE4 BACKOUT RESULT PASS' <<< "$O" && [ "$(ex P4-BACKOUT)" = 0 ] && grep '^   id arm: ' <<< "$O" | grep -q '(sudo)' \
+  && res phase4-backout PASS "expect=BACKOUT-PASS(arm back in sudo, sudo -l as before) got=$(grep -m1 '^PHASE4 BACKOUT RESULT' <<< "$O" | cut -c1-120); $(grep -m1 '^   id arm: ' <<< "$O" | cut -c1-120)" \
+  || res phase4-backout FAIL "expect=BACKOUT-PASS got=$(grep -E '^PHASE4 BACKOUT|R8P P4-BACKOUT|^STOP' <<< "$O" | tr '\n' '|' | cut -c1-300)"
 
 # ------------------------------------------------------------------------------------------ identities and secret hygiene
 pace

@@ -223,11 +223,15 @@ node $R build --checkout ~/projects/afldb --revision <40-hex> --afldb-env produc
 # ATTENDED STEP (AFLDB-ISSUE-351): the gate, the switch, your restart and the identity gate are one sitting
 node $R host-gate                              # read-only: apt/needrestart/reboot-required/next apt-daily-upgrade
 node $R promote <rev12>-<BUILD_ID> --attended  # runs the same gate; refuses unless the service runs `current`
-sudo systemctl restart afldb                   # owner, NOW: the activation window is open until this
-node $R status --expect <rev12>-<BUILD_ID>     # the identity gate; also audits who restarted the service
-bash deploy/post-install-check.sh <rev12>-<BUILD_ID>   # origin, public assets, journal
+# [ADM-ROOT] = the owner's admin root session: the afldb-admin SSH session, then `sudo -k; sudo /usr/bin/bash --noprofile --norc`
+# (docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md §0). Never sudo in arm's session.
+systemctl restart afldb                        # [ADM-ROOT], owner, NOW: the activation window is open until this
+node $R status --expect <rev12>-<BUILD_ID>     # as arm: the identity gate; also audits who restarted the service
+bash deploy/post-install-check.sh <rev12>-<BUILD_ID>   # as arm: origin, public assets, journal
 # if the gate fails: switch back to the retained release (no build), restart, gate again
-node $R rollback --attended [--ledger-head <name>] && sudo systemctl restart afldb && node $R status --expect <previous id>
+node $R rollback --attended [--ledger-head <name>]   # as arm
+systemctl restart afldb                              # [ADM-ROOT], owner, only after rollback exited 0
+node $R status --expect <previous id>                # as arm, after the restart
 ```
 
 `promote` and `rollback` refuse without `--attended` (nothing is changed): switching `current` is only half of an

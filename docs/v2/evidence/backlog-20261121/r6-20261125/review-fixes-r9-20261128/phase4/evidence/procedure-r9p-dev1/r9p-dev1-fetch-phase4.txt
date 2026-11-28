@@ -1,0 +1,7 @@
+== r9p-dev1 2026-11-28T07:35:29Z workstation: saved outputs copied back over the admin path (phase4)
+=== R8P FILE 3.11-verify-verify-install.txt
+=== R8P FILE 3.12-owner-checks.txt
+=== R8P FILE 3.5-verify-backup-install.txt
+=== R8P FILE 3.6-verify-backup-install-as-arm.txt
+=== R8P FILE 4.4-owner-checks.txt
+=== R8P FILE 4.5-reverify.txt

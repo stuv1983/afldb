@@ -1,0 +1,39 @@
+== r9 agent B: affected checks for the [ADM-ROOT] hint changes (deploy/release.mjs, deploy/post-install-check.sh, docs/deployment.md)
+== and the accept test on Linux. Excerpt of the console output (ANSI colour codes and per-test lines removed), not a raw log.
+== Where: a disposable workspace /home/arm/r9b-accept-XXXXXX on streamanator (DEV), removed afterwards ("left: 0").
+== What: the worktree's tracked files except issues/, .agents/ and docs/v2/evidence/, with the edits, plus node_modules linked from
+==       /home/arm/afldb-i316-apply-876dadbfa024-20261024T001117Z (read only). Node v22.23.2 from nvm (/usr/bin/node is v18, which
+==       vitest 4.1.10 cannot start under: two earlier runs failed at startup on that, and one on files missing from a narrower tar).
+== r9b-run 2026-11-28T06:56:51Z host=streamanator user=arm
+node /home/arm/.nvm/versions/node/v22.23.2/bin/node v22.23.2; vitest   "version": "4.1.10",
+-- syntax
+node --check deploy/release.mjs OK
+bash -n deploy/post-install-check.sh OK
+-- vitest tests/deploy-release.test.ts tests/deploy-web-unit.test.ts tests/draftguru-import.test.ts
+ ✓ tests/deploy-web-unit.test.ts (46 tests) 4792ms
+ ✓ tests/draftguru-import.test.ts (53 tests | 8 skipped) 844ms
+ ✓ tests/deploy-release.test.ts (62 tests) 45781ms
+ Test Files  3 passed (3)
+      Tests  153 passed | 8 skipped (161)
+-- vitest tests/afl-api-ingestion-safety.test.ts -t no installer or sync path|prepared, not installed
+ ✓ tests/afl-api-ingestion-safety.test.ts (198 tests | 186 skipped) 708ms
+ Test Files  1 passed (1)
+      Tests  12 passed | 186 skipped (198)
+-- vitest tests/current-season-import.test.ts -t docs/deployment.md|rollback procedures
+ ✓ tests/current-season-import.test.ts (360 tests | 356 skipped) 16ms
+ Test Files  1 passed (1)
+      Tests  4 passed | 356 skipped (360)
+-- vitest tests/db-test-rebuild.test.ts -t named as canonical by active operator documentation
+ ✓ tests/db-test-rebuild.test.ts (1161 tests | 1160 skipped) 9ms
+ Test Files  1 passed (1)
+      Tests  1 passed | 1160 skipped (1161)
+-- accept test on Linux (GNU bash 5.2.21(1)-release)
+GATE ACCEPT TESTS RESULT PASS cases=27 pass=27 fail=0 checker-sha256=e365456a6a4b23de464aef48c598bb09e48132b212817f717cde58c6c4a21b85
+ACCEPT-RC 0
+R9B RUN RESULT rc=0
+CLEANUP removed /home/arm/r9b-accept-qQEzFq rc=0; left: 0
+== The checker then gained the 24 h freshness bound and case n20; the accept test alone was run again on Linux (same kind of workspace):
+== r9b-accept 2026-11-28T07:02:18Z host=streamanator GNU bash 5.2.21(1)-release
+GATE ACCEPT TESTS RESULT PASS cases=28 pass=28 fail=0 checker-sha256=d3981f9314c4fc7de36c1bfe3c612c6ea85690806bcf632f8f67ff2dbbd0fb33
+ACCEPT-RC 0
+CLEANUP removed /home/arm/r9b-accept-P1KTgW; left: 0

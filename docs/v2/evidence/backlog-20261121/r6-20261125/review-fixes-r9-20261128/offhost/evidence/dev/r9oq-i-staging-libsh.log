@@ -1,0 +1,92 @@
+== r7v-run r9oq 2026-11-28T06:52:51Z workstation Office user stuar; worktree HEAD c83abebddae12874be2674bce44123c79381444e
+[HARNESS] inputs sent (sha256, worktree):
+   96508d789484cd471a417b2b9bc65cf5d1a233a95de82a4593e880c77a0de62a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-container.sh
+   574ccd11ca33d5e4f0cbc34ff23977c44c466997200d02b1259a9c4d789e0880  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh
+   270bb7ad2fe433c17d666b2e716e8f00b2de251a4318e33e4aa1ea210c04eddd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-run.sh
+   ab54dbfeb569bd93826cf405442373e9c6f0df50fa30674a8732505f0993a9b6  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md
+   0330c5952f43722d6e19e099062be540feb1a4533d03aa32b282ad083c99f2b8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+   a33e317646145e08fc006cae07efded2d65838acfb1c17d6f27e1d511c97c9ee  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/afldb-verify-call.sh
+   ca739de772b31b466bdbb9c6295c8c4646f7b1746c71d7b618d92b606aee9bfb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/authorized_keys.template
+   15fdd32cb7bb960d569358eb0306cf7b5aec03a9289c5167929156b2b3c9215a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/build-sums.sh
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/60-afldb-verify.conf
+   3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-settle-failure-status.sh
+   05cba1ecff3e01c5618130cd12da5d7e31a41cefee9fab2bb1bb56db0ebcdad2  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts@.service
+   d2afbe6177c4fc9b27a6d7609cf803175d2e99568142e52a3d0506d50ba8bb6f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0-core.sh
+   7bd8e4970a9ce796ec8cd8532b3a398fe8a8e4955b5d373604d38d1d8b4115ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/lib.sh
+   a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/sealed-origin.sh
+   f8c95fb103e7c394adcd837de6c7a55060361a38b45f9b829097dd79ce862417  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/install-verify.sh
+   062f2dd3ed1791f92059cc38438942406ba80c98dc46b069375d3ac0c07bdd3f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/pg-auth-lines.txt
+   d7e71ed7bf8756d0b3d4d1bea38be7354f4c5cc22c79f6daa6fca0b9d7b99cd7  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verifier-db.sql
+   4b3d5ed11cf9cb833f5ad6cb20acd885e2d640a4cd18e1663f0c441fd29ce9ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verify-verify-install.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   e1dec9c218d9a25991a2e2e56ced05f49cbd1fbe8fcc6fa9f695ad2b21713d0f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md
+   e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   66b5be10f7d6a94e24e0d9c2e44c7673a777bf9dbcce774e54435625f3e3d73a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   4c99c7ae57a39ebfdb65740a01bc09669be9b734dc86ce814ad1db77681e4982  deploy/release.mjs
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  deploy/afldb-settle-failure-status.sh
+   183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e  deploy/host-policy/needrestart-afldb-hold.conf
+   4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810  deploy/host-policy/apt-52-afldb-unattended.conf
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] no --verify-rev: the worktree as it stands (uncommitted files included)
+PASS bundle digest 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+[HARNESS] r8 contrast blobs (r7 revision 7e2ef51a): install-verify-r7.sh 7ab4ba61ef0785db... call-r7.sh fe49c3dd2580b1e6...
+[HARNESS] fresh keys: verify AAAAC3NzaC1lZDI1NTE5AAAA... other AAAAC3NzaC1lZDI1NTE5AAAA... arm AAAAC3NzaC1lZDI1NTE5AAAA...
+workspace /home/arm/r7v-ws.TktjAc
+49
+[HARNESS] r9 FIXTURE qualification Q-ok (sha256 e3ece5543cf8d5dd1e3968368f7481de4bed935dccc5962ef1000d7ca2ae94db), record sha256 8e11e0b71e7e89afbe1a06ce355828ec146a9c4fb6c8b57fdaf05d5214e1a715:
+   # FIXTURE qualification (r7v-run.sh r9oq): rehearsal transport only
+   format=afldb-offhost-qualification-fixture-v1
+   host=r7v-offhost
+   address=r7v-offhost
+   hostkey=SHA256:jkXcev6EyhLhCF1mGtWw4Vbn9yXv4oKW7cBckbTciUk
+   record-file=records/r7v-fixture.txt
+   record-sha256=8e11e0b71e7e89afbe1a06ce355828ec146a9c4fb6c8b57fdaf05d5214e1a715
+   qualified-on=2026-11-28
+   rehearsal-utc-offset=-13982
+[HARNESS] r9 also: Q-streamanator (host=streamanator), Q-wrongkey (a host key not in the rehearsal known_hosts)
+
+== scenario i (2026-11-28T07:03:57Z)
+[HARNESS] verifier state digest before: f1af0f297650783d2493ac6fa73df3418a0f1c9fdc6ea56b464d651769aa9c58
+[FIXTURE-ATTACK] case home-arm: staging /home/arm/r8-stage-home-arm owned by arm (arm can write lib.sh), hostile line appended to bundle/lib.sh
+   | session check: no ancestor of pid 3592 has arm's uid (2 hops to pid 3567), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 10)
+   | INSTALL-VERIFY STOP: the staging directory must not be under /home
+R8 LIBSH home-arm exit=1 marker=absent INSTALL-VERIFY STOP: the staging directory must not be under /home
+[FIXTURE-ATTACK] case group-writable: staging /opt/r8-stage-group-writable root-owned but group-writable (0775), hostile line appended to bundle/lib.sh
+   | session check: no ancestor of pid 3622 has arm's uid (2 hops to pid 3567), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 10)
+   | INSTALL-VERIFY STOP: staging is not root-owned and protected: /opt/r8-stage-group-writable has mode 775: group- or other-writable
+R8 LIBSH group-writable exit=1 marker=absent INSTALL-VERIFY STOP: staging is not root-owned and protected: /opt/r8-stage-group-writable has mode 775: group- or other-writable
+[FIXTURE-ATTACK] case tampered: staging /opt/r8-stage-tampered root-owned and protected, hostile line appended to bundle/lib.sh (digest differs)
+   | session check: no ancestor of pid 3653 has arm's uid (2 hops to pid 3567), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 10)
+   | INSTALL-VERIFY STOP: bundle/lib.sh (9abb1dd0b50687437443e7b2444c416eb862d6b119d607f7879eba92eaefc640) does not match its bundle/SHA256SUMS line (e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369); refused before sourcing it
+R8 LIBSH tampered exit=1 marker=absent INSTALL-VERIFY STOP: bundle/lib.sh (9abb1dd0b50687437443e7b2444c416eb862d6b119d607f7879eba92eaefc640) does not match its bundle/SHA256SUMS line (e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369); refused before sourcing it
+[FIXTURE-ATTACK] case contrast-r7-home-arm: staging /home/arm/r8-stage-contrast-r7-home-arm owned by arm (arm can write lib.sh), hostile line appended to bundle/lib.sh
+[HARNESS] CONTRAST: the r7 install-verify.sh (r7 7e2ef51a blob 7ab4ba61ef0785db...) in /home/arm/r8-stage-contrast-r7-home-arm
+   | == install-verify 2026-11-28T07:03:57Z host=afldb-prod role=prod staging=/home/arm/r8-stage-contrast-r7-home-arm
+   | INSTALL-VERIFY STOP: /home/arm/r8-stage-contrast-r7-home-arm/bundle/lib.sh does not match SHA256SUMS
+R8 LIBSH contrast-r7-home-arm exit=1 marker=present INSTALL-VERIFY STOP: /home/arm/r8-stage-contrast-r7-home-arm/bundle/lib.sh does not match SHA256SUMS
+R8 STATE UNCHANGED f1af0f297650783d2493ac6fa73df3418a0f1c9fdc6ea56b464d651769aa9c58
+[HARNESS] summary:
+   R8 LIBSH home-arm exit=1 marker=absent INSTALL-VERIFY STOP: the staging directory must not be under /home
+   R8 LIBSH group-writable exit=1 marker=absent INSTALL-VERIFY STOP: staging is not root-owned and protected: /opt/r8-stage-group-writable has mode 775: group- or other-writable
+   R8 LIBSH tampered exit=1 marker=absent INSTALL-VERIFY STOP: bundle/lib.sh (9abb1dd0b50687437443e7b2444c416eb862d6b119d607f7879eba92eaefc640) does not match its bundle/SHA256SUMS line (e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369); refused before sourcing it
+   R8 LIBSH contrast-r7-home-arm exit=1 marker=present INSTALL-VERIFY STOP: /home/arm/r8-stage-contrast-r7-home-arm/bundle/lib.sh does not match SHA256SUMS
+   R8 STATE UNCHANGED f1af0f297650783d2493ac6fa73df3418a0f1c9fdc6ea56b464d651769aa9c58

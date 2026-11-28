@@ -15,6 +15,8 @@
 #    arm-owned value through san(); the wrapper sanitises and neutralises again).
 # 4. Prints exactly one final line and exits with the core's exit status (sshd returns it to the client):
 #    AFLDB-VERIFY RESULT <G0|A2|G0B|VERSION> <PASS|STOP> nonce=<n> host=<h> boot=<b> bundle=<sha256 of SHA256SUMS> at=<UTC> exit=<n> <fields>
+#    r9: G0B's fields are date dump sha256 dispatch-at received-at complete-at received-sha256 rehash-sha256 (g0b-core.sh; `none` when
+#    the core did not establish one), and a G0B PASS without all five evidence fields is turned into an internal STOP.
 set -uo pipefail
 export LC_ALL=C PATH=/usr/sbin:/usr/bin
 umask 077
@@ -55,7 +57,8 @@ result() { # PASS|STOP exit
     A2)  FLD[outcome]=${ARGS[0]}; FLD[current]=${ARGS[1]}; FLD[r3]=${ARGS[2]}; FLD[r4]=${ARGS[3]}; FLD[window]=${ARGS[4]}
          FLD[tue]=${ARGS[5]}; FLD[inv]=${ARGS[6]#inv:}
          for f in outcome current r3 r4 window tue inv day backup-origin; do extra+=" $f=${FLD[$f]:-none}"; done;;
-    G0B) FLD[date]=${ARGS[0]}; FLD[dump]=${ARGS[1]}; FLD[sha256]=${ARGS[2]}; for f in date dump sha256; do extra+=" $f=${FLD[$f]}"; done;;
+    G0B) FLD[date]=${ARGS[0]}; FLD[dump]=${ARGS[1]}; FLD[sha256]=${ARGS[2]}; for f in date dump sha256; do extra+=" $f=${FLD[$f]}"; done
+         for f in dispatch-at received-at complete-at received-sha256 rehash-sha256; do extra+=" $f=${FLD[$f]:-none}"; done;;
     VERSION) extra=" role=${FLD[role]:-none}";;
   esac
   echo "AFLDB-VERIFY RESULT $MODE $1 nonce=$NONCE host=$HOST boot=$BOOT bundle=$BSUM at=$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=$2$extra"
@@ -129,6 +132,8 @@ for k in "${!FLD[@]}"; do
     dispatch) [[ ${FLD[$k]} =~ ^(scheduled|catch-up)$ ]] || unset "FLD[$k]";;
     backup-origin) [[ ${FLD[$k]} =~ ^(attributed|refused)$ ]] || unset "FLD[$k]";;
     day) [[ ${FLD[$k]} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || unset "FLD[$k]";;
+    dispatch-at|received-at|complete-at) [ "$MODE" = G0B ] && [[ ${FLD[$k]} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || unset "FLD[$k]";;
+    received-sha256|rehash-sha256) [ "$MODE" = G0B ] && [[ ${FLD[$k]} =~ ^[0-9a-f]{64}$ ]] || unset "FLD[$k]";;
     *) unset "FLD[$k]";;
   esac
 done
@@ -137,6 +142,7 @@ if [ "$rc" = 0 ]; then
     G0) [ -n "${FLD[invocation]:-}" ] && [ -n "${FLD[dump]:-}" ] && [ -n "${FLD[sha256]:-}" ] && [ -n "${FLD[dispatch]:-}" ] \
           || { echo "STOP internal: the G0 core exited 0 without a valid invocation, dump, sha256 and dispatch"; result STOP 3; };;
     A2) [ "${FLD[backup-origin]:-}" = attributed ] || { echo "STOP internal: the A-2 core exited 0 without an attributed backup origin"; result STOP 3; };;
+    G0B) [ -n "${FLD[dispatch-at]:-}" ] && [ -n "${FLD[received-at]:-}" ] && [ -n "${FLD[complete-at]:-}" ] && [ -n "${FLD[received-sha256]:-}" ]            && [ -n "${FLD[rehash-sha256]:-}" ] || { echo "STOP internal: the G0B core exited 0 without the scheduled-transfer evidence fields"; result STOP 3; };;
   esac
   result PASS 0
 fi

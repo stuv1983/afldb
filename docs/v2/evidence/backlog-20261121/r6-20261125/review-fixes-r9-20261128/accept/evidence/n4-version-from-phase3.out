@@ -1,0 +1,13 @@
+== case n4-version-from-phase3: bash afldb-gate-accept.sh --rehearsal --gate ng-pre --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/real-reverify-4.5-post-phase4.txt --version inputs/real-version-3.13-pre-phase4.txt --verdict inputs/fx-a2-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:41:33Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   1f866b1f6479e6df3aae0666e2584e4e6876a177a7e77f53727313aa0b1139ce  inputs/real-reverify-4.5-post-phase4.txt
+   2fbf74dcd7a81fea6b919325db32ef5bdce5e00b3d8c1a0cec53034fdc449d79  inputs/real-version-3.13-pre-phase4.txt
+   0c4c25e847d8116a36d51c5ff4d3d067772b6c75e515d7445dee6facae1d7f30  inputs/fx-a2-pass-post.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+ACCEPT version FAIL made at 2026-11-28T05:21:26Z, not after the owner checks (2026-11-28T05:21:46Z) and the re-verification (2026-11-28T05:21:45Z): a Phase 3 version check is an installation diagnostic
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T05:25:33Z, exit 0, after the version check
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=version reason="version: made at 2026-11-28T05:21:26Z, not after the owner checks (2026-11-28T05:21:46Z) and the re-verification (2026-11-28T05:21:45Z): a Phase 3 version check is an installation diagnostic"
+== exit 1

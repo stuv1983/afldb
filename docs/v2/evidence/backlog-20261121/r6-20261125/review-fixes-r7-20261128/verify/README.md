@@ -19,16 +19,21 @@ exits 0 only for PASS. Release G0 consumes only `OWNER VERDICT G0 PASS`; NG-PRE 
 separate `backup-origin=` field on the same line. `--rehearsal <ssh-config> --key <key>` exists only for the harness, and it prints
 `transport=rehearsal` in every verdict, so a rehearsal verdict can never be pasted as a production one.
 
-`version` prints one `OWNER VERDICT VERSION` line per host and exits 0 only when both are PASS (r8; r7 exited 0 even when a host
-answered STOP).
+`version` prints one production line and one off-host line, and exits 0 only when both are PASS (r8; r7 exited 0 even when a host
+answered STOP). r9: the off-host line goes to the qualified endpoint (`../../review-fixes-r9-20261128/offhost/QUALIFY-OFFHOST.md`).
+With no pin it is `OWNER VERDICT VERSION STOP … host=none role=offhost reason="no qualified off-host endpoint"`, and the production
+line stays independent of it. Every G0 and VERSION verdict ends with `qualification=none|pinned|FIXTURE|refused qual-sha256=<pin
+sha256|none>`. `--qualification-fixture <file>` is accepted only with `--rehearsal`, and labels every verdict `qualification=FIXTURE`.
 
 **What a PASS establishes (r8).** Before an A2 or G0 verdict the wrapper prints one `SCOPE` line:
 * `A2 SCOPE:` an `OWNER VERDICT A2 PASS` establishes that the live production host matched **these seven arguments** at `at=`. The
   arguments come from the Tuesday record, printed by arm-run scripts over arm's login, and nothing here checks them. PASS lines marked
   `[ARM-PRODUCED ...]` are authentic readings of arm's data, not independent facts. `backup-origin=attributed` rests on root and
   PID 1 evidence only.
-* `G0 SCOPE:` the sealed timer run (root seal, PID 1) produced the named dump with that sha256, and streamanator holds a root-re-hashed
-  copy with those bytes after a root cron dispatch; the pull-log lines linking that dispatch to the copy are ARM-PRODUCED.
+* `G0 SCOPE:` the sealed timer run (root seal, PID 1) produced the named dump with that sha256. The **qualified** off-host endpoint's
+  root-owned verifier reports a 03:10 root cron dispatch, a transfer by that dispatch that received and verified those bytes and
+  completed in time, and a root re-hash at check time. The pull-log lines linking them are written by the endpoint's pull account, and
+  the endpoint's independence rests on the owner's qualification record (FIXTURE runs say that independence is simulated).
 A verdict is **authentic** (§3) only while root on both hosts is independent of arm (§10, F1; R7 README §4 item 20 for
 streamanator); authentic is not the same as "every input is true" (R8 `DEPENDENCIES.md` §1).
 
@@ -61,7 +66,7 @@ The dispatcher's last line is
 `AFLDB-VERIFY RESULT <G0|A2|G0B|VERSION> <PASS|STOP> nonce=<32hex> host=<hostname> boot=<boot id> bundle=<sha256 of SHA256SUMS> at=<UTC> exit=<n> <fields>`
 and its exit status is `exit=`, which sshd returns to the client. The wrapper generates a fresh nonce per call and accepts an answer
 only when all hold: exactly one RESULT line and it is the last line; mode as requested; nonce equals this call's; `bundle=` equals
-the digest pinned in the wrapper (`BUNDLE_SHA`, set by `build-sums.sh`); `host=` is `afldb-prod` (G0a, A2) or `streamanator` (G0b);
+the digest pinned in the wrapper (`BUNDLE_SHA`, set by `build-sums.sh`); `host=` is `afldb-prod` (G0a, A2) or the pin's `host=` (G0b and the off-host version line; r9);
 `at=` within 300 s of the workstation clock; `exit=` equals the ssh exit status; PASS if and only if exit 0; every argument field
 equals the request. Otherwise the verdict is STOP with `reason=`. This refuses stale, replayed, crossed and edited answers
 (scenario e of the harness exercises each one).
@@ -76,13 +81,29 @@ prefixes `[relayed, neutralised] ` to every relayed line containing `OWNER VERDI
 authenticated RESULT line. So a transcript has exactly one line that **begins** `OWNER VERDICT` per call: the wrapper's own.
 Harness scenario g replays the reviewer's forged comment.
 
-## 4. G0a to G0b handoff
+## 4. G0a to G0b handoff (r9: qualified endpoint and scheduled-transfer evidence)
 
 `g0` calls production first (G0a). Only an authenticated G0a PASS continues, and the wrapper then takes `dump=`, `sha256=`,
 `invocation=` and `dispatch=` **only from the G0a RESULT line** (they also appear as `OFFHOST-COMPARE <dump> <sha>` and
 `DISPATCH <kind> <delay> s after timer activation` in the output, for the human record, but the wrapper never parses those lines).
-It calls `g0b <date> <dump> <sha256>` on streamanator (G0b) and requires the RESULT fields to echo the same values. The final
-verdict carries both nonces. A G0a STOP never calls G0b.
+
+Off-host qualification is fail-closed. The endpoint is named only by the owner's pin
+`../../review-fixes-r9-20261128/offhost/QUALIFIED-ENDPOINT`, located relative to the wrapper's own directory. It is absent in the
+repository; the format and the procedure are in `QUALIFY-OFFHOST.md` there.
+
+* **Pin refused** (malformed; names streamanator or 10.0.40.100; carries streamanator's known host key; names production; record
+  digest mismatch): STOP `step=qualification`, before any call.
+* **No pin:** the legacy endpoint streamanator is asked `g0b`, and every line of its answer is printed behind
+  `[unqualified endpoint, information only]`. The verdict is
+  `OWNER VERDICT G0 STOP … offhost=none offhost-info=<PASS|STOP|unauthenticated> reason="no qualified off-host endpoint …"`, a PASS
+  included.
+* **Pin:** the pinned host key must be among the owner's known_hosts keys for the address, and ssh is then given only that key. The
+  wrapper calls `g0b <date> <dump> <sha256>` and requires the date/dump/sha256 fields to echo the request. It also requires the five
+  evidence fields: `dispatch-at=` in [D 03:10, +60 s); `received-at=` ≥ dispatch − 5 s; `received-at` ≤ `complete-at=` ≤ D 03:10 +
+  2100 s and ≤ `at=`; `received-sha256=` and `rehash-sha256=` equal to G0a's sha256. A missing dispatch or completion is reported as
+  "possession only", and G0 STOPs.
+
+The final verdict carries both nonces, `offhost=`, the five fields and the qualification fields. A G0a STOP never calls G0b.
 
 ## 5. A-2 to NG-PRE
 
@@ -112,7 +133,8 @@ production (R7 README §4, item 17, which r8 states precisely: what such a role 
 - **G0B (streamanator)**: the dump's size and full sha256, the `.verified-<dump>` marker, the retention hold, the sidecar line and
   arm's crontab line, via the root facts reader; the cron dispatch line from journald **only** if `_UID=0` (kernel-attested),
   `_TRANSPORT=syslog`, `SYSLOG_IDENTIFIER=CRON` and `SYSLOG_PID=_PID` (a line arm logs with `logger` cannot match); the pull log's
-  BEGIN/VERIFIED/END lineage (arm-produced, see §9).
+  BEGIN/VERIFIED/END lineage (arm-produced, see §9). r9: the core emits `rehash-sha256`, `dispatch-at`, `complete-at`,
+  `received-at` and `received-sha256` as result fields, and the dispatcher turns a G0B PASS without all five into an internal STOP.
 - **A2**: §7.
 
 ## 7. A-2 substitutions (the WHOLE r6-pre-verify.sh is ported: every check, same order, same wording where the fact is the same)
@@ -201,14 +223,14 @@ The block below runs in that session:
 * `afldb_verify.pub` travels the same way, and its `ssh-keygen -lf` fingerprint must equal the workstation's.
 * `install-verify.sh` refuses (r8) a root session that descends from arm: an ancestor with real or effective uid arm,
   `SUDO_USER`/`SUDO_UID` = arm, or loginuid = arm. It prints `REFUSED: root session descends from arm` before any change.
-* The streamanator line needs the same kind of independent root path on streamanator. How the owner reaches it is UNKNOWN, and
-  streamanator's arm is in `docker`, `lxd` and `sudo` (OWNER-PROCEDURE §8), so `G0B PASS` is not independent of streamanator's arm
-  until the owner decides.
+* r9: the off-host role is installed on the **qualified** endpoint, through its own admin path (`QUALIFY-OFFHOST.md` §2).
+  streamanator's arm is in `docker`, `lxd` and `sudo` (OWNER-PROCEDURE §8), so the wrapper refuses to qualify it; a `G0B PASS` from it
+  is information only. No endpoint is qualified today.
 
 ```text
 # as root, from a root-owned staging copy of verify/ (never from arm's checkout):
 bash install-verify.sh --role prod --key /root/staging/afldb_verify.pub       # production
-bash install-verify.sh --role offhost --key /root/staging/afldb_verify.pub    # streamanator
+bash install-verify.sh --role offhost --key /root/staging/afldb_verify.pub    # the qualified off-host endpoint
 # then on production, as postgres: verifier-db.sql and pg-auth-lines.txt (section 8)
 bash verify-verify-install.sh --role prod|offhost                              # read-only check, any user (sshd checks need root)
 ```
@@ -255,6 +277,9 @@ read-only check, and **never writes arm's checkout**.
 13. **r8, wrapper.** `version` exits 1 unless both hosts answer an authenticated PASS; `A2 SCOPE:` and `G0 SCOPE:` lines (§1) are
     printed before the verdict. A-2 and G0b PASS lines resting on arm's data carry `[ARM-PRODUCED ...]` (§9). No check changed.
 14. Harness image (r8) adds `sudo`, used only inside the prod container by scenario h.
+15. **r9, off-host qualification (Astra blocker 1).** The wrapper gains the qualification pin, the streamanator denylist, pinned
+    known_hosts, `--qualification-fixture` (rehearsal only) and the scheduled-transfer evidence check. `g0b-core.sh` and the
+    dispatcher gain the five G0B fields. In `g0-core.sh` only one message changes. Bundle digest `3ea41209…`.
 
 ## 12. Rehearsal (`../verify-harness/`)
 
@@ -268,6 +293,12 @@ r8 added `--log-dir` (dev runs write under R8 `dev-logs/`, so the recorded r7 lo
 (a hostile `bundle/lib.sh` in an arm-owned, a group-writable and a tampered staging copy is never sourced; CONTRAST: the r7 blob ran it
 as root), **j version-exit** (control exit 0; an off-host VERSION STOP gives exit 1; CONTRAST: the r7 blob exited 0). Scenarios a and
 c also require the SCOPE line and the ARM-PRODUCED labels, and c reports A-2's `backup-origin=` and the whole-A-2 exit separately.
+
+r9 renamed the off-host container to `r7v-offhost`. Scenarios a, d, e and j pass a FIXTURE qualification. New scenarios:
+**k offhost-qualification** (an unqualified STOP although the container answers PASS; a fixture naming streamanator refused;
+production transport refuses the fixture flag; an unknown host key gives STOP) and **l possession-only** (the pull log's END removed,
+then the dispatch journal vacuumed: each a STOP "possession only"). The local decision test is
+`../../review-fixes-r9-20261128/offhost/tests/r9q-wrapper-test.sh`.
 
 Two disposable containers on streamanator (`--network none`, never `--privileged`, label `r7v.run=<RID>`), whose PID 1 is the real
 systemd 255. `afldb-prod` has a fixed-offset Melbourne zone so the **real afldb-backup.timer** fires at 02:20 local about two

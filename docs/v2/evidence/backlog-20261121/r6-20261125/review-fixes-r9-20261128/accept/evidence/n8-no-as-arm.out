@@ -1,0 +1,13 @@
+== case n8-no-as-arm: bash afldb-gate-accept.sh --rehearsal --gate release-g0 --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/fx-reverify-no-as-arm.txt --version inputs/fx-version-post.txt --verdict inputs/fx-g0-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:41:44Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   678894aba22bb0decde387382d6ccb6af4d72223eff26de172336487c26a20c0  inputs/fx-reverify-no-as-arm.txt
+   4087a7e0603c00cde5cc29bbab0524bcb18a723fb55f4c614c1a03a511d6a60f  inputs/fx-version-post.txt
+   b338ab86f537bbd10c996518da5dcfe61f40974150c4fbef4a3f2ba64a15c0d6  inputs/fx-g0-pass-post.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify FAIL need each header once: root 1, --as-arm 0, verify-verify-install --role prod 1
+ACCEPT version FAIL cannot be ordered after (a) and (b), which did not pass
+ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T05:25:16Z, exit 0, after the version check
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=reverify,version reason="reverify: need each header once: root 1, --as-arm 0, verify-verify-install --role prod 1"
+== exit 1

@@ -1,0 +1,19 @@
+SCENARIO group-only PASS expect=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS got=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS
+SCENARIO group-only-backout FAIL expect=entry=PASS,verify=PASS,backout=PASS,state=pre-change got=failed: backout RESULT PASS;
+SCENARIO refuse-90-arm PASS expect=entry=REFUSED(90-arm:1 arm),nothing-changed got=entry=REFUSED(90-arm:1 arm),nothing-changed
+SCENARIO refuse-user-alias PASS expect=entry=REFUSED(80-alias:1 arm),nothing-changed got=entry=REFUSED(80-alias:1 arm),nothing-changed
+SCENARIO refuse-group-adm PASS expect=entry=REFUSED(70-adm:1 %adm),nothing-changed got=entry=REFUSED(70-adm:1 %adm),nothing-changed
+SCENARIO refuse-admin-group PASS expect=entry=REFUSED(arm in admin),nothing-changed got=entry=REFUSED(arm in admin),nothing-changed
+SCENARIO refuse-include PASS expect=entry=REFUSED(@include /etc/sudoers.local),nothing-changed got=entry=REFUSED(@include /etc/sudoers.local),nothing-changed
+SCENARIO refuse-dispose-nomatch PASS expect=entry=REFUSED(--dispose without a match),nothing-changed got=entry=REFUSED(--dispose without a match),nothing-changed
+SCENARIO disposed FAIL expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=failed: backout RESULT PASS;
+SCENARIO disposed-removed FAIL expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=failed: backout RESULT PASS;
+SCENARIO residual-uid FAIL expect=entry=PASS(blind),verify=STOP,B1=FAIL+B3=PASS,backout=PASS got=failed: backout RESULT PASS;
+SCENARIO residual-all FAIL expect=entry=PASS(blind),verify=STOP,B1=FAIL+B3=PASS,backout=PASS got=failed: backout RESULT PASS;
+SCENARIO old-r8-backout FAIL expect=r8-backout=LOST(rule,NOPASSWD,sudo-l),r9-backout=PASS got=failed: backout RESULT PASS;
+SCENARIO unplanned-edit PASS expect=verify=STOP(README),backout=FAIL(README),group-restored got=verify=STOP(README),backout=FAIL(README),group-restored
+SCENARIO state-tamper PASS expect=verify=STOP(seal),backout=FAIL(seal),nothing-changed got=verify=STOP(seal),backout=FAIL(seal),nothing-changed
+R9P4 RESIDUE containers=0 images=0 workspace=removed r9p4-workspaces=0 base-image=sha256:d71c0b286c54 build-cache=[Cache entries, 0]
+R9P4 RESIDUE-CHECK 2026-11-28T06:56:01Z containers-this-run=0 containers-any-r9p4=0 images-any-r9p4=0 workspaces=0
+secret scan of dev-p4d-run.txt: 0 match(es) for private key blocks, DSNs, password= assignments or crypt hashes
+R9 PHASE4 HARNESS RESULT FAIL (pass=9 fail=6 of 15; residue lines 1/1; secret matches 0)

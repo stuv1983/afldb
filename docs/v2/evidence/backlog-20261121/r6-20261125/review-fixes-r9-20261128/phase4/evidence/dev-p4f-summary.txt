@@ -1,0 +1,24 @@
+SCENARIO group-only PASS expect=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS got=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS
+SCENARIO group-only-backout PASS expect=entry=PASS,verify=PASS,backout=PASS,state=pre-change got=entry=PASS,verify=PASS,backout=PASS,state=pre-change
+SCENARIO refuse-90-arm PASS expect=entry=REFUSED(90-arm:1 arm),nothing-changed got=entry=REFUSED(90-arm:1 arm),nothing-changed
+SCENARIO refuse-user-alias PASS expect=entry=REFUSED(80-alias:1 arm),nothing-changed got=entry=REFUSED(80-alias:1 arm),nothing-changed
+SCENARIO refuse-group-adm PASS expect=entry=REFUSED(70-adm:1 %adm),nothing-changed got=entry=REFUSED(70-adm:1 %adm),nothing-changed
+SCENARIO refuse-admin-group PASS expect=entry=REFUSED(arm in admin),nothing-changed got=entry=REFUSED(arm in admin),nothing-changed
+SCENARIO refuse-include PASS expect=entry=REFUSED(@include /etc/sudoers.local),nothing-changed got=entry=REFUSED(@include /etc/sudoers.local),nothing-changed
+SCENARIO refuse-dispose-nomatch PASS expect=entry=REFUSED(--dispose without a match),nothing-changed got=entry=REFUSED(--dispose without a match),nothing-changed
+SCENARIO disposed PASS expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before
+SCENARIO disposed-removed PASS expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before
+SCENARIO residual-uid PASS expect=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed
+SCENARIO residual-all PASS expect=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed
+SCENARIO refuse-uid-alias PASS expect=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed got=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed
+SCENARIO refuse-continued PASS expect=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed got=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed
+SCENARIO refuse-negated PASS expect=entry=REFUSED(83-neg:1 negated),nothing-changed got=entry=REFUSED(83-neg:1 negated),nothing-changed
+SCENARIO refuse-nsswitch PASS expect=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed got=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed
+SCENARIO late-grant PASS expect=verify=STOP(95-late added),backout=FAIL(names 95-late),manual-rm,backout=PASS,state=pre-change got=verify=STOP(95-late added),backout=FAIL(names 95-late),manual-rm,backout=PASS,state=pre-change
+SCENARIO old-r8-backout PASS expect=r8-backout=LOST(rule,NOPASSWD,sudo-l),r9-backout=PASS got=r8-backout=LOST(rule,NOPASSWD,sudo-l),r9-backout=PASS
+SCENARIO unplanned-edit PASS expect=verify=STOP(README),backout=FAIL(README),group-restored got=verify=STOP(README),backout=FAIL(README),group-restored
+SCENARIO state-tamper PASS expect=verify=STOP(seal),backout=FAIL(seal),nothing-changed got=verify=STOP(seal),backout=FAIL(seal),nothing-changed
+R9P4 RESIDUE containers=0 images=0 workspace=removed r9p4-workspaces=0 base-image=sha256:d71c0b286c54 build-cache=[Cache entries, 0]
+R9P4 RESIDUE-CHECK 2026-11-28T07:07:07Z containers-this-run=0 containers-any-r9p4=0 images-any-r9p4=0 workspaces=0
+secret scan of dev-p4f-run.txt: 0 match(es) for private key blocks, DSNs, password= assignments or crypt hashes
+R9 PHASE4 HARNESS RESULT PASS (20 of 20 scenarios; residue 0 containers, 0 images, 0 workspaces)

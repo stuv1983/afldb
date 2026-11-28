@@ -13,6 +13,14 @@
 # trusted fields say a root process wrote it via syslog (_UID=0 kernel-attested, SYSLOG_IDENTIFIER=CRON, _TRANSPORT=syslog, SYSLOG_PID=_PID;
 # not _COMM/_EXE: journald reads them from /proc after receipt and the cron child has exec'd /bin/sh by then), so a
 # `logger -t CRON` line from any non-root user no longer counts; CRON_LOG_FILE (a retained export) is not supported (no environment passes).
+# r9 (Astra blocker 1): SCHEDULED-TRANSFER EVIDENCE as result fields (lib.sh field(); the dispatcher validates and prints them on the
+# G0B RESULT line, `none` when absent), each emitted only once this core has established it:
+#   rehash-sha256    root's check-time re-hash of the copy (the facts reader's dump_sha256)
+#   dispatch-at      the journal time (UTC) of the unique 03:10 root cron dispatch
+#   complete-at      the END time of the invocation linked to that dispatch, once that END is in time and rc=0
+#   received-at      the time of that invocation's VERIFIED record of this dump and sha256, once it lies inside the invocation
+#   received-sha256  the sha256 that VERIFIED record carries
+# The workstation wrapper accepts G0B PASS only with all five, consistent with G0a; a copy without them is possession only.
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin
 VB=/usr/local/lib/afldb-verify
 . "$VB/lib.sh"
@@ -40,6 +48,8 @@ unproven() {
   finish 10
 }
 rootfacts g0b "$DAY" "$D" || failed "the root facts reader failed: $RF_WHY"
+utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; }
+[[ ${RF[dump_sha256]:-} =~ ^[0-9a-f]{64}$ ]] && field rehash-sha256 "${RF[dump_sha256]}"
 
 # ---- A. The copy itself (independent of cron)
 [[ ${RF[dump_size]:-0} =~ ^[1-9][0-9]*$ && ${RF[verified_marker]:-} = yes ]] || failed 'dump or verified marker missing'
@@ -72,6 +82,7 @@ done <<< "$J"
 [[ ${#dpid[@]} -ge 1 ]] || unproven "no 03:10 cron dispatch of the r3 command in the journal for $DAY"
 [[ ${#dpid[@]} = 1 ]] || unproven "ambiguous 03:10 cron dispatch for $DAY (count=${#dpid[@]})"
 echo "DISPATCH journal: pid=${dpid[0]} at $(TZ=Australia/Melbourne date -d "@${dtime[0]}" +'%F %T %Z') (a root syslog entry: _UID=0, SYSLOG_PID=_PID)"
+field dispatch-at "$(utc "${dtime[0]}")"
 [ "${RF[pull_log_readable]:-}" = yes ] || unproven 'invocation log missing'
 LOGL=${RF[pull_log]:-}
 matches=()
@@ -98,10 +109,12 @@ read -r et tag er rc <<< "${E[0]}"
 fin=$(date -d "$et" +%s 2>/dev/null) || failed 'invalid completion timestamp'
 (( fin >= start && fin <= DEADLINE && fin <= $(date +%s) )) || failed 'stale, late or future completion'
 [[ $rc = rc=0 ]] || failed "scheduled invocation failed ($(san "$rc" 20)); a later retry cannot replace it"
+field complete-at "$(utc "$fin")"
 mapfile -t V < <(awk -v r="$run" -v d="dump=$D" -v s="sha256=$S" '$2=="VERIFIED" && $3==r && $4==d && $5==s && NF==5' <<< "$LOGL")
 [[ ${#V[@]} = 1 ]] || unproven "the scheduled invocation succeeded but did not itself verify $D with this checksum"
 vtime=$(date -d "${V[0]%% *}" +%s 2>/dev/null) || unproven 'invalid verification time'
 (( vtime >= start && vtime <= fin )) || unproven 'verification record lies outside the invocation'
+field received-at "$(utc "$vtime")"; field received-sha256 "${V[0]##* sha256=}"
 echo "PASS scheduled pull date=$DAY dispatch_pid=${dpid[0]} $(san "$run" 80) completion=$(san "$et" 40) rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]"
 echo "OFFHOST-COMPARE $D $S"
 echo 'RESULT SCHEDULED-COPY-VERIFIED'

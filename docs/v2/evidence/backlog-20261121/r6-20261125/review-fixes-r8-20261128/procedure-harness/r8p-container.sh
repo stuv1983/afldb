@@ -17,6 +17,8 @@
 #                      admin-key-option, admin-extra-key, c3-gw-other (a root-run unit's argument in a root:<group arm is
 #                      not in> 0775 directory: C3 reports it, does not fail), c3-gw-arm (the same directory group arm: C3 FAIL,
 #                      R8-F-14), then control; each mutation is reverted afterwards                                     [FIXTURE]
+#   phase4-backout     (r9) the documented Phase 4 back-out at the console stand-in: the staged afldb-phase4.sh, pin-checked, runs
+#                      `backout --state /root/afldb-phase4-state`; run after every other scenario that needs the post-Phase-4 state
 #   final              (stdin: every log of the run) `id` of every identity, then the count of fixture-password occurrences
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -175,6 +177,14 @@ fc)
   FP=${2:?fp}
   [ -f "$CHECKS" ] || { echo "STOP the owner checks were not staged by the admin session"; exit 1; }
   for c in pg-superuser pg-nologin-super group-writable no-admin admin-key-option admin-extra-key c3-gw-other c3-gw-arm control; do fc_case "$c" "$FP"; done;;
+phase4-backout) # r9: the documented back-out at the console stand-in, after the main flow (OWNER-PROCEDURE Phase 4 back-out)
+  P4=/root/afldb-r9-phase4
+  [ -f $P4/afldb-phase4.sh ] || { echo "STOP the Phase 4 script was not staged by the admin session"; exit 1; }
+  echo "---- [CON] (console stand-in) pin check, then afldb-phase4.sh backout"
+  (cd $P4 && sha256sum -c --strict SHA256SUMS) || { echo "STOP the staged Phase 4 script does not match its pin"; exit 1; }
+  env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc $P4/afldb-phase4.sh backout --state /root/afldb-phase4-state < /dev/null
+  echo "R8P P4-BACKOUT exit $?"
+  echo "   id arm: $(id arm)"; echo "   sudo -l -U arm: $(sudo -n -l -U arm 2>&1 | tail -1)";;
 final)
   for u in root arm afldb-admin afldb-backup afldb-verify postgres; do echo "   id $u: $(id "$u" 2>&1)"; done
   n=$(grep -c -F -f /root/r8p-fixture-pw); echo "R8P SECRET-SCAN fixture-password-occurrences ${n:-0}";;

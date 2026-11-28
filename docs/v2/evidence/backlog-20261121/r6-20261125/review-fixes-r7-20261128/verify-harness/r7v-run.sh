@@ -30,6 +30,18 @@
 #                      install-verify.sh refuses each before sourcing it (no marker); CONTRAST: r7's (the blob at the pinned r7 revision 7e2ef51a) ran it as root
 #   j  version-exit    wrapper 'version': both hosts PASS -> exit 0 (control); the off-host answer replaced by an authenticated-
 #                      looking VERSION STOP (HARNESS fake transport) -> exit 1; CONTRAST: r7's wrapper (blob at the pinned r7 revision 7e2ef51a) exited 0
+#   r9 additions (Astra blocker 1, off-host qualification; R9 offhost/):
+#   The off-host container is now --hostname r7v-offhost (r7v-host.sh), and the wrapper qualifies NO off-host endpoint by default.
+#   a, d, e (fresh control) and j (control and fake STOP) pass a FIXTURE qualification of that container (--qualification-fixture,
+#   simulated independence), and a also requires qualification=FIXTURE, the FIXTURE SCOPE wording and the five evidence fields.
+#   k  offhost-qualification  unqualified g0: the off-host container answers an authenticated G0B PASS, printed only behind
+#                      "[unqualified endpoint, information only]", and the verdict is G0 STOP qualification=none; a fixture naming
+#                      streamanator is refused before any call; production transport refuses --qualification-fixture (exit 2, no
+#                      ssh); a fixture whose host key is not in the rehearsal known_hosts STOPs before the G0b call
+#   l  possession-only  (FIXTURE-ATTACK, off-host container, qualified by fixture) l1: root removes the pull log's END lines: the core
+#                      answers STOP and the wrapper says "possession only ... complete-at missing"; restored. l2 (LAST, after b):
+#                      the journal holding the 03:10 dispatch is vacuumed: "possession only ... dispatch-at missing"
+#   j  also runs version unqualified: production PASS line, off-host "no qualified off-host endpoint" STOP, exit 1
 # Logs: verify-harness/logs/<RID>-*.log (workstation), or --log-dir. Containers, image, workspace and test keys are removed at the end.
 # Development only (never in a recorded run): R7V_IMAGE=<kept image> reuses an image; --keep-image keeps it; R7V_KEEP_CTRS=1 keeps
 # the containers and workspace for inspection (the summary prints the `down` command).
@@ -120,6 +132,21 @@ Host *
   GlobalKnownHostsFile $KDM/known_hosts
 EOF
 CFG=$KDM/cfg; KV=$KDM/verify; KO=$KDM/other; KA=$KDM/arm
+# ---- r9: FIXTURE qualifications of the off-host container (simulated independence; the wrapper takes them with --rehearsal only)
+OFFOFF=$(sed -n 's/^R7V OFFHOST-UTC-OFFSET //p' "$SETUP")
+OFP=$("$WKEYGEN" -lf "$KDM/known_hosts" | tr -d '\r' | awk '$3 == "r7v-offhost" {print $2}')
+mkdir -p "$KD/qual/records"
+printf '%s\n' "FIXTURE qualification record (r7v-run.sh $RID, $(date -u +%FT%TZ)): r7v-offhost is a disposable container on streamanator," \
+  "inside streamanator arm's control. Its independence is SIMULATED for the rehearsal; this record establishes nothing about any machine." > "$KD/qual/records/r7v-fixture.txt"
+RSF=$(sha256sum < "$KD/qual/records/r7v-fixture.txt" | cut -c1-64)
+mkq() { printf '%s\n' "# FIXTURE qualification (r7v-run.sh $RID): rehearsal transport only" "format=afldb-offhost-qualification-fixture-v1" \
+  "host=$2" "address=r7v-offhost" "hostkey=$3" "record-file=records/r7v-fixture.txt" "record-sha256=$RSF" "qualified-on=$DAY" \
+  "rehearsal-utc-offset=$OFFOFF" > "$KD/qual/$1"; }
+mkq Q-ok r7v-offhost "$OFP"; mkq Q-streamanator streamanator "$OFP"; mkq Q-wrongkey r7v-offhost "SHA256:$(printf 'A%.0s' {1..43})"
+QF=(--qualification-fixture "$KDM/qual/Q-ok")
+{ echo "[HARNESS] r9 FIXTURE qualification Q-ok (sha256 $(sha256sum < "$KD/qual/Q-ok" | cut -c1-64)), record sha256 $RSF:"; sed 's/^/   /' "$KD/qual/Q-ok"
+  echo "[HARNESS] r9 also: Q-streamanator (host=streamanator), Q-wrongkey (a host key not in the rehearsal known_hosts)"; } >> "$HDR"
+[[ $OFP =~ ^SHA256:[A-Za-z0-9+/]{43}$ && $OFFOFF =~ ^-?[0-9]+$ ]] || { say "STOP cannot build the fixture qualification (fingerprint '$OFP', offset '$OFFOFF')"; say "R7 VERIFY HARNESS RESULT FAIL"; exit 1; }
 say "== r7v $RID day $DAY containers $CA $CB; transport ProxyCommand docker exec; client $WSSH ($("$WSSH" -V 2>&1 | tr -d '\r'))"
 norm() { sed -E 's/ (nonce|at|g0a-nonce|g0a-at|g0b-nonce|g0b-at)=[^ ]+//g'; }
 wcall() { # log args... : runs the documented wrapper (rehearsal transport) and logs it; sets WRC and WOUT
@@ -132,12 +159,15 @@ hdr() { { cat "$HDR"; echo; echo "== scenario $1 ($(date -u +%FT%TZ))"; } > "$2"
 
 # ---- a: G0 success
 LA=$LOGS/$RID-a-g0-success.log; hdr a "$LA"
-wcall "$LA" g0 "$DAY"; A_OUT=$WOUT; A_RC=$WRC; A_V=$(vline "$WOUT")
+wcall "$LA" "${QF[@]}" g0 "$DAY"; A_OUT=$WOUT; A_RC=$WRC; A_V=$(vline "$WOUT")
 A_LAB=$(grep -c '\[ARM-PRODUCED' <<< "$WOUT")
-{ echo "[HARNESS] r8: SCOPE line: $(grep '^G0 SCOPE: ' <<< "$WOUT" | cut -c1-120)..."; echo "[HARNESS] r8: lines labelled ARM-PRODUCED ($A_LAB):"; grep '\[ARM-PRODUCED' <<< "$WOUT" | cut -c1-200 | sed 's/^/   /'; } >> "$LA"
-if [ "$A_RC" = 0 ] && [[ $A_V == "OWNER VERDICT G0 PASS transport=rehearsal"* ]] && grep -q '^-- G0b' <<< "$WOUT" && grep -q '^AFLDB-VERIFY RESULT G0B PASS' <<< "$WOUT" \
-   && grep -q '^G0 SCOPE: ' <<< "$WOUT" && grep -q '^PASS scheduled pull .*\[ARM-PRODUCED' <<< "$WOUT" && grep -q '^INVOCATION linked .*\[ARM-PRODUCED' <<< "$WOUT"; then
-  res a "PASS g0-success: exit 0, G0 SCOPE line, $A_LAB ARM-PRODUCED label(s); $(cut -c1-230 <<< "$A_V")"
+{ echo "[HARNESS] r8: SCOPE line: $(grep '^G0 SCOPE: ' <<< "$WOUT" | cut -c1-120)..."; echo "[HARNESS] r8: lines labelled ARM-PRODUCED ($A_LAB):"; grep '\[ARM-PRODUCED' <<< "$WOUT" | cut -c1-200 | sed 's/^/   /'
+  echo "[HARNESS] r9: the G0B RESULT line's scheduled-transfer evidence: $(grep '^AFLDB-VERIFY RESULT G0B' <<< "$WOUT" | grep -o ' dispatch-at=.*')"; } >> "$LA"
+A_EV=0; [[ $A_V == *" dispatch-at=20"*"Z received-at=20"*"Z complete-at=20"*"Z received-sha256="[0-9a-f]*" rehash-sha256="[0-9a-f]*" qualification=FIXTURE qual-sha256="* ]] && A_EV=1
+if [ "$A_RC" = 0 ] && [[ $A_V == "OWNER VERDICT G0 PASS transport=rehearsal"* ]] && grep -q '^-- G0b: qualified' <<< "$WOUT" && grep -q '^AFLDB-VERIFY RESULT G0B PASS' <<< "$WOUT" \
+   && grep -q '^G0 SCOPE: .*qualification=FIXTURE: the endpoint.s independence is SIMULATED' <<< "$WOUT" && [ "$A_EV" = 1 ] \
+   && grep -q '^PASS scheduled pull .*\[ARM-PRODUCED' <<< "$WOUT" && grep -q '^INVOCATION linked .*\[ARM-PRODUCED' <<< "$WOUT"; then
+  res a "PASS g0-success (FIXTURE qualification): exit 0, G0 SCOPE line (FIXTURE), five evidence fields, $A_LAB ARM-PRODUCED label(s); $(grep -o 'dispatch-at=[^ ]* received-at=[^ ]* complete-at=[^ ]*' <<< "$A_V") qualification=FIXTURE"
 else res a "FAIL g0-success: exit $A_RC; $(cut -c1-300 <<< "$A_V")"; fi
 
 # ---- c: whole A-2 through the owner path
@@ -210,7 +240,7 @@ grep -q '^R8 STATE UNCHANGED' <<< "$IS" || IOK=0
 # ---- d: hostile arm login environment
 LD=$LOGS/$RID-d-hostile-arm.log; hdr d "$LD"
 "${DEVSSH[@]}" "$HOSTSH hostile" >> "$LD" 2>&1
-wcall "$LD" g0 "$DAY"; D1_RC=$WRC; D1_V=$(vline "$WOUT"); D1_OUT=$WOUT
+wcall "$LD" "${QF[@]}" g0 "$DAY"; D1_RC=$WRC; D1_V=$(vline "$WOUT"); D1_OUT=$WOUT
 wcall "$LD" a2 $A2ARGS; D2_RC=$WRC; D2_V=$(vline "$WOUT"); D2_OUT=$WOUT
 pf() { grep -E '^(PASS|FAIL) ' <<< "$1" | grep -v ' next=' ; }
 { echo "[HARNESS] verdict comparison (nonce= and at= fields removed):"
@@ -254,7 +284,7 @@ EOF
 chmod 755 "$KD/fakessh"
 EOK=1; ELINE=
 for m in fresh replay stale bundle exitlie tworesults; do
-  out=$(R7V_FAKE=$m AFLDB_VERIFY_SSH="$KD/fakessh" bash "$CALL" --rehearsal "$CFG" --key "$KV" g0 "$DAY" 2>&1); rc=$?
+  out=$(R7V_FAKE=$m AFLDB_VERIFY_SSH="$KD/fakessh" bash "$CALL" --rehearsal "$CFG" --key "$KV" "${QF[@]}" g0 "$DAY" 2>&1); rc=$?
   v=$(vline "$out"); { echo "-- fake transport mode $m: wrapper exit $rc"; echo "   $v"; } >> "$LE"
   case $m in
     fresh) [ "$rc" = 0 ] && [[ $v == "OWNER VERDICT G0 PASS"* ]] || EOK=0;;
@@ -290,10 +320,11 @@ fk verify-key-stdio-forward 255 'open failed|administratively prohibited|forward
 fk arm-key-as-arm-control 0 'uid=1000\(arm\)' -i "$KA" -T r7v-prod-arm 'command -p id'
 [ "$FOK" = 1 ] && res f "PASS keys: $FL" || res f "FAIL keys: $FL"
 
-# ---- j (r8): the wrapper's version mode exits 1 when a host answers STOP (r7 exited 0)
+# ---- j (r8): the wrapper's version mode exits 1 when a host answers STOP (r7 exited 0). r9: the control and the fake STOP pass the
+# FIXTURE qualification (without one the off-host line is "no qualified off-host endpoint"); the r7 CONTRAST blob has no such flag.
 LJ=$LOGS/$RID-j-version-exit.log; hdr j "$LJ"
 JOK=1
-wcall "$LJ" version; J1=$WRC; J1P=$(grep -c '^OWNER VERDICT VERSION PASS' <<< "$WOUT")
+wcall "$LJ" "${QF[@]}" version; J1=$WRC; J1P=$(grep -c '^OWNER VERDICT VERSION PASS .* qualification=FIXTURE qual-sha256=' <<< "$WOUT")
 [ "$J1" = 0 ] && [ "$J1P" = 2 ] || JOK=0
 BSHA=$(sed -n 's/^BUNDLE_SHA=\([0-9a-f]\{64\}\).*/\1/p' "$CALL")
 cat > "$KD/fakever" <<EOF
@@ -302,30 +333,73 @@ cat > "$KD/fakever" <<EOF
 # with a well-formed VERSION STOP for this call's nonce, the pinned bundle and the current time (what a verifier whose self-check
 # failed answers: exit 3, role=none).
 cmd=\${!#}; tgt=\${@: -2:1}
-case \$tgt:\$cmd in r7v-offhost:version\ *) n=\${cmd##* }; echo "STOP verifier self-check: (harness)"; echo "AFLDB-VERIFY RESULT VERSION STOP nonce=\$n host=streamanator boot=none bundle=$BSHA at=\$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=3 role=none"; exit 3;; esac
+case \$tgt:\$cmd in r7v-offhost:version\ *) n=\${cmd##* }; echo "STOP verifier self-check: (harness)"; echo "AFLDB-VERIFY RESULT VERSION STOP nonce=\$n host=r7v-offhost boot=none bundle=$BSHA at=\$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=3 role=none"; exit 3;; esac
 exec "$WSSH" "\$@"
 EOF
 chmod 755 "$KD/fakever"
-sleep 2
-out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$CALL" --rehearsal "$CFG" --key "$KV" version 2>&1); J2=$?
+sleep 4
+out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$CALL" --rehearsal "$CFG" --key "$KV" "${QF[@]}" version 2>&1); J2=$?
 { echo "-- r8 wrapper, off-host answer replaced by a VERSION STOP (HARNESS fake transport): exit $J2"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
-[ "$J2" = 1 ] && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator' <<< "$out" || JOK=0
-sleep 2
+[ "$J2" = 1 ] && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=r7v-offhost role=offhost reason=' <<< "$out" || JOK=0
+sleep 4
 out=$(AFLDB_VERIFY_SSH="$KD/fakever" bash "$KD/call-r7.sh" --rehearsal "$CFG" --key "$KV" version 2>&1); J3=$?
 { echo "-- CONTRAST: r7 wrapper (r7 revision blob), same fake transport: exit $J3"; grep '^OWNER VERDICT' <<< "$out" | sed 's/^/   /'; } >> "$LJ"
 [ "$J3" = 0 ] && grep -q '^OWNER VERDICT VERSION STOP' <<< "$out" || JOK=0
-[ "$JOK" = 1 ] && res j "PASS version-exit: both PASS -> exit 0 ($J1P PASS lines); off-host STOP -> exit $J2; CONTRAST r7 wrapper exited $J3 with a STOP line" \
-  || res j "FAIL version-exit: control $J1 ($J1P PASS), off-host STOP $J2, r7 contrast $J3"
+sleep 4
+wcall "$LJ" version; J4=$WRC
+{ echo "-- r9: version without a qualification: exit $J4"; grep '^OWNER VERDICT' <<< "$WOUT" | sed 's/^/   /'; } >> "$LJ"
+[ "$J4" = 1 ] && grep -q '^OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod .*qualification=none qual-sha256=none$' <<< "$WOUT" \
+  && grep -q '^OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none$' <<< "$WOUT" || JOK=0
+[ "$JOK" = 1 ] && res j "PASS version-exit: both PASS (FIXTURE) -> exit 0 ($J1P PASS lines); off-host STOP -> exit $J2; CONTRAST r7 wrapper exited $J3 with a STOP line; unqualified: production PASS line + off-host 'no qualified off-host endpoint' STOP -> exit $J4" \
+  || res j "FAIL version-exit: control $J1 ($J1P PASS), off-host STOP $J2, r7 contrast $J3, unqualified $J4"
+
+# ---- k (r9): off-host qualification is fail-closed
+LK=$LOGS/$RID-k-offhost-qualification.log; hdr k "$LK"
+KOK=1; KL=
+sleep 4; wcall "$LK" g0 "$DAY"; K1=$WRC; K1V=$(vline "$WOUT")
+if [ "$K1" = 1 ] && [[ $K1V == "OWNER VERDICT G0 STOP transport=rehearsal"*"step=G0b"*"offhost-info=PASS"*"no qualified off-host endpoint"*" qualification=none qual-sha256=none" ]] \
+   && grep -q '^\[unqualified endpoint, information only\] AFLDB-VERIFY RESULT G0B PASS ' <<< "$WOUT" && ! grep -q '^AFLDB-VERIFY RESULT G0B' <<< "$WOUT" \
+   && [ "$(grep -c '^OWNER VERDICT' <<< "$WOUT")" = 1 ]; then KL+="unqualified:STOP(info=PASS) "; else KL+="unqualified:UNEXPECTED($K1) "; KOK=0; fi
+sleep 4; wcall "$LK" --qualification-fixture "$KDM/qual/Q-streamanator" g0 "$DAY"; K2=$WRC; K2V=$(vline "$WOUT")
+if [ "$K2" = 1 ] && [[ $K2V == *"step=qualification"*"root-equivalent"*"qualification=refused qual-sha256="* ]] && ! grep -q '^-- G0a' <<< "$WOUT"; then KL+="fixture-naming-streamanator:refused "
+else KL+="fixture-naming-streamanator:UNEXPECTED($K2) "; KOK=0; fi
+out=$(bash "$CALL" --qualification-fixture "$KDM/qual/Q-ok" g0 "$DAY" 2>&1); K3=$?
+{ echo "\$ bash afldb-verify-call.sh --qualification-fixture <Q-ok> g0 $DAY   (production transport)"; printf '%s\n' "$out"; echo "[HARNESS] wrapper exit $K3"; } >> "$LK"
+if [ "$K3" = 2 ] && grep -q '^STOP --qualification-fixture is accepted with --rehearsal only' <<< "$out" && ! grep -q '^OWNER VERDICT' <<< "$out"; then KL+="production-transport-fixture-flag:refused "
+else KL+="production-transport-fixture-flag:UNEXPECTED($K3) "; KOK=0; fi
+sleep 4; wcall "$LK" --qualification-fixture "$KDM/qual/Q-wrongkey" g0 "$DAY"; K4=$WRC; K4V=$(vline "$WOUT")
+if [ "$K4" = 1 ] && [[ $K4V == *"step=G0b"*"is not among the owner's known_hosts keys for r7v-offhost"*"qualification=FIXTURE"* ]] && ! grep -q '^-- G0b: qualified' <<< "$WOUT"; then KL+="unknown-host-key:STOP "
+else KL+="unknown-host-key:UNEXPECTED($K4) "; KOK=0; fi
+[ "$KOK" = 1 ] && res k "PASS offhost-qualification: $KL" || res k "FAIL offhost-qualification: $KL"
+
+# ---- l1 (r9): the copy is present and qualified (FIXTURE), but the pull log's END is missing: possession only
+LL=$LOGS/$RID-l-possession-only.log; hdr l "$LL"
+sleep 4; "${DEVSSH[@]}" "$HOSTSH r9-drop-end" >> "$LL" 2>&1
+sleep 4; wcall "$LL" "${QF[@]}" g0 "$DAY"; L1=$WRC; L1V=$(vline "$WOUT"); L1O=$WOUT
+sleep 4; "${DEVSSH[@]}" "$HOSTSH r9-restore-end" >> "$LL" 2>&1
+L1OK=0
+[ "$L1" = 1 ] && [[ $L1V == *"step=G0b"*"reason=\"the off-host verifier answered STOP; possession only: "*"complete-at missing"*"qualification=FIXTURE"* ]] \
+  && grep -q '^AFLDB-VERIFY RESULT G0B STOP .* rehash-sha256=[0-9a-f]\{64\}$' <<< "$L1O" && grep -q '^FAIL scheduled pull: scheduled invocation .* has no unique completion record' <<< "$L1O" && L1OK=1
 
 # ---- b: refusal when a required check fails (root damages the published dump)
 LB=$LOGS/$RID-b-g0-refusal.log; hdr b "$LB"
-"${DEVSSH[@]}" "$HOSTSH tamper" >> "$LB" 2>&1
-wcall "$LB" g0 "$DAY"; B_V=$(vline "$WOUT")
-"${DEVSSH[@]}" "$HOSTSH untamper" >> "$LB" 2>&1
+sleep 4; "${DEVSSH[@]}" "$HOSTSH tamper" >> "$LB" 2>&1
+sleep 4; wcall "$LB" g0 "$DAY"; B_V=$(vline "$WOUT")
+sleep 4; "${DEVSSH[@]}" "$HOSTSH untamper" >> "$LB" 2>&1
 if [ "$WRC" = 1 ] && [[ $B_V == "OWNER VERDICT G0 STOP transport=rehearsal"*"step=G0a"* ]] && grep -q '^FAIL scheduled origin unproven' <<< "$WOUT" \
    && ! grep -q '^-- G0b' <<< "$WOUT" && ! grep -q '^OFFHOST-COMPARE' <<< "$WOUT"; then
   res b "PASS g0-refusal: exit 1, $(grep '^FAIL scheduled origin' <<< "$WOUT" | cut -c1-140); G0b not called, no OFFHOST-COMPARE"
 else res b "FAIL g0-refusal: exit $WRC; $(cut -c1-200 <<< "$B_V")"; fi
+
+# ---- l2 (r9, LAST: it cannot be undone): the journal holding the 03:10 dispatch is removed; copy and pull log intact: possession only
+sleep 4; "${DEVSSH[@]}" "$HOSTSH r9-drop-dispatch" >> "$LL" 2>&1
+sleep 4; wcall "$LL" "${QF[@]}" g0 "$DAY"; L2=$WRC; L2V=$(vline "$WOUT"); L2O=$WOUT
+L2OK=0
+[ "$L2" = 1 ] && [[ $L2V == *"step=G0b"*"reason=\"the off-host verifier answered STOP; possession only: "*"dispatch-at missing"*"qualification=FIXTURE"* ]] \
+  && grep -q '^UNPROVEN scheduled origin: no 03:10 cron dispatch' <<< "$L2O" && grep -q '^COPY VERIFIED ' <<< "$L2O" && L2OK=1
+{ echo "[HARNESS] l1 (END removed): exit $L1; $L1V"; echo "[HARNESS] l2 (dispatch journal removed): exit $L2; $L2V"; } >> "$LL"
+[ "$L1OK$L2OK" = 11 ] && res l "PASS possession-only: END removed -> G0 STOP exit $L1 '...possession only ... complete-at missing'; dispatch journal removed -> G0 STOP exit $L2 '...possession only ... dispatch-at missing'; both qualification=FIXTURE" \
+  || res l "FAIL possession-only: l1 ok=$L1OK exit $L1; l2 ok=$L2OK exit $L2 ($(cut -c1-200 <<< "$L2V"))"
 
 say "logs: $(cd "$LOGS" && ls "$RID"-*.log | tr '\n' ' ')"
 [ "$BAD" = 0 ] && say "R7 VERIFY HARNESS RESULT PASS" || say "R7 VERIFY HARNESS RESULT FAIL ($BAD scenario(s))"

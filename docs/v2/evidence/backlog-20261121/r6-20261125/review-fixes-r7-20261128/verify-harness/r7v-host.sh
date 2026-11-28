@@ -4,13 +4,16 @@
 # sha256:d71c0b28..., Ubuntu 24.04, plus apt packages installed in the image build only, the one step that uses the network):
 #   r7v-<RID>-prod     --hostname afldb-prod     FIXED-OFFSET Melbourne zone   (r7v-container.sh setup-prod), so the REAL
 #                      afldb-backup.timer (OnCalendar 02:20) fires about 2 minutes after the container starts, on today's date
-#   r7v-<RID>-offhost  --hostname streamanator   FIXED-OFFSET Melbourne zone   (r7v-container.sh setup-offhost), so arm's real
+#   r7v-<RID>-offhost  --hostname r7v-offhost    FIXED-OFFSET Melbourne zone   (r7v-container.sh setup-offhost), so arm's real
 #                      `10 3 * * *` cron job fires about 2 minutes after the container starts, on today's Melbourne date
+#                      (r9: was --hostname streamanator. The wrapper refuses to qualify any endpoint named streamanator, so the
+#                      container the harness qualifies by FIXTURE carries a neutral name; `up` prints its fixed UTC offset as
+#                      "R7V OFFHOST-UTC-OFFSET <s>" for the fixture's rehearsal-utc-offset)
 # Container flags (never --privileged): --network none --cgroupns=private --tmpfs /run --tmpfs /run/lock --cap-add SYS_ADMIN (systemd
 # as PID 1) --cap-add DAC_READ_SEARCH --cap-add SYS_PTRACE (the two capabilities the root facts reader's unit keeps; Docker's default
 # set lacks them; production root has them) --security-opt apparmor=unconfined. Labels r7v.run=<RID> on the image and containers.
 # r8: the image adds sudo, used only by r8-sudo-on (arm gets sudo INSIDE the prod container for scenario h; r8-sudo-off removes it).
-# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh|pull-log|down [--keep-image]
+# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh|pull-log|r9-drop-end|r9-restore-end|r9-drop-dispatch|down [--keep-image]
 set -uo pipefail; export LC_ALL=C
 [ "$(hostname)" != afldb-prod ] || { echo "REFUSED: rehearsal never runs on production"; exit 2; }
 WS=${1:?workspace}; RID=${2:?rid}; CMD=${3:?command}; KEEP=${4:-}
@@ -56,19 +59,20 @@ EOF
   rm -rf "$WS/incoming"; mkdir -p "$WS/incoming"; docker cp "$A:/var/lib/afldb-backup/published/." "$WS/incoming/" > /dev/null || { echo "STOP docker cp"; exit 1; }
   echo "[HARNESS] carried to the off-host container (instead of rsync from production): $(cd "$WS/incoming" && ls | tr '\n' ' ')"
   TD=$(( $(date +%s) + 120 )); off=$(( $(date -u -d "$DAY 03:10:00" +%s) - TD ))
-  run_ctr "$B" streamanator -e "FAKE_STDOFF=$(hms "$off")" -e "R7V_DISPATCH=$TD" || { echo "STOP container $B did not start"; exit 1; }
+  run_ctr "$B" r7v-offhost -e "FAKE_STDOFF=$(hms "$off")" -e "R7V_DISPATCH=$TD" || { echo "STOP container $B did not start"; exit 1; }
   docker cp "$WS/incoming/." "$B:/opt/r7v-incoming" > /dev/null || { echo "STOP docker cp into $B"; exit 1; }
   echo "== $B setup-offhost (fake Melbourne offset $(hms "$off"): 03:10:00 local = real $(date -u -d "@$TD" +%FT%TZ))"
   docker exec "$B" bash "$CT" setup-offhost; rc=$?; [ "$rc" = 0 ] || { echo "STOP setup-offhost exit $rc"; exit 1; }
   echo "[HARNESS] waiting for arm's real 03:10 cron job in $B to finish"
   for i in $(seq 1 80); do docker exec "$B" bash "$CT" pull-log 2>/dev/null | grep -q ' END run=' && break; sleep 5; done
   docker exec "$B" bash "$CT" pull-log | sed 's/^/   pull-log | /'
-  echo "R7V CTR prod $A"; echo "R7V CTR offhost $B"; echo "R7V DAY $DAY"
+  echo "R7V CTR prod $A"; echo "R7V CTR offhost $B"; echo "R7V DAY $DAY"; echo "R7V OFFHOST-UTC-OFFSET $off"
   echo "R7V HOSTKEY prod $(docker exec "$A" bash "$CT" hostkey)"; echo "R7V HOSTKEY offhost $(docker exec "$B" bash "$CT" hostkey)"
   echo "R7V READY";;
 hostile) for c in "$A" "$B"; do echo "== $c hostile"; docker exec "$c" bash "$CT" hostile; done;;
 tamper|untamper|forge|unforge|r8-sudo-on|r8-sudo-off|r8-libsh) docker exec "$A" bash "$CT" "$CMD";;
 pull-log) docker exec "$B" bash "$CT" pull-log;;
+r9-drop-end|r9-restore-end|r9-drop-dispatch) docker exec "$B" bash "$CT" "$CMD";;
 down)
   n=$(docker ps -aq --filter "label=$LBL" | wc -l); [ "$n" = 0 ] || docker ps -aq --filter "label=$LBL" | xargs -r docker rm -f > /dev/null
   [ "$KEEP" = --keep-image ] || docker rmi "$IMG" > /dev/null 2>&1

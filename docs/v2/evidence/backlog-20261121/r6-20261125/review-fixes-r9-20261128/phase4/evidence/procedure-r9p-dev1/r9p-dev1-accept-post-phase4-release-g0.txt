@@ -1,0 +1,13 @@
+== r9p-dev1 2026-11-28T07:36:14Z workstation: afldb-gate-accept.sh --gate release-g0 --rehearsal (post-phase4): inputs r9p-dev1-in-4.4-owner-checks.log r9p-dev1-in-4.5-reverify.log r9p-dev1-in-4.6-version.log r9p-dev1-in-4.6a-a2.log exit 1
+== afldb-gate-accept 2026-11-28T07:36:12Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   93a519cc854a0e2fb88e6a5ef5cd299a5265795083704f69623f1f585921ceb6  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-4.4-owner-checks.log
+   fc804ac447bb7f4fdc5171bbf3b02fb5a873dc6447681af0d3a47a9d638511b6  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-4.5-reverify.log
+   a2bd82c6831c706855a210e0056dbdea081b58ab899df0224bf9ae422187dfba  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-4.6-version.log
+   3066bd2bd569a3a5bde48325723ee53ab380083eb6888594c0ca9192fe70295d  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-4.6a-a2.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T07:34:56Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T07:35:17Z, --as-arm 2026-11-28T07:35:19Z (arm has no admin group), verify-install 2026-11-28T07:35:22Z, bundle 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95
+ACCEPT version FAIL release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP transport=rehearsal host=none role=o
+ACCEPT verdict FAIL need exactly one wrapper header '== afldb-verify-call <ts> mode=g0', found 0
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=version,verdict reason="version: release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP transport=rehearsal host=none role=o"
+exit 1

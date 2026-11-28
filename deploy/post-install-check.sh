@@ -73,7 +73,7 @@ done
 state=$(systemctl show "$UNIT" -p ActiveState --value); result=$(systemctl show "$UNIT" -p Result --value)
 if [ "$state" != active ]; then
   echo "  FAIL  $UNIT is $state (Result=$result)"
-  [ "$result" = start-limit-hit ] && echo "        start limit hit (5 starts in 120 s): sudo systemctl reset-failed $UNIT && sudo systemctl start $UNIT, then re-run this check"
+  [ "$result" = start-limit-hit ] && echo "        start limit hit (5 starts in 120 s): owner, as root in the admin root session [ADM-ROOT] (never sudo in this arm session): systemctl reset-failed $UNIT && systemctl start $UNIT, then re-run this check"
   echo "POST-INSTALL CHECK FAIL"; exit 1
 fi
 echo "release route status"
@@ -131,11 +131,11 @@ since=$(systemctl show "$UNIT" -p ActiveEnterTimestamp --value)
 j=$(journalctl -u "$UNIT" --since "$since" -o cat --no-pager 2>/dev/null)
 journal_unverified=0
 if ! grep -q '\[afldb\] primary' <<< "$j"; then
-  # Not an application failure: arm may lack journal access. The owner counts the lines with sudo instead.
+  # Not an application failure: arm may lack journal access. The owner counts the lines as root in [ADM-ROOT] instead.
   journal_unverified=1
-  echo "  UNVERIFIED  journal unreadable for $(id -un), or no primary start line since $since. Owner, run:"
-  echo "        sudo journalctl -u $UNIT --since \"$since\" -o cat | grep -E '\\[afldb\\] (primary|serving build)'"
-  echo "        sudo journalctl -u $UNIT --since \"$since\" -o cat | grep -ciE 'error|fatal|unhandled'   # must print 0"
+  echo "  UNVERIFIED  journal unreadable for $(id -un), or no primary start line since $since. Owner, as root in the admin root session [ADM-ROOT] (the afldb-admin SSH session, then sudo -k; sudo /usr/bin/bash --noprofile --norc; never sudo in this arm session), run:"
+  echo "        journalctl -u $UNIT --since \"$since\" -o cat | grep -E '\\[afldb\\] (primary|serving build)'"
+  echo "        journalctl -u $UNIT --since \"$since\" -o cat | grep -ciE 'error|fatal|unhandled'   # must print 0"
 else
   ok "primary start line present since $since"
   line=$(grep '\[afldb\] serving build' <<< "$j" | tail -1)
@@ -148,6 +148,6 @@ mem=$(systemctl show "$UNIT" -p MemoryCurrent --value); [[ $mem =~ ^[0-9]+$ ]] &
 echo "  info  NRestarts $(systemctl show "$UNIT" -p NRestarts --value), MemoryCurrent $mem"
 notes=""
 [ $cache_hits -gt 0 ] && notes="$notes; $cache_hits old Cloudflare cache HIT(s) reported above, origin 404"
-[ $journal_unverified = 1 ] && notes="$notes; journal unverified: run the two sudo commands above"
+[ $journal_unverified = 1 ] && notes="$notes; journal unverified: run the two journalctl commands above as root in [ADM-ROOT]"
 [ $fails -eq 0 ] && { echo "POST-INSTALL CHECK PASS $ID${notes:+ (${notes#; })}"; exit 0; }
 echo "POST-INSTALL CHECK FAIL ($fails)"; exit 1

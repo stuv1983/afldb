@@ -21,6 +21,10 @@
 #   r8-sudo-on|r8-sudo-off  r8 scenario h (FIXTURE): grant arm sudo inside this container only, recording the verifier's state digest;
 #                  remove it and compare the digest (the workstation logs in as arm by ssh and runs sudo install-verify.sh between)
 #   r8-libsh       r8 scenario i (FIXTURE-ATTACK): hostile bundle/lib.sh in untrusted or tampered staging copies (see r8_libsh)
+#   r9-drop-end|r9-restore-end  r9 scenario l1 (FIXTURE-ATTACK, off-host container): root removes every END line from arm's pull log
+#                  (the copy, sidecar, marker and VERIFIED lines stay), keeping the original; restore writes it back (same inode)
+#   r9-drop-dispatch  r9 scenario l2 (FIXTURE-ATTACK, off-host container, LAST scenario): `journalctl --rotate --vacuum-time=1s`
+#                  removes the journal holding the 03:10 root cron dispatch (the copy and the whole pull log stay); not restorable
 #   status         prints facts for the host driver (labelled HARNESS)
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -313,6 +317,18 @@ SQL
     [ "$s" = "$(cat /root/r8-snap0)" ] && echo "R8 STATE UNCHANGED $s" || echo "R8 STATE CHANGED $(cat /root/r8-snap0) -> $s"; rm -f /root/r8-snap0;;
   r8-libsh) r8_libsh;;
   pull-log) cat /home/arm/afldb-ops/state/offhost-pull.log 2>/dev/null;;
+  r9-drop-end)
+    PL=/home/arm/afldb-ops/state/offhost-pull.log; cp -p "$PL" /root/r9-pull.log.orig
+    grep -v ' END run=' /root/r9-pull.log.orig > /root/r9-pull.log.new; cat /root/r9-pull.log.new > "$PL"; rm -f /root/r9-pull.log.new
+    L FIXTURE-ATTACK "root removed the END line(s) from arm's pull log: $(grep -c ' END run=' /root/r9-pull.log.orig) -> $(grep -c ' END run=' "$PL"); VERIFIED lines kept: $(grep -c ' VERIFIED run=' "$PL"); copy kept: $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
+  r9-restore-end)
+    PL=/home/arm/afldb-ops/state/offhost-pull.log; cat /root/r9-pull.log.orig > "$PL"; rm -f /root/r9-pull.log.orig
+    L FIXTURE "restored arm's pull log: END lines $(grep -c ' END run=' "$PL"), owner $(stat -c '%U:%G %a' "$PL")";;
+  r9-drop-dispatch)
+    n0=$(journalctl -t CRON -q --no-pager 2>/dev/null | grep -c '(arm) CMD (')
+    journalctl --rotate --vacuum-time=1s > /root/r9-vacuum.log 2>&1; rc=$?
+    n1=$(journalctl -t CRON -q --no-pager 2>/dev/null | grep -c '(arm) CMD (')
+    L FIXTURE-ATTACK "journalctl --rotate --vacuum-time=1s exit $rc ($(tail -1 /root/r9-vacuum.log)); arm's cron dispatch lines in the journal: $n0 -> $n1; pull log and copy kept: $(grep -c ' END run=' /home/arm/afldb-ops/state/offhost-pull.log) END, $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
   hostkey) cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub;;
   *) echo "STOP unknown command $CMD"; exit 2;;
 esac

@@ -1194,7 +1194,7 @@ function serviceRelease(opts) {
 }
 
 function afterSwitch(id, root, attendedWindow) {
-  log('next, NOW and attended: sudo systemctl restart afldb');
+  log('next, NOW and attended, as root in the owner\'s admin root session [ADM-ROOT] (the afldb-admin SSH session, then sudo -k; sudo /usr/bin/bash --noprofile --norc), never sudo in this arm session: systemctl restart afldb');
   log(`then: node deploy/release.mjs status --expect ${id}${rootArg(root)}`);
   if (attendedWindow) {
     log('the activation window is OPEN: `current` names the new release but the service still runs the old one; any '

@@ -1,0 +1,22 @@
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] no --verify-rev: the worktree as it stands (uncommitted files included)
+PASS bundle digest 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+workspace /home/arm/r7v-ws.TktjAc
+== r7v r9oq day 2026-11-28 containers r7v-r9oq-prod r7v-r9oq-offhost; transport ProxyCommand docker exec; client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+SCENARIO a PASS g0-success (FIXTURE qualification): exit 0, G0 SCOPE line (FIXTURE), five evidence fields, 3 ARM-PRODUCED label(s); dispatch-at=2026-11-28T07:03:03Z received-at=2026-11-28T07:03:03Z complete-at=2026-11-28T07:03:03Z qualification=FIXTURE
+SCENARIO c PASS a2-whole: the verifier's own STOP (exit 1, 13 FAIL / 25 PASS lines), backup-origin=attributed reported separately; A2 SCOPE line; 9 ARM-PRODUCED PASS lines; FAILs: today is not the scheduled Wednesday (2026-11-25); re-p|running 6.8.0-151-generic (expected 6.8.0-137-generic)|installed kernel images are '' (expected exactly 137 an|missing /boot/vmlinuz-6.8.0-149-generic|missing /boot/initrd.img-6.8.0-149-generic|missing /boot/vmlinuz-6.8.0-137-generic|missing /boot/initrd.img-6.8.0-137-generic|a modules directory is missing|caddy inactive|Caddyfile  (r4:no expects 4f6972ec)|restore service lacks a matching timer dispatch, start |last-verify.json and restored dump do not match the sch|afldb_restore_test lacks the scheduled restore digest o|
+SCENARIO g PASS forged-comment: the forged text reached the wrapper only as data (1 line(s) '[relayed, neutralised] ...', 0 ESC, 0 control bytes); genuine verdict and exit unchanged (OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe curren... exit 1)
+SCENARIO h PASS installer-guard: install-verify.sh through arm's sudo over a real arm ssh login REFUSED (plain:refused stripped:refused ), verifier state digest unchanged
+SCENARIO i PASS staging-libsh: refused before sourcing (home-arm, group-writable, tampered: marker absent); CONTRAST r7 ran the hostile lib.sh as root (marker present); state unchanged
+SCENARIO d PASS hostile-arm: owner-path verdicts and exits unchanged (g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2... exit 0; a2 STOP exit 1); CONTRAST old path forged 'G0 PROD RESULT PASS' + OFFHOST-COMPARE (exit 0) and 'R6 PRE RESULT PASS' (exit 0)
+SCENARIO e PASS stale-replay: fresh control accepted, replay/stale/wrong-bundle/exit-lie/two-RESULT refused (fresh:0 replay:1 stale:1 bundle:1 exitlie:1 tworesults:1 )
+SCENARIO f PASS keys: other-key-as-verify:ok arm-key-as-verify:ok verify-key-as-arm:ok verify-key-forced-tty:ok verify-key-no-command:ok verify-key-shell-command:ok verify-key-extra-words:ok verify-key-stdio-forward:ok arm-key-as-arm-control:ok 
+SCENARIO j FAIL version-exit: control 0 (2 PASS), off-host STOP 1, r7 contrast 0, unqualified 1
+SCENARIO k PASS offhost-qualification: unqualified:STOP(info=PASS) fixture-naming-streamanator:refused production-transport-fixture-flag:refused unknown-host-key:STOP 
+SCENARIO b PASS g0-refusal: exit 1, FAIL scheduled origin unproven: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump has 3995 bytes, the seal says 3994; G0b not called, no OFFHOST-COMPARE
+SCENARIO l PASS possession-only: END removed -> G0 STOP exit 1 '...possession only ... complete-at missing'; dispatch journal removed -> G0 STOP exit 1 '...possession only ... dispatch-at missing'; both qualification=FIXTURE
+logs: r9oq-a-g0-success.log r9oq-b-g0-refusal.log r9oq-c-a2-whole.log r9oq-d-hostile-arm.log r9oq-e-stale-replay.log r9oq-f-keys.log r9oq-g-forged-comment.log r9oq-h-installer-guard.log r9oq-i-staging-libsh.log r9oq-inputs.log r9oq-j-version-exit.log r9oq-k-offhost-qualification.log r9oq-l-possession-only.log r9oq-setup.log r9oq-summary.log 
+R7 VERIFY HARNESS RESULT FAIL (1 scenario(s))
+removed 2 container(s); left: containers 0, images 0, workspace removed

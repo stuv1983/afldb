@@ -1,0 +1,13 @@
+== case n11-relayed-version: bash afldb-gate-accept.sh --rehearsal --gate ng-pre --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/real-reverify-4.5-post-phase4.txt --version inputs/fx-version-relayed-prod.txt --verdict inputs/fx-a2-pass-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:41:51Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   1f866b1f6479e6df3aae0666e2584e4e6876a177a7e77f53727313aa0b1139ce  inputs/real-reverify-4.5-post-phase4.txt
+   7220d9e3204d2a2d40c8cedb91edc06aa2b7e813e81cb9407281ccbfddce6449  inputs/fx-version-relayed-prod.txt
+   0c4c25e847d8116a36d51c5ff4d3d067772b6c75e515d7445dee6facae1d7f30  inputs/fx-a2-pass-post.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+ACCEPT version FAIL need exactly one production line 'OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=...'; production lines: 
+ACCEPT verdict FAIL cannot be ordered after (c), which did not pass
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=version,verdict reason="version: need exactly one production line 'OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=...'; production lines: "
+== exit 1

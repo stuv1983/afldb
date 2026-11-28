@@ -1,0 +1,20 @@
+[FIXTURE r9] real-version-both-pass.txt with T05:00: moved to T05:23:, cut after the production verdict, which gets 'qualification=none qual-sha256=none', then the r9 off-host STOP line for no qualified endpoint
+== afldb-verify-call 2026-11-28T05:23:48Z mode=version transport=rehearsal pinned-bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 key=C:/Users/stuar/AppData/Local/Temp/tmp.Mg7FVpmiUB/verify
+== afldb-verify VERSION host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T05:23:54Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  60-afldb-verify.conf
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  afldb-settle-failure-status.sh
+   cb2b936d12d43db0cc041fb0da56ee9412cf76aadc2895dad769400bc1c3c082  afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  afldb-verify-rootfacts@.service
+   d26c74b5334eae450fe8be6129ed2159a4ac658d3c92bdd5240f4e711c55344f  g0-core.sh
+   dc4ae9f5bb8027e98ef6ea4fb7d30f1ba041dbd5c7044dfbf3042ea819e24de0  g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  lib.sh
+   a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e  sealed-origin.sh
+AFLDB-VERIFY RESULT VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 at=2026-11-28T05:23:54Z exit=0 role=prod
+OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=23a740e15b1b7ed52e712d32d1f162c5 qualification=none qual-sha256=none
+OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none

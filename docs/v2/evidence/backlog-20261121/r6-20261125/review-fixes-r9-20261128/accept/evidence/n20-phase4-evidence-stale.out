@@ -1,0 +1,13 @@
+== case n20-phase4-evidence-stale: bash afldb-gate-accept.sh --rehearsal --gate release-g0 --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/real-reverify-4.5-post-phase4.txt --version inputs/fx-version-post-2days.txt --verdict inputs/fx-g0-pass-post-2days.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:42:12Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   1f866b1f6479e6df3aae0666e2584e4e6876a177a7e77f53727313aa0b1139ce  inputs/real-reverify-4.5-post-phase4.txt
+   38abc46a50f05afc95377041054b87f2098b4ed6a13b723bcbbbf35274c7acfb  inputs/fx-version-post-2days.txt
+   6a85dbc750e842e8c71204e2623542086da30f8cddf70853145a3a9b9500d937  inputs/fx-g0-pass-post-2days.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-30T05:23:54Z, after (a) and (b); off-host VERSION PASS from r9-fixture-offhost, qual-sha256 b17d8c78273a34ad1a2a41a3845404b4f4
+ACCEPT verdict FAIL made at 2026-11-30T05:25:16Z, more than 24 h after the owner evidence of 2026-11-28T05:21:45Z: repeat 4.4-4.6 on the gate day
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=verdict reason="verdict: made at 2026-11-30T05:25:16Z, more than 24 h after the owner evidence of 2026-11-28T05:21:45Z: repeat 4.4-4.6 on the gate day"
+== exit 1

@@ -1,0 +1,13 @@
+== case n13-production-with-rehearsal-flag: bash afldb-gate-accept.sh --rehearsal --gate release-g0 --owner-checks inputs/real-oc-4.4-pass.txt --reverify inputs/real-reverify-4.5-post-phase4.txt --version inputs/fx-version-post-prod.txt --verdict inputs/fx-g0-pass-post-prod.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T07:41:56Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   23f5de43176372fc6e92929da7b785fc5c5cabd98bed0cd1c19eab6b02601af9  inputs/real-oc-4.4-pass.txt
+   1f866b1f6479e6df3aae0666e2584e4e6876a177a7e77f53727313aa0b1139ce  inputs/real-reverify-4.5-post-phase4.txt
+   ec9cf02f824eac092071f5515f2600a93366e9cadcc03bf5f5cab136c95cb6a5  inputs/fx-version-post-prod.txt
+   435a1a4e4c7c4ec720fa0c8e4e22b785e615dd1d4a62a3717a43eb0bc482fa27  inputs/fx-g0-pass-post-prod.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+ACCEPT version FAIL transport=production, but this evaluation is rehearsal (a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)
+ACCEPT verdict FAIL transport=production, but this evaluation is rehearsal (a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=version,verdict reason="version: transport=production, but this evaluation is rehearsal (a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)"
+== exit 1

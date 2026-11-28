@@ -1,0 +1,4 @@
+R9P4 RESIDUE containers=0 images=0 workspace=removed r9p4-workspaces=0 base-image=sha256:d71c0b286c54 build-cache=[Cache entries, 0]
+R9P4 RESIDUE-CHECK 2026-11-28T06:46:50Z containers-this-run=0 containers-any-r9p4=0 images-any-r9p4=0 workspaces=0
+secret scan of dev-p4a-run.txt: 0 match(es) for private key blocks, DSNs, password= assignments or crypt hashes
+R9 PHASE4 HARNESS RESULT FAIL (pass=0 fail=0 of 14; residue lines 1/1; secret matches 0)
