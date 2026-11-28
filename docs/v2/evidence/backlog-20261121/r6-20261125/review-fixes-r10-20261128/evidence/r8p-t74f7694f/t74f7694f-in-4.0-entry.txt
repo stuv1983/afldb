@@ -1,0 +1,21 @@
+PHASE4 STATE /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9
+PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+PHASE4 ENTRY pre-change: arm's groups: afldb-backup-read arm sudo (primary gid 1000)
+PHASE4 ENTRY pre-change: group line: sudo:x:27:arm,afldb-admin
+PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: (ALL : ALL) ALL;
+PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+PHASE4 ENTRY change 1 (group-only, step 4.1 by apply): gpasswd -d arm sudo; back-out: gpasswd -a arm sudo, after which id -Gn arm lists exactly: afldb-backup-read arm sudo 
+PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of THIS state directory and seal, given after reading this output
+PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+PHASE4 ENTRY apply (4.1, [ADM-ROOT]): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh apply --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY verify (4.2, [ADM-ROOT]): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh verify --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY back-out ([CON], also from a fresh console session): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 STATE /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9
+PHASE4 SEAL 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY RESULT PASS change=group-only matches=1 grants-removed=0 state=/root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal=6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a

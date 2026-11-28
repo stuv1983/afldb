@@ -1,0 +1,20 @@
+== t74f7694f 2026-11-28T12:28:35Z console (fresh session): the back-out command 4.1 printed, as printed
+---- [CON] (console stand-in, a fresh session) the back-out command 4.1 printed, run as printed: (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+   access epoch before: 4613d777d9de850ec9dee95a7f5079e0
+afldb-phase4.sh: OK
+PHASE4 BACKOUT state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a verified; plan: change=group-only remove=
+PHASE4 BACKOUT access epoch 4613d777d9de850ec9dee95a7f5079e0 -> 3936f9bec3935a1bc49f40c34394a4c0 written to /var/lib/afldb-access/epoch (backout of /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9)
+PHASE4 BACKOUT VOID: STOP: every saved 4.4, 4.5 and 4.6 output and every gate verdict made before this moment is VOID, even on this boot and inside the freshness window. Before any gate: repeat 4.4, 4.5 and 4.6, then make a NEW gate call
+PHASE4 BACKOUT ran: gpasswd -a arm sudo
+PHASE4 BACKOUT check visudo-c PASS
+PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: afldb-backup-read arm sudo 
+PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;
+PHASE4 BACKOUT check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record
+PHASE4 BACKOUT pre-change group line: sudo:x:27:arm,afldb-admin; now: sudo:x:27:afldb-admin,arm (member order may differ; membership is compared)
+PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 (seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a); the host records no applied attempt
+R8P P4-BACKOUT exit 0
+   access epoch after: 3936f9bec3935a1bc49f40c34394a4c0
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read)
+   sudo -l -U arm:     (ALL : ALL) ALL

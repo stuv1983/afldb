@@ -1,0 +1,8 @@
+workspace /home/arm/r10vt-6d0e75ad at 6d0e75ad86bf4b9e2c49b85f453b5fff201c558d; node v22.23.2; host streamanator
+
+ Test Files  1 passed (1)
+      Tests  46 passed (46)
+   Start at  23:36:55
+   Duration  6.27s (transform 548ms, setup 246ms, import 513ms, tests 5.14s, environment 0ms)
+
+vitest exit 0; workspace removed: yes

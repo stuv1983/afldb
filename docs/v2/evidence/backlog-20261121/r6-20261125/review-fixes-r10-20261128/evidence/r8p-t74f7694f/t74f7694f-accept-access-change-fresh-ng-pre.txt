@@ -1,0 +1,16 @@
+== t74f7694f 2026-11-28T12:29:32Z workstation: afldb-gate-accept.sh --gate ng-pre --rehearsal (access-change-fresh): inputs t74f7694f-in-4.4r-owner-checks.log t74f7694f-in-4.5-reverify.log t74f7694f-in-4.6c-version.log t74f7694f-in-4.6d-a2.log exit 1 confirm t74f7694f-in-4.6c-version.log
+== afldb-gate-accept 2026-11-28T12:29:29Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   dc6a0d63c861a1b0f9f9d0ff0fa77f0bd2e5ef322cb2f0fc22603f5d4fa22ce1  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/t74f7694f-in-4.4r-owner-checks.log
+   476221dd7dd3949b9870345e336b5f6e30076dc23fbe10fb11c365dcb6a371b3  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/t74f7694f-in-4.5-reverify.log
+   c93b4a503bc5468cd5b8de6532de575d6867b18f492db671f0545bf864b4f8af  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/t74f7694f-in-4.6c-version.log
+   0b7bbd8c456d3a10e496519461b1aec496c8302606e599a0076df17de8ae5597  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/t74f7694f-in-4.6d-a2.log
+   c93b4a503bc5468cd5b8de6532de575d6867b18f492db671f0545bf864b4f8af  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/t74f7694f-in-4.6c-version.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+ACCEPT reverify PASS root 2026-11-28T12:24:28Z, --as-arm 2026-11-28T12:24:31Z (arm has no admin group), verify-install 2026-11-28T12:24:33Z, bundle 059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba, boot c3
+ACCEPT version FAIL [after FAILED owner-checks] made at 2026-11-28T12:28:44Z, not after the owner checks (2026-11-28T12:29:07Z) and the re-verification (2026-11-28T12:24:33Z): a Phase 3 version check is an installation d
+ACCEPT verdict FAIL the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=bb16a83d3ac26fa5fbbd61
+INFO confirm: not judged (the gate verdict did not pass); its access epoch 3936f9bec3935a1bc49f40c34394a4c0 is compared in (f)
+ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm (access epochs
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=owner-checks,version,verdict,access reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
+exit 1

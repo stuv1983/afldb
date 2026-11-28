@@ -1,0 +1,10 @@
+== t74f7694f 2026-11-28T12:29:29Z workstation: saved outputs copied back over the admin path (access-change)
+=== R8P FILE 3.11-verify-verify-install.txt
+=== R8P FILE 3.12-owner-checks.txt
+=== R8P FILE 3.5-verify-backup-install.txt
+=== R8P FILE 3.6-verify-backup-install-as-arm.txt
+=== R8P FILE 4.0-entry.txt
+=== R8P FILE 4.1-apply.txt
+=== R8P FILE 4.4-owner-checks.txt
+=== R8P FILE 4.4r-owner-checks.txt
+=== R8P FILE 4.5-reverify.txt

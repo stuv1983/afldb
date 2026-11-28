@@ -1,0 +1,50 @@
+== t74f7694f 2026-11-28T12:24:23Z admin login 2 (new connection) after Phase 4: 4.4 owner checks, tee'd and handed over
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step checks44 2026-11-28T12:24:06Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+---- 4.4 owner checks after the access change (tee /root/afldb-r9-evidence/4.4-owner-checks.txt)
+BOOT-ID c3524e4759ab4e0f8050875471b56b12
+ACCESS-EPOCH 4613d777d9de850ec9dee95a7f5079e0
+== afldb-owner-checks (R6 r8) 2026-11-28T12:24:06Z host=afldb-prod as uid=0
+   script sha256 5f2f9d8bc6572a8007517ac3beed62e63520469c04f5ddd60bfd0b69251c59aa
+CHECK A1 PASS running as root
+CHECK A0 PASS account arm exists (uid 1000)
+CHECK A2 PASS no ancestor of this session has arm's uid, loginuid or SUDO_USER (loginuid 1001; 4294967295 = unset); 30934:bash?:uid=0/0:loginuid=1001 30928:bash?:uid=0/0:loginuid=1001:sudo=afldb-admin,uid:1001 30908:bash?:uid=0/0:loginuid=1001:sudo=afldb-admin,uid:1001 30907:sudo?:uid=1001/0:loginuid=1001 30906:sshd?:uid=1001/1001:loginuid=1001 30895:sshd?:uid=0/0:loginuid=1001 279:sshd?:uid=0/0:loginuid=429496
+CHECK A3 PASS SUDO_USER in this environment: unset
+CHECK B1 PASS sudo -l -U arm: arm is not allowed to run sudo
+CHECK B4 PASS report: sudo authentication timestamp type: tty; timeout: 15.0 minutes
+CHECK B2 PASS arm's groups (arm afldb-backup-read) include none of sudo, admin, wheel
+CHECK B3 PASS no non-comment line of /etc/sudoers or /etc/sudoers.d/* names arm or a group of arm (%arm,afldb-backup-read); 2 file(s) read; include directives: /etc/sudoers.d 
+CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d 
+CHECK B6 PASS report: passwd -S root: L (L locked, P usable)
+CHECK B6 PASS report: passwd -S arm: P (L locked, P usable)
+CHECK B6 PASS report: passwd -S afldb-admin: P (L locked, P usable)
+CHECK C1 PASS arm is in none of docker, lxd, incus-admin, incus, libvirt, disk, shadow; read-only log groups: none
+CHECK C2 PASS no polkit .rules file mentions arm (1 file(s) read in /etc/polkit-1/rules.d and /usr/share/polkit-1/rules.d)
+CHECK C2b PASS no polkit .pkla grants to arm; 1 .rules file(s) read
+CHECK C3 PASS 112 root-run service unit(s), 186 executed/argument/EnvironmentFile path(s): no component arm can modify (ACLs read with getfacl); reported, not arm-writable:udevadm(not-found-in-search-path); User=arm units (run as arm, reported): afldb-backup-failed.service
+CHECK C4 PASS no root cron entry runs a /home path
+CHECK C5 PASS root's home and startup files are root-owned, not group/other-writable, carry no ACL and do not mention /home/
+CHECK C6 PASS root's authorized keys (sshd AuthorizedKeysFile for root: /root/.ssh/authorized_keys /root/.ssh/authorized_keys2 ): 0 ( ); none is one of arm's 1 key fingerprint(s)
+CHECK C7 PASS report: kernel.yama.ptrace_scope=1 (0: arm may ptrace any of its own processes; never run an owner command in an arm session)
+CHECK C8 PASS report: sshd for root: permitrootlogin without-password;pubkeyauthentication yes;passwordauthentication yes;kbdinteractiveauthentication no;permituserrc yes;permituserenvironment no;; sshd_config first directive: line 12:Include /etc/ssh/sshd_config.d/*.conf
+CHECK C9 PASS /etc/ld.so.preload absent
+CHECK D0 PASS PostgreSQL reachable as postgres by peer: 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+CHECK D1 PASS no login role other than postgres is, or is a member (direct or inherited) of, a superuser role; superuser roles: postgres(login); login roles: afldb_app afldb_backup afldb_owner afldb_verify postgres ; with any of super/createrole/replication/bypassrls: postgres(super=t createrole=t replication=t bypassrls=t) 
+CHECK D2 PASS no login role other than postgres is a member (direct or inherited) of pg_execute_server_program, pg_write_server_files or pg_read_server_files
+CHECK D3 PASS report: owner of database afldb_prod: afldb_owner
+CHECK D4 PASS arm's DSN roles (names only): DATABASE_URL=>afldb_app AFLDB_OWNER_DATABASE_URL=>afldb_owner AFLDB_BACKUP_DATABASE_URL=>afldb_backup [afldb_app: not superuser or a member of one, no server program/file role, createrole=false] [afldb_backup: not superuser or a member of one, no server program/file role, createrole=false] [afldb_owner: not superuser or a member of one, no server program/file role, cr
+CHECK D5 PASS pg_hba has no trust line and pg_ident maps neither arm nor a regex to postgres, all, afldb_backup or afldb_verify
+CHECK E0 PASS arm cannot run 'sudo -n true' (no passwordless sudo, no cached ticket reachable from a fresh arm process)
+CHECK E1 PASS as arm (uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); no startup file, no PAM session) nothing in the protected set or its parents is writable (access(2), ACLs included; 65 paths; probe completed)
+CHECK E2 PASS every component of the 65 protected paths: not arm-owned, not group/other-writable, no ACL, no link (2 absent, e.g. not installed yet)
+CHECK E3 PASS outside /home,/tmp,/var/tmp,/proc,/sys,/dev,/run/user: no arm-owned, arm-group-writable or world-writable path except: none
+CHECK F1 PASS admin account: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); home /home/afldb-admin; shell /bin/bash
+CHECK F2 PASS arm is not in afldb-admin's primary group
+CHECK F3 PASS afldb-admin may run (ALL) ALL with its own password
+CHECK F4 PASS afldb-admin has a usable password (for sudo; it is typed only in the admin session)
+CHECK F5 PASS afldb-admin authorises exactly one bare key line (SHA256:WRhiQoP+XfPKYbTvMRo8BqN3lpoIc4wKsMkWPZ6Sq9U = the workstation fingerprint); not arm's; home and startup files trusted
+CHECK F6 PASS sshd for afldb-admin: pubkey authentication, no forced command, no AuthorizedKeysCommand; passwordauthentication yes;permituserrc yes;
+OWNER CHECKS RESULT PASS
+R8P CHECKS exit 0
+   handed over: c52258973a413bf6 3.11-verify-verify-install.txt; 5eff8ea66bcdcabf 3.12-owner-checks.txt; 38b915bdb28bee6b 3.5-verify-backup-install.txt; 4cdc6b3f22d0789a 3.6-verify-backup-install-as-arm.txt; 090afae98aa07c33 4.0-entry.txt; 4bde619772271e67 4.1-apply.txt; a6e28b8f18e8024c 4.4-owner-checks.txt; 

@@ -7,7 +7,16 @@ labelled r10.
 
 ## Pins
 
-@PINS@
+Delivered tested revision: `6d0e75ad86bf4b9e2c49b85f453b5fff201c558d` (the pin commit that follows it changes text and records only).
+
+| Pin | sha256 |
+|---|---|
+| `review-fixes-r7-20261128/verify/SHA256SUMS` (P_VERIFY) | `e253e97545545b7183cf474750cea2b54e36158e6f7b0d80552939bd42665324` |
+| wrapper `BUNDLE_SHA` = `verify/bundle/SHA256SUMS` (P_BUNDLE) | `059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba` |
+| `review-fixes-r10-20261128/phase4/SHA256SUMS` (P_PHASE4) | `8bed56298b8fd3aada979d4c10e9bc5e1734075676b064da3c1c9756d8ca985b` |
+| `review-fixes-r9-20261128/accept/SHA256SUMS` (P_ACCEPT) | `6d49ce2a52b71b38d65b9c41d358b94af24ef7a89162c4171f8662fd28e00539` |
+| `afldb-gate-accept.sh` | `1b3f7d6547c85a0a907d1ef8613e1f9bd058fb6bb40c4bed4099a514ed7a5525` |
+| `afldb-phase4.sh` | `5f77517a1c6d47568113678e3ca951c2d8038c4e59a8dd99e167c2ad475b2aed` |
 
 ## What r10 changed
 
@@ -85,4 +94,27 @@ labelled r10.
 * **F4, F8, F9.** Texts: the checker binds pin bytes, not wrapper bytes (procedure step); apply adds a final newline to a selected
   file that lacks one, while back-out restores the exact original bytes; VERIFIED wording replaced by RECEIVED/HELD/END/RECEIPT.
 
-@VERIFICATION@
+## Verification
+
+Tested revisions, in order: `07f05f3d` (round 1, judged by the independent review), `67c80882` (round 2 code), `74f7694f`
+(procedure-harness call order), `6d0e75ad` (receipt test fixture). Between `67c80882` and `6d0e75ad` the only non-text changes are
+`r8p-run.sh` (procedure harness, rerun at `74f7694f`) and `tests/deploy-web-unit.test.ts` (rerun at `6d0e75ad`); every executable the
+operator runs is byte-identical across the three, so each result below holds for the delivered head.
+
+| Run | Revision | Caller exit | Decisive output | Record |
+|---|---|---|---|---|
+| Verify harness `r7v-run.sh --verify-rev`, DEV containers, real `offhost-pull.sh` over rsync/ssh | `67c80882` | 0 | `R7 VERIFY HARNESS RESULT PASS` (14 scenarios); m: `m2-preplaced:END-rc0,HELD,no-RECEIVED->STOP m3-other-dump:RECEIPT-for-…022700.dump-only->STOP m4-partial:END-rc1,no-RECEIPT->STOP m4-retry:…G0-STOP(failed-0310-run) m1-genuine:RECEIVED+RECEIPT->PASS`; n: `candidate-g0:exit3,no-verdict candidate-version:exit3,no-verdict gate-on-candidate:NO-GO old-export:STOP(qualification=none) pinned-export:G0-PASS checker-pin-C1:PASS checker-pin-C0:FAIL checker-production-fixture-pin:FAIL production-on-fixture-pin:refused(no-ssh)`; residue 0 containers | `evidence/r7v-t67c80882/` |
+| Procedure harness `r8p-run.sh --verify-rev` (OWNER-PROCEDURE command blocks extracted from the revision) | `74f7694f` | 0 | `R8 PROCEDURE HARNESS RESULT PASS` (48 scenarios); `access-change-saved-void` and the reviewer's F1 sequence `access-change-all-saved-void`: `got=exit 1 failed=verdict,access` (4.4–4.6 and the gate verdict all one epoch, the confirm another); `access-change-fresh-blocked`: `OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 … failed=owner-checks,version,verdict,access` | `evidence/r8p-t74f7694f/` |
+| Phase 4 harness `p4-run.sh` (clean worktree at the revision; SHA256SUMS `afldb-phase4.sh: OK`) | `74f7694f` | 0 | `R10 PHASE4 HARNESS RESULT PASS (26 of 26 scenarios; residue 0 containers, 0 images, 0 workspaces)` | `phase4/evidence/t74f7694f-*` |
+| `vitest run tests/deploy-web-unit.test.ts`, streamanator, disposable `git archive` workspace, Node v22.23.2 | `6d0e75ad` | 0 | `Tests 46 passed (46)` (receipt cases: genuine, pre-placed, different dump, partial failure and retry, leftover partial, fd 3 only) | `evidence/vitest-6d0e75ad/` |
+| Gate checker suite `test-gate-accept-r10.sh` (local) | checker `1b3f7d65` | 0 | `GATE ACCEPT TESTS RESULT PASS cases=76 pass=76 fail=0` (h1 is the reviewer's sequence: `failed=access`) | `accept/evidence/`, `evidence/local-gate-accept-76.txt` |
+| Wrapper suite `r10q-wrapper-test.sh` (local) | `67c80882` bytes | 0 | `R10Q LOCAL RESULT PASS (45 tests)` | `evidence/local-r10q-wrapper-45.txt` |
+
+The first vitest attempt at `74f7694f` used DEV's default Node v18 and failed at startup (`node:util` has no `styleText`); with
+Node 22 one case failed because the fixture source kept a dump the destination had pruned, so the pre-placed run genuinely fetched
+it again (a correct receipt, a wrong fixture). `6d0e75ad` trims the fixture source as production's own retention does. The first
+procedure-harness run at `67c80882` failed `wrapper-g0-post` only: the new confirm call had been placed between the G0 call and its
+assertion; `74f7694f` moves it after. Neither involved a change to an executable the operator runs.
+
+**Not verified:** anything in production; a real off-host endpoint (none is qualified); the dated window after 2026-11-29 (F3);
+Astra's verdict on this head.

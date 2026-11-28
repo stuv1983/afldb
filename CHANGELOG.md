@@ -15,13 +15,13 @@ commit.
 
 ## [Unreleased]
 
-### R6 r10: Astra's four acceptance cases (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `@REV@`; nothing installed or deployed; R6 NO-GO)
+### R6 r10: Astra's four acceptance cases (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `6d0e75ad86bf4b9e2c49b85f453b5fff201c558d`; nothing installed or deployed; R6 NO-GO)
 
 - **Receipt, not possession.** `offhost-pull.sh` prints `RECEIVED` only for a dump the run itself transferred in full (rsync itemisation) and verified; the daily wrapper logs `RECEIVED`, `HELD` (possession only) and, after `END rc=0`, a per-dump `RECEIPT`; `g0b-core.sh` takes the G0b receipt only from the identified 03:10 invocation's own `RECEIVED` and `RECEIPT`. A pre-placed copy, a different dump moved by the same job, a failed run and a resumed partial are possession only; the receipt reaches the wrapper on fd 3 only, out of reach of source-side text (round 2).
 - **Off-host qualification without a bootstrap loop.** `afldb-verify-call.sh candidate-g0|candidate-version` collect evidence for an unpinned candidate and never print an owner verdict or exit 0; `afldb-gate-accept.sh --pin-rev <commit>` binds release G0 to the pin committed there (an export without it, a fixture pin, another pin, or a pin revoked or superseded at the checker clone's HEAD is `failed=pin`).
 - **Access changes void saved evidence.** `afldb-phase4.sh apply`, `backout` and `invalidate` write a new access epoch before any change; the verifier prints it on every RESULT line, OWNER-PROCEDURE 4.4/4.5 save it, and the gate checker requires one epoch from 4.4 to a required `--confirm` version call made after the gate verdict and at most 10 min before the check (`failed=access`; round 2, independent review F1: four saved files alone cannot show a change made after all of them).
 - **Phase 4 bound to the exact change.** `--dispose` is replaced by per-grant `--remove-grant` tokens bound to the captured bytes; entry creates its own attempt directory and prints its state, seal and the exact apply, verify and back-out commands; apply and back-out refuse another or an altered attempt before any change.
-- Validation: @VALIDATION@ ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r10-20261128/README.md)).
+- Validation: DEV at the tested revision `6d0e75ad` (executables byte-identical since `67c80882`): verify harness PASS 14/14 with the real `offhost-pull.sh` over rsync/ssh, procedure harness PASS 48 scenarios incl. the independent review's all-saved access-change sequence (`failed=access`), Phase 4 harness PASS 26/26 with zero residue, vitest `deploy-web-unit` 46/46 on streamanator; local gate checker 76/76 and wrapper suite 45/45. Independent review round 1 (F1 HIGH, F2/F3 MED) fixed or stated; round 2 NOT DEFEATED on all four questions ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r10-20261128/README.md)).
 
 ### R6 r9: Astra's three merge blockers (28 November 2026; on `claude/closeout-20261127`, draft PR 5; tested `0c8de418`; nothing installed or deployed; R6 NO-GO)
 
